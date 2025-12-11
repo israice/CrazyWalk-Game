@@ -7,6 +7,21 @@ services:
     networks:
       - pc2-net
 
+  autoupdate_webhook_from_github:
+    build:
+      context: ./CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app
+    environment:
+      - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
+    networks:
+      - pc2-net
+
 networks:
   pc2-net:
     external: true

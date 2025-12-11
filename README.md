@@ -263,6 +263,30 @@ https://crazywalk.weforks.org
 <!-- ---------------------- -->
 
 <details>
+  <summary>GitHub Webhook Setup</summary>
+
+## Configure Webhook in GitHub
+
+1. Go to your repository settings on GitHub.
+2. Click on **Webhooks** -> **Add webhook**.
+3. **Payload URL**: `https://crazywalk.weforks.org:9000/push_and_update_server` (Ensure port 9000 is exposed and routed correctly).
+4. **Content type**: `application/x-www-form-urlencoded`.
+5. **Secret**: Generate a strong secret and add it to your `.env` file or environment variables as `AUTOUPDATE_WEBHOOK_FROM_GITHUB`.
+6. **Which events would you like to trigger this webhook?**: Select "Just the push event".
+7. Click **Add webhook**.
+
+## Server Configuration
+
+Ensure your `docker-compose.prod.yml` has the `AUTOUPDATE_WEBHOOK_FROM_GITHUB` environment variable set. You can pass it when running docker compose:
+
+```Bash
+AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" docker compose -f docker-compose.prod.yml up -d --build
+```
+</details>
+
+<!-- ---------------------- -->
+
+<details>
   <summary>Github Cheetsheet</summary>
 
 ## dev icons
@@ -310,7 +334,7 @@ git log --oneline -n 10
 
 ```Bash
 git add .
-git commit -m "v0.0.3 - prod docker on linux server"
+git commit -m "v0.0.4 - create webhook from github to auto update server docker"
 git push
 ```
 
@@ -336,7 +360,11 @@ git push
 - added setup instructions to README.md
 - test the subdomain crazywalk.weforks.org
 
-[ ] v0.0.4 - create webhook from github to auto update server docker
-- make a test commit to make sure server updated
+[X] v0.0.4 - create webhook from github to auto update server docker
+- added webhook server and dockerfile
+- make pull on server to update
+
+[] v0.0.5 - make a test commit to make sure server updated
+
 
 </details>
