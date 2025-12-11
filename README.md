@@ -29,29 +29,6 @@
 
 <!-- ---------------------- -->
 
-### For Windows and Linux
-On Windows start the DOCKER SOFTWARE FIRST!
-```Bash
-git clone https://github.com/israice/CrazyWalk-Game.git
-cd CrazyWalk-Game
-docker-compose up --build -d
-```
-```Bash
-# Result
-http://localhost:8000
-```
-
-<!-- ---------------------- -->
-
-<details open>
-  <summary>CrazyWalk Roadmap</summary>
-
-- SOON
-
-</details>
-
-<!-- ---------------------- -->
-
 <details>
   <summary>CrazyWalk Dev Roadmap</summary>
 
@@ -211,24 +188,75 @@ http://localhost:8000
 
 <!-- ---------------------- -->
 
+<details open>
+
+  <summary>Dev</summary>
+
+
 <details>
-  <summary>Dev Logs</summary>
 
-[x] v0.0.1 - project folders and files structure created
-- dev since 2022, dev from strach started 12.11.2025 
-- full project step by step flow inside README.md
-- create .gitignore file
-- create github repository
-- project first folders and files structure created
+  <summary>Development Setup</summary>
 
-[X] v0.0.2 - test hello world docker on local
-- hello world html page created
-- docker compose file created
+### On Windows or Linux
+```Bash
+# On Windows start the DOCKER SOFTWARE FIRST!
+git clone https://github.com/israice/CrazyWalk-Game.git
+cd CrazyWalk-Game
+docker compose -f docker-compose.dev.yml up --build
+```
+```Bash
+# or run using python
+git clone https://github.com/israice/CrazyWalk-Game.git
+cd CrazyWalk-Game
+python server.py
+```
 
-[ ] v0.0.3 - run hello world docker on linux server
+</details>
 
-[ ] v0.0.4 - create webhook from github to auto update server docker
-- make a test commit to make sure server updated
+<!-- ---------------------- -->
+
+<details>
+  <summary>Production Setup</summary>
+
+## For Linux
+```Bash
+# Step 1 - install cloudflared and login
+```
+```Bash
+# Step 2 - Link the DNS record
+## TUNNEL NAME: myTunnelName
+## SUBDOMAIN: mySubdomain
+## DOMAIN: myDomain
+
+cloudflared tunnel create myTunnelName-tunnel
+
+cloudflared tunnel route dns myTunnelName-tunnel mySubdomain.myDomain.com
+```
+```Bash
+# Step 3 - add subdomain and port to config.yml
+cd ~/.cloudflared/
+nano config.yml
+```
+```Bash
+- hostname: crazywalk.weforks.org
+  service: http://10.0.0.5:80
+```
+
+
+```Bash
+# Step 4 - restart cloudflared
+docker restart cloudflared
+```
+```Bash
+# Step 5 - Enter "Your Projects" folder first, then run the docker
+git clone https://github.com/israice/CrazyWalk-Game.git
+cd CrazyWalk-Game
+docker compose -f docker-compose.prod.yml up --build -d
+```
+```Bash
+# Resault
+https://crazywalk.weforks.org
+```
 
 </details>
 
@@ -236,20 +264,6 @@ http://localhost:8000
 
 <details>
   <summary>Github Cheetsheet</summary>
-
-## see last 10 commits
-
-```Bash
-git log --oneline -n 10
-```
-
-## update repository
-
-```Bash
-git add .
-git commit -m "v0.0.2 - test hello world docker on local"
-git push
-```
 
 ## dev icons
 
@@ -286,6 +300,43 @@ git push
 🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄 
 🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
 
+## see last 10 commits
+
+```Bash
+git log --oneline -n 10
+```
+
+## update repository
+
+```Bash
+git add .
+git commit -m "v0.0.3 - prod docker on linux server"
+git push
+```
+
 </details>
 
 <!-- ---------------------- -->
+
+<details open>
+  <summary>Dev Logs</summary>
+
+[x] v0.0.1 - project folders and files structure created
+- dev since 2022, dev from strach started 12.11.2025 
+- full project step by step flow inside README.md
+- create .gitignore file
+- create github repository
+- project first folders and files structure created
+
+[X] v0.0.2 - test hello world docker on local
+- hello world html page created
+- docker compose file created
+
+[X] v0.0.3 - prod docker on linux server
+- added setup instructions to README.md
+- test the subdomain crazywalk.weforks.org
+
+[ ] v0.0.4 - create webhook from github to auto update server docker
+- make a test commit to make sure server updated
+
+</details>

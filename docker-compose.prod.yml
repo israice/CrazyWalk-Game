@@ -1,0 +1,13 @@
+services:
+  crazywalk-game:
+    build: .
+    restart: always
+    ports:
+      - "80:8000"
+    networks:
+      - pc2-net
+
+networks:
+  pc2-net:
+    external: true
+    name: pc2-net
