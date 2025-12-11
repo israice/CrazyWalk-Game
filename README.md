@@ -334,7 +334,7 @@ git log --oneline -n 10
 
 ```Bash
 git add .
-git commit -m "v0.0.5 - update env in dockerfile build"
+git commit -m "v0.0.6 - make a test commit to make sure server updated"
 git push
 ```
 
@@ -377,7 +377,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 [X] v0.0.5 - update env in dockerfile build
 
-[ ] v0.0.6 - make a test commit to make sure server updated
+[X] v0.0.6 - make a test commit to make sure server updated
 
 
 
