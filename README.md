@@ -29,6 +29,20 @@
 
 <!-- ---------------------- -->
 
+### For Windows and Linux
+On Windows start the DOCKER SOFTWARE FIRST!
+```Bash
+git clone https://github.com/israice/CrazyWalk-Game.git
+cd CrazyWalk-Game
+docker-compose up --build -d
+```
+```Bash
+# Result
+http://localhost:8000
+```
+
+<!-- ---------------------- -->
+
 <details open>
   <summary>CrazyWalk Roadmap</summary>
 
@@ -207,11 +221,13 @@
 - create github repository
 - project first folders and files structure created
 
-[ ] v0.0.2 - hosting server hello world page
+[X] v0.0.2 - test hello world docker on local
 - hello world html page created
 - docker compose file created
-- run hello world docker on linux server
-- to auto update server docker, create webhook from github
+
+[ ] v0.0.3 - run hello world docker on linux server
+
+[ ] v0.0.4 - create webhook from github to auto update server docker
 - make a test commit to make sure server updated
 
 </details>
@@ -221,19 +237,18 @@
 <details>
   <summary>Github Cheetsheet</summary>
 
-## Посмотреть последние 10 коммитов и выбрать hash
+## see last 10 commits
 
-```
+```Bash
 git log --oneline -n 10
 ```
 
-## Обновить репозиторий
+## update repository
 
-```
+```Bash
 git add .
-git commit -m "v0.0.2 - hosting server hello world page"
+git commit -m "v0.0.2 - test hello world docker on local"
 git push
-
 ```
 
 ## dev icons
