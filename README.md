@@ -334,9 +334,20 @@ git log --oneline -n 10
 
 ```Bash
 git add .
-git commit -m "v0.0.4 - create webhook from github to auto update server docker"
+git commit -m "v0.0.5 - update env in dockerfile build"
 git push
 ```
+
+## stop server
+```Bash
+docker compose -f docker-compose.prod.yml down
+```
+
+## start or update server
+```Bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
 
 </details>
 
@@ -364,7 +375,10 @@ git push
 - added webhook server and dockerfile
 - make pull on server to update
 
-[] v0.0.5 - make a test commit to make sure server updated
+[X] v0.0.5 - update env in dockerfile build
+
+[ ] v0.0.6 - make a test commit to make sure server updated
+
 
 
 </details>
