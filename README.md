@@ -324,6 +324,16 @@ AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" docker compose -f docker-compo
 🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄 
 🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
 
+## stop server
+```Bash
+docker compose -f docker-compose.prod.yml down
+```
+
+## start or update server
+```Bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
 ## see last 10 commits
 
 ```Bash
@@ -334,18 +344,8 @@ git log --oneline -n 10
 
 ```Bash
 git add .
-git commit -m "v0.0.6 - make a test commit to make sure server updated"
+git commit -m "v0.0.7 - retest server updated"
 git push
-```
-
-## stop server
-```Bash
-docker compose -f docker-compose.prod.yml down
-```
-
-## start or update server
-```Bash
-docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 
@@ -378,6 +378,8 @@ docker compose -f docker-compose.prod.yml up --build -d
 [X] v0.0.5 - update env in dockerfile build
 
 [X] v0.0.6 - make a test commit to make sure server updated
+
+[X] v0.0.7 - retest server updated
 
 
 
