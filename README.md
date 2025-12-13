@@ -324,14 +324,14 @@ AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" docker compose -f docker-compo
 🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄 
 🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
 
-## stop server
-```Bash
-docker compose -f docker-compose.prod.yml down
-```
-
 ## start or update server
 ```Bash
 docker compose -f docker-compose.prod.yml up --build -d
+```
+
+## stop server
+```Bash
+docker compose -f docker-compose.prod.yml down
 ```
 
 ## see last 10 commits
@@ -339,7 +339,6 @@ docker compose -f docker-compose.prod.yml up --build -d
 ```Bash
 git log --oneline -n 10
 ```
-
 
 </details>
 
