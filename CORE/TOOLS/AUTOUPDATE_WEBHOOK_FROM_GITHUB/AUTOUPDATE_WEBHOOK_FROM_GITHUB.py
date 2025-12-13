@@ -41,6 +41,16 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         # Process payload (optional: check for specific branch)
         # For now, we just trigger the update for any push event
         
+        # Respond immediately to avoid GitHub timeout
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Update triggered successfully")
+        
+        # Run update in a separate thread
+        import threading
+        threading.Thread(target=self.run_update).start()
+
+    def run_update(self):
         try:
             print("Received valid webhook. Starting update process...", flush=True)
             
@@ -58,17 +68,12 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                 stderr=subprocess.STDOUT
             )
             
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"Update triggered successfully")
             print("Update completed successfully.", flush=True)
             
         except subprocess.CalledProcessError as e:
             print(f"Error during update: {e}", flush=True)
-            self.send_error(500, f"Internal Server Error: Update failed - {e}")
         except Exception as e:
             print(f"Unexpected error: {e}", flush=True)
-            self.send_error(500, f"Internal Server Error: {e}")
 
 if __name__ == "__main__":
     # Ensure we are in the right directory (though Docker workdir should handle this)
