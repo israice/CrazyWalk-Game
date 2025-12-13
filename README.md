@@ -340,14 +340,6 @@ docker compose -f docker-compose.prod.yml up --build -d
 git log --oneline -n 10
 ```
 
-## update repository
-
-```Bash
-git add .
-git commit -m "v0.0.7 - retest server updated"
-git push
-```
-
 
 </details>
 
@@ -382,5 +374,12 @@ git push
 [X] v0.0.7 - retest server updated
 
 
+## update repository
+
+```Bash
+git add .
+git commit -m "v0.0.7 - retest server updated"
+git push
+```
 
 </details>

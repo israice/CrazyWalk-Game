@@ -42,31 +42,32 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         # For now, we just trigger the update for any push event
         
         try:
-            print("Received valid webhook. Starting update process...")
+            print("Received valid webhook. Starting update process...", flush=True)
             
             # Execute git pull
-            print("Running: git pull")
-            subprocess.check_call(["git", "pull"], cwd="/app")
+            print("Running: git pull", flush=True)
+            subprocess.check_call(["git", "pull"], cwd="/app", stderr=subprocess.STDOUT)
             
             # Execute docker compose up
             # We assume docker-compose.prod.yml is the target, but we might need to be flexible.
             # Given the plan, we will use the prod file.
-            print("Running: docker-compose -f docker-compose.prod.yml up -d --build crazywalk-game")
+            print("Running: docker-compose -f docker-compose.prod.yml up -d --build crazywalk-game", flush=True)
             subprocess.check_call(
                 ["docker-compose", "-f", "docker-compose.prod.yml", "up", "-d", "--build", "crazywalk-game"],
-                cwd="/app"
+                cwd="/app",
+                stderr=subprocess.STDOUT
             )
             
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"Update triggered successfully")
-            print("Update completed successfully.")
+            print("Update completed successfully.", flush=True)
             
         except subprocess.CalledProcessError as e:
-            print(f"Error during update: {e}")
+            print(f"Error during update: {e}", flush=True)
             self.send_error(500, f"Internal Server Error: Update failed - {e}")
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            print(f"Unexpected error: {e}", flush=True)
             self.send_error(500, f"Internal Server Error: {e}")
 
 if __name__ == "__main__":
@@ -74,5 +75,5 @@ if __name__ == "__main__":
     # os.chdir("/app") 
     
     with socketserver.TCPServer(("", PORT), WebhookHandler) as httpd:
-        print(f"Webhook listener serving at port {PORT}")
+        print(f"Webhook listener serving at port {PORT}", flush=True)
         httpd.serve_forever()
