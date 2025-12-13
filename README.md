@@ -377,7 +377,7 @@ git log --oneline -n 10
 
 ```Bash
 git add .
-git commit -m "v0.0.7 - retest server updated test3"
+git commit -m "v0.0.7 - retest server updated test4"
 git push
 ```
 
