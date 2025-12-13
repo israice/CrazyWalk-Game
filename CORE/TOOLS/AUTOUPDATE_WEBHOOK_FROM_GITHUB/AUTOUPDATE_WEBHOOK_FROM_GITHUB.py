@@ -61,9 +61,11 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
             # Execute docker compose up
             # We assume docker-compose.prod.yml is the target, but we might need to be flexible.
             # Given the plan, we will use the prod file.
-            print("Running: docker-compose -f docker-compose.prod.yml up -d --build crazywalk-game", flush=True)
+            # IMPORTANT: We must specify project name '-p crazywalk-game' because inside the container
+            # the directory is /app, so default project name would be 'app', causing conflict with host's 'crazywalk-game'.
+            print("Running: docker-compose -p crazywalk-game -f docker-compose.prod.yml up -d --build crazywalk-game", flush=True)
             subprocess.check_call(
-                ["docker-compose", "-f", "docker-compose.prod.yml", "up", "-d", "--build", "crazywalk-game"],
+                ["docker-compose", "-p", "crazywalk-game", "-f", "docker-compose.prod.yml", "up", "-d", "--build", "crazywalk-game"],
                 cwd="/app",
                 stderr=subprocess.STDOUT
             )
