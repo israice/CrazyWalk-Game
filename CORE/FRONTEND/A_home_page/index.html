@@ -572,37 +572,43 @@
                 subdomains: 'abcd'
             }).addTo(map);
 
-            const startGeolocation = () => {
+            const startGeolocation = (retryCount = 0) => {
                 loadingGif.style.display = 'block';
                 errorScreen.style.display = 'none';
+                console.log(`DEBUG: [Step 1] Initializing Geolocation Sequence (Attempt ${retryCount + 1})...`);
 
-                // Safety Timeout (e.g., if user ignores prompt or browser hangs)
+                // Safety Timeout - 65 seconds (slightly longer than geo timeout)
                 const safetyTimeout = setTimeout(() => {
-                    console.warn("DEBUG: Safety Timeout Triggered");
+                    console.warn(`DEBUG: [Timeout] Safety Timeout Triggered (65s elapsed on attempt ${retryCount + 1})`);
                     showError("Request timed out.<br>Please check your GPS or connection.");
-                }, 7000);
+                }, 65000);
 
                 if (!("geolocation" in navigator)) {
                     clearTimeout(safetyTimeout);
+                    console.error("DEBUG: [Error] Geolocation not supported");
                     showError("Geolocation is not supported<br>by your browser.");
                     return;
                 }
 
-                console.log("DEBUG: Requesting Geolocation...");
+                console.log("DEBUG: [Step 2] Requesting browser coordinates...");
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         clearTimeout(safetyTimeout); // Got location, cancel safety timer
-                        console.log("DEBUG: Location Found!", position);
+                        console.log("DEBUG: [Step 3] Browser Location Found!", position);
                         const userLat = position.coords.latitude;
                         const userLon = position.coords.longitude;
+                        console.log(`DEBUG: [Info] Raw Coordinates: Lat=${userLat}, Lon=${userLon}`);
 
                         // Use server-side logic to determine location
+                        console.log("DEBUG: [Step 4] Sending request to server /api/locate...");
                         fetch(`/api/locate?lat=${userLat}&lon=${userLon}`)
                             .then(response => {
+                                console.log(`DEBUG: [Step 5] Server responded with status: ${response.status}`);
                                 if (!response.ok) throw new Error("API Network Error");
                                 return response.json();
                             })
                             .then(data => {
+                                console.log("DEBUG: [Step 6] Server Data Parsed:", data);
                                 // Update UI with server-provided data
                                 cityLabel.textContent = data.city;
 
@@ -611,17 +617,28 @@
                                 // "data.user_lat" and "data.user_lon" are the user's RAW coordinates
                                 // For A_home_page, we want to center on the CITY to look nice.
 
+                                console.log(`DEBUG: [Step 7] Updating Map View to: [${data.lat}, ${data.lon}]`);
                                 map.setView([data.lat, data.lon], 17, { animate: false });
                                 revealContent();
+                                console.log("DEBUG: [Success] Geolocation sequence complete.");
                             })
                             .catch(err => {
-                                console.error("DEBUG: Location API Error:", err);
+                                console.error("DEBUG: [Error] Location API Error:", err);
                                 showError(`Unable to connect to Server.<br><small>${err.message}</small>`);
                             });
                     },
                     (error) => {
                         clearTimeout(safetyTimeout); // Got error, cancel safety timer
-                        console.error("DEBUG: Geolocation Error Callback:", error);
+                        console.error("DEBUG: [Error] Geolocation Error Callback:", error);
+                        console.error(`DEBUG: [Error Details] Code: ${error.code}, Message: ${error.message}`);
+
+                        // Retry Logic for Timeout
+                        if (error.code === error.TIMEOUT && retryCount < 1) {
+                            console.warn("DEBUG: [Retry] Timeout occurred. Retrying geolocation request...");
+                            startGeolocation(retryCount + 1);
+                            return;
+                        }
+
                         if (error.code === error.PERMISSION_DENIED) {
                             showError("Location Access Denied.<br>Please enable GPS permissions.");
                         } else if (error.code === error.TIMEOUT) {
@@ -632,8 +649,8 @@
                     },
                     {
                         enableHighAccuracy: false,
-                        timeout: 5000,
-                        maximumAge: 0
+                        timeout: 60000,
+                        maximumAge: Infinity
                     }
                 );
             };

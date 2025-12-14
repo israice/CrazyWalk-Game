@@ -214,34 +214,45 @@
             };
 
             const startLocationWatch = () => {
+                console.log("DEBUG: [Map Page] Initializing Location Watch...");
                 if (!("geolocation" in navigator)) {
+                    console.error("DEBUG: [Error] Geolocation not supported");
                     alert("Geolocation not supported by this browser.");
                     return;
                 }
 
                 // User requested "no updates", so we use getCurrentPosition to fetch ONCE.
+                console.log("DEBUG: [Map Page] Requesting single position fix...");
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
                         const accuracy = position.coords.accuracy;
 
-                        console.log(`Location Found: ${lat}, ${lon} (Accuracy: ${accuracy}m)`);
+                        console.log(`DEBUG: [Map Page] Position Found: ${lat}, ${lon} (Accuracy: ${accuracy}m)`);
+                        console.log("DEBUG: [Map Page] Sending request to server /api/locate...");
 
                         fetch(`/api/locate?lat=${lat}&lon=${lon}`)
-                            .then(res => res.json())
+                            .then(res => {
+                                console.log(`DEBUG: [Map Page] Server responded with status: ${res.status}`);
+                                return res.json();
+                            })
                             .then(data => {
+                                console.log("DEBUG: [Map Page] Server Data:", data);
                                 map.setView([data.user_lat, data.user_lon], 19);
                                 revealMap();
+                                console.log("DEBUG: [Map Page] Map view updated.");
                             })
                             .catch(err => {
-                                console.warn("Locate API Error:", err);
+                                console.warn("DEBUG: [Warning] Locate API Error:", err);
                                 map.setView([lat, lon], 19);
                                 revealMap();
                             });
                     },
                     (error) => {
-                        console.warn("Geolocation Error:", error);
+                        console.warn("DEBUG: [Warning] Geolocation Error:", error);
+                        console.warn(`DEBUG: [Error Details] Code: ${error.code}, Message: ${error.message}`);
+
                         if (!hasRevealed) {
                             if (error.code === error.PERMISSION_DENIED) {
                                 alert("Please allow location access to see your exact position.");
@@ -249,8 +260,8 @@
                         }
                     },
                     {
-                        enableHighAccuracy: true,
-                        timeout: 20000,
+                        enableHighAccuracy: false,
+                        timeout: 10000,
                         maximumAge: 0
                     }
                 );
