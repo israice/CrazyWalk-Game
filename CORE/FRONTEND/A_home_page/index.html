@@ -5,10 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CrazyWalk</title>
-    <link rel="icon" type="image/png" href="components/crazywalk_logo.png">
+    <script>
+        // Mask URL to show only root address
+        window.history.replaceState(null, '', '/');
+    </script>
+    <link rel="icon" type="image/png" href="/A_home_page/components/crazywalk_logo.png">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/A_home_page/manifest.json">
     <!-- Preconnect for Performance -->
     <link rel="preconnect" href="https://unpkg.com">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -464,7 +468,7 @@
 <body>
     <div class="black-square">
         <div id="map"></div>
-        <img id="loading-gif" src="components/earth.gif" alt="Loading...">
+        <img id="loading-gif" src="/A_home_page/components/earth.gif" alt="Loading...">
 
         <!-- Red Error Screen -->
         <div id="error-screen">
@@ -476,7 +480,7 @@
 
         <div class="ui-overlay" id="ui-overlay">
             <div class="header">
-                <img src="components/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
+                <img src="/A_home_page/components/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
                 <h1>CrazyWalk</h1>
                 <h2>v0.0.13</h2>
                 <h2>Walk & Earn Game</h2>
@@ -512,7 +516,7 @@
             <div id="city-label"></div>
         </div>
     </div>
-    <img class="iphone-frame" src="components/iphone.png" alt="iphone">
+    <img class="iphone-frame" src="/A_home_page/components/iphone.png" alt="iphone">
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -675,7 +679,7 @@
                     .then(html => {
                         // We need to fix relative paths since we are staying on A_home_page URL
                         // Injecting a base tag is the robust way to handle this
-                        const baseTag = '<base href="../B_map_page/">';
+                        const baseTag = '<base href="/B_map_page/">';
                         const fixedHtml = html.replace('<head>', `<head>${baseTag}`);
 
                         document.open();

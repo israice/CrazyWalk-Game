@@ -392,18 +392,18 @@
   - added link to GUEST button 
   - added button of sendwich in right top corner
   - Fix production 404 by enforcing correct server root
+  - added user marker on map
   - added GPS icon next to sendwich button
   - marker to center and purple color no borders circle under the marker
-  - [x] v0.0.14 - 32.05673, 34.76875 logic to GPS icon
-  - [x] v0.0.15 - fix real location logic
-  - added user marker on map
-  - fix URL
-
+  - [x] v0.0.14 - fix real location logic
+  - [x] v0.0.15 - 32.05673, 34.76875 logic to GPS icon
+  - B_map_page marker added in center of map
   - fix marker so he will not move on map move
-  - fixed small screen UI
+  - [x] v0.0.16 - fix URL
+
+  - fixed movile horizontal screen UI do it only when small
   - added top bar with cocial icons
-  - fixed 
-  - [x] v0.0.15 - B_map_page marker added in center of map
+  - [x] v0.0.17 - B_map_page marker added in center of map
   - 
 
 
@@ -411,7 +411,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.13 - fixing GPS icon next to sendwich button 2"
+  git commit -m "v0.0.16 - fix URL"
   git push
   ```
 
