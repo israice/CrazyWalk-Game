@@ -195,7 +195,7 @@
   <summary>Dev</summary>
 
 
-- <details>
+<details>
 
   <summary>Development Setup</summary>
 
@@ -376,18 +376,17 @@ git log --oneline -n 10
 - A_home_page added pre loading gif in future sponsored by NAME
 - [x] v0.0.9 - if small screen then do not show Iphone image
 - [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
-- **Mobile First**: Fixed aspect ratio UI overlay, larger responsive fonts for touch.
-- **Matrix Green Theme**: Custom "Bio-Digital" palette (Spring Green #00ff9d + Electric Cyan #00b8ff).
-- **Glowing Map**: OpenStreetMap integration with high-contrast filters for "Neon Roads" effect.
-- **UX Polish**: Glassmorphism cards, single-line legal links, improved gradients.
+- README.md updated
 
 
 ## update repository
 
 ```Bash
 git add .
-git commit -m "v0.0.10 - Premium UI Overhaul & Mobile-First Redesign"
+git commit -m "v0.0.10 - README.md updated"
 git push
 ```
+
+</details>
 
 </details>
