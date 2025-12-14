@@ -101,7 +101,7 @@
         .header {
             text-align: center;
             flex-shrink: 0;
-            margin-bottom: 2vh;
+            margin-bottom: 1vh;
         }
 
         .logo-icon {
@@ -148,14 +148,14 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            gap: 3vh;
+            gap: 1.5vh;
             width: 100%;
         }
 
         .menu-links {
             display: flex;
             flex-direction: column;
-            gap: 1.5vh;
+            gap: 1vh;
         }
 
         .menu-item {
@@ -208,7 +208,7 @@
             justify-content: center;
             align-items: center;
             gap: 2vh;
-            margin-bottom: 1.5vh;
+            margin-bottom: 1vh;
             flex-shrink: 0;
         }
 
@@ -245,8 +245,8 @@
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            gap: 1.2vh;
-            margin-top: 1vh;
+            gap: 1vh;
+            margin-top: 0.5vh;
         }
 
         .btn {
@@ -281,14 +281,14 @@
             width: 100%;
             text-align: center;
             color: rgba(255, 255, 255, 0.5);
-            font-size: 1.5vh;
+            font-size: 3vh;
             font-weight: 600;
             letter-spacing: 2px;
             pointer-events: none;
             opacity: 0;
             transition: opacity 1s;
             text-transform: uppercase;
-            margin-top: 3vh;
+            margin-top: 6vh;
             /* Spacing from buttons */
         }
 
@@ -319,8 +319,8 @@
 
             .ui-overlay {
                 /* Floating HUD in center, matching desktop size */
-                width: 42vh;
-                height: 72vh;
+                width: 90vh;
+                height: 90vh;
                 max-width: 100vw;
                 /* Safety */
                 top: 50%;
@@ -334,37 +334,36 @@
                 /* Ensure vertical spacing matches desktop */
             }
 
-            /* Restore fonts to VH units to match desktop "same size" feel, 
-               since container height is fixed to 72vh again */
+            /* RESTORED & INCREASED fonts for mobile readability */
             .logo-icon {
-                font-size: 4vh;
+                font-size: 8vh;
             }
 
             h1 {
-                font-size: 3.2vh;
+                font-size: 5vh;
             }
 
             h2 {
-                font-size: 1.3vh;
+                font-size: 2.5vh;
             }
 
             .btn {
-                font-size: 1.6vh;
-                padding: 1.5vh;
+                font-size: 3vh;
+                padding: 2.5vh;
             }
 
             .menu-item span {
-                font-size: 1.5vh;
+                font-size: 2.5vh;
             }
 
             .icon-circle {
-                width: 3vh;
-                height: 3vh;
-                font-size: 1.4vh;
+                width: 5vh;
+                height: 5vh;
+                font-size: 2.5vh;
             }
 
             .legal-item {
-                font-size: 1.1vh;
+                font-size: 1.8vh;
             }
 
             #city-label {
@@ -384,8 +383,8 @@
                    or move it up to 12vh from center bottom?
                    Let's stick to screen bottom for better map visibility and cleaner UI box.
                 */
-                font-size: 2vh;
-                bottom: 8vh;
+                font-size: 5vh;
+                bottom: 12vh;
                 /* Lift slightly on mobile */
             }
         }

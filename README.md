@@ -380,7 +380,7 @@ git log --oneline -n 10
 
 ```Bash
 git add .
-git commit -m "v0.0.10 - testing UI on mobile"
+git commit -m "v0.0.10 - testing UI on mobile test2"
 git push
 ```
 
