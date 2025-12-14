@@ -619,9 +619,9 @@
                             }
                         },
                         {
-                            enableHighAccuracy: true,
-                            timeout: 10000, // 10 seconds timeout
-                            maximumAge: 0
+                            enableHighAccuracy: false, // Use WiFi/Network (Faster, no GPS needed)
+                            timeout: 10000,
+                            maximumAge: 60000 // Cache is fine for 1 minute
                         }
                     );
                 }, 1000);
