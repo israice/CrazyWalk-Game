@@ -378,13 +378,13 @@ git log --oneline -n 10
 
 [X] v0.0.7 - retest server updated
 
-[X] v0.0.8 - A_home_page created with city detection and background map
+[ X ] v0.0.8 - A_home_page created with city detection and background map
 - A_home_page maximum zoom fixed to city center
 - A_home_page added pre loading gif in future sponsored by NAME
 
-[X] v0.0.9 - if small screen then do not show Iphone image
+[ x ] v0.0.9 - if small screen then do not show Iphone image
 
-[X] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
+[x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
 - **Mobile First**: Fixed aspect ratio UI overlay, larger responsive fonts for touch.
 - **Matrix Green Theme**: Custom "Bio-Digital" palette (Spring Green #00ff9d + Electric Cyan #00b8ff).
 - **Glowing Map**: OpenStreetMap integration with high-contrast filters for "Neon Roads" effect.
