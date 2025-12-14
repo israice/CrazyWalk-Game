@@ -385,6 +385,7 @@
   - [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
   - README.md updated
   - [x] v0.0.11 - Logo changed
+  - [x] v0.0.12 - geolocation timeout fixed
   - 
 
 
@@ -392,7 +393,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.11 - Logo changed"
+  git commit -m "v0.0.12 - geolocation timeout fixed"
   git push
   ```
 
