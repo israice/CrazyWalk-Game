@@ -393,7 +393,9 @@
   - added button of sendwich in right top corner
   - Fix production 404 by enforcing correct server root
   - added GPS icon next to sendwich button
-
+  - marker to center and purple color no borders circle under the marker
+  - [x] v0.0.14 - 32.05673, 34.76875 logic to GPS icon
+  - [x] v0.0.15 - fix real location logic
   - added user marker on map
   - fix URL
 
@@ -401,8 +403,7 @@
   - fixed small screen UI
   - added top bar with cocial icons
   - fixed 
-  - [x] v0.0.14 - B_map_page marker added in center of map
-  - [x] v0.0.15 - 32.05673, 34.76875 logic to GPS icon
+  - [x] v0.0.15 - B_map_page marker added in center of map
   - 
 
 
@@ -410,7 +411,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.13 - added GPS icon next to sendwich button"
+  git commit -m "v0.0.13 - fixing GPS icon next to sendwich button"
   git push
   ```
 

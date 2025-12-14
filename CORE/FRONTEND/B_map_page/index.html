@@ -66,24 +66,6 @@
             transition: opacity 0.6s ease-out;
         }
 
-        /* Center Marker GIF */
-        #center-marker {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 15vh;
-            /* Adjust size based on visual need */
-            height: auto;
-            transform: translate(-50%, -50%);
-            /* Perfectly centered */
-            z-index: 20;
-            /* Above map and loader */
-            pointer-events: none;
-            /* Let clicks pass through to map if needed */
-            display: none;
-            /* Hidden until map is ready */
-        }
-
         /* The Phone Frame */
         .phone-frame {
             height: 200vh;
@@ -104,7 +86,7 @@
             display: flex;
             gap: 2vh;
             z-index: 50;
-            /* Above map and center marker, below phone frame */
+            /* Above map, below phone frame */
         }
 
         .control-btn {
@@ -122,6 +104,11 @@
             transition: background-color 0.2s;
         }
 
+        .control-btn.active {
+            border: 2px solid red;
+            background-color: rgba(60, 60, 60, 0.9);
+        }
+
         .control-btn:active {
             background-color: rgba(60, 60, 60, 0.9);
         }
@@ -130,6 +117,12 @@
             width: 60%;
             height: 60%;
             fill: white;
+        }
+
+        /* Leaflet DivIcon Custom Style for Marker */
+        .leaftlet-div-icon {
+            background: transparent !important;
+            border: none !important;
         }
 
         /* Mobile Responsive */
@@ -147,6 +140,12 @@
             .top-controls {
                 top: 2vh;
                 right: 2vh;
+            }
+
+            /* Larger icons for mobile */
+            .control-btn {
+                width: 8vh;
+                height: 8vh;
             }
         }
     </style>
@@ -173,7 +172,6 @@
             </div>
         </div>
         <img id="loading-gif" src="components/earth.gif" alt="Loading...">
-        <img id="center-marker" src="components/marker.gif" alt="Center Marker">
     </div>
     <img class="phone-frame" src="components/iphone.png" alt="Phone Frame">
 
@@ -185,16 +183,19 @@
         document.addEventListener('DOMContentLoaded', () => {
             const mapElement = document.getElementById('map');
             const loadingGif = document.getElementById('loading-gif');
-            const markerElement = document.getElementById('center-marker');
             let hasRevealed = false;
-            let watchId = null;
 
-            // Initialize Map
+            // Default coordinates
+            const DEFAULT_LAT = 32.05693;
+            const DEFAULT_LON = 34.76878;
+            let isGpsActive = false;
+
+            // Initialize Map at DEFAULT location immediately
             const map = L.map('map', {
                 zoomControl: false,
                 attributionControl: false,
                 zoomSnap: 0,
-            }).setView([0, 0], 3);
+            }).setView([DEFAULT_LAT, DEFAULT_LON], 18);
 
             // Dark Matter No Labels Layer
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
@@ -202,61 +203,68 @@
                 subdomains: 'abcd'
             }).addTo(map);
 
+            // Custom Marker Icon (using divIcon to support vh sizing/CSS)
+            const customIcon = L.divIcon({
+                className: 'custom-marker', // Needs empty class or custom styling helper
+                // transform: translate(-50%, -50%) centers the image on the lat/lon anchor
+                html: '<img src="components/marker.gif" style="width: 15vh; height: auto; display: block; transform: translate(-50%, -50%);">',
+                iconSize: null, // Let CSS control size
+                iconAnchor: [0, 0] // We handle centering via CSS transform
+            });
+
+            // Create Marker pinned to map
+            const userMarker = L.marker([DEFAULT_LAT, DEFAULT_LON], { icon: customIcon }).addTo(map);
+
             const revealMap = () => {
                 if (hasRevealed) return;
                 hasRevealed = true;
                 loadingGif.style.opacity = '0';
                 mapElement.style.opacity = '1';
-                markerElement.style.display = 'block';
                 setTimeout(() => {
                     loadingGif.style.display = 'none';
                 }, 600);
             };
 
+            // Reveal immediately since we have default coords
+            setTimeout(revealMap, 500);
+
             const startLocationWatch = () => {
-                console.log("DEBUG: [Map Page] Initializing Location Watch...");
+                console.log("DEBUG: [Map Page] Requesting GPS position...");
                 if (!("geolocation" in navigator)) {
-                    console.error("DEBUG: [Error] Geolocation not supported");
                     alert("Geolocation not supported by this browser.");
                     return;
                 }
 
-                // User requested "no updates", so we use getCurrentPosition to fetch ONCE.
-                console.log("DEBUG: [Map Page] Requesting single position fix...");
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
-                        const accuracy = position.coords.accuracy;
 
-                        console.log(`DEBUG: [Map Page] Position Found: ${lat}, ${lon} (Accuracy: ${accuracy}m)`);
-                        console.log("DEBUG: [Map Page] Sending request to server /api/locate...");
+                        console.log(`DEBUG: [Map Page] GPS Found: ${lat}, ${lon}`);
 
                         fetch(`/api/locate?lat=${lat}&lon=${lon}`)
-                            .then(res => {
-                                console.log(`DEBUG: [Map Page] Server responded with status: ${res.status}`);
-                                return res.json();
-                            })
+                            .then(res => res.json())
                             .then(data => {
-                                console.log("DEBUG: [Map Page] Server Data:", data);
-                                map.setView([data.user_lat, data.user_lon], 19);
-                                revealMap();
-                                console.log("DEBUG: [Map Page] Map view updated.");
+                                // Only update if GPS is still active
+                                if (isGpsActive) {
+                                    const newLatLng = [data.user_lat, data.user_lon];
+                                    map.setView(newLatLng, 18);
+                                    userMarker.setLatLng(newLatLng);
+                                }
                             })
                             .catch(err => {
                                 console.warn("DEBUG: [Warning] Locate API Error:", err);
-                                map.setView([lat, lon], 19);
-                                revealMap();
+                                if (isGpsActive) {
+                                    const newLatLng = [lat, lon];
+                                    map.setView(newLatLng, 18);
+                                    userMarker.setLatLng(newLatLng);
+                                }
                             });
                     },
                     (error) => {
                         console.warn("DEBUG: [Warning] Geolocation Error:", error);
-                        console.warn(`DEBUG: [Error Details] Code: ${error.code}, Message: ${error.message}`);
-
-                        if (!hasRevealed) {
-                            if (error.code === error.PERMISSION_DENIED) {
-                                alert("Please allow location access to see your exact position.");
-                            }
+                        if (error.code === error.PERMISSION_DENIED) {
+                            alert("Please allow location access.");
                         }
                     },
                     {
@@ -267,9 +275,24 @@
                 );
             };
 
-            // Start immediately
-            // Brief delay to prevent UI jank on load
-            setTimeout(startLocationWatch, 1000);
+            // GPS Button Logic
+            const gpsBtn = document.getElementById('gps-btn');
+            gpsBtn.addEventListener('click', () => {
+                isGpsActive = !isGpsActive;
+
+                if (isGpsActive) {
+                    // Turn ON
+                    console.log("DEBUG: GPS Toggled ON");
+                    gpsBtn.classList.add('active');
+                    startLocationWatch();
+                } else {
+                    // Turn OFF
+                    console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
+                    gpsBtn.classList.remove('active');
+                    map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
+                    userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
+                }
+            });
         });
     </script>
 </body>
