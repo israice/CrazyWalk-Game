@@ -392,8 +392,8 @@
   - added link to GUEST button 
   - added button of sendwich in right top corner
   - Fix production 404 by enforcing correct server root
-
   - added GPS icon next to sendwich button
+
   - added user marker on map
   - fix URL
 
@@ -410,7 +410,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.13 - Fix production 404 by enforcing correct server root"
+  git commit -m "v0.0.13 - added GPS icon next to sendwich button"
   git push
   ```
 

@@ -68,6 +68,10 @@ if not os.environ.get("SERVER_PORT"):
 if not os.environ.get("FRONTEND_INDEX_PAGE"):
     logger.warning("FRONTEND_INDEX_PAGE not found in .env, defaulting to CORE/FRONTEND")
 
+if "A_home_page" in DIRECTORY:
+    logger.warning(f"Detected incorrect DIRECTORY configuration: {DIRECTORY}. Forcing to 'CORE/FRONTEND'")
+    DIRECTORY = "CORE/FRONTEND"
+
 logger.info(f"Server starting.")
 logger.info(f"Current Working Directory: {os.getcwd()}")
 logger.info(f"Serving Directory: {DIRECTORY}")
