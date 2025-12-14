@@ -345,7 +345,9 @@
   ```Bash
   git log --oneline -n 10
   ```
-
+  ```Bash
+  git fetch origin; git checkout master; git reset --hard ba78799; git clean -fdX;
+  ```
   </details>
 
 <!-- ---------------------- -->
