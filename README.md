@@ -190,207 +190,203 @@
 
 <!-- ---------------------- -->
 
-<details>
+<details open>
 
   <summary>Dev</summary>
 
 
-<blockquote>
-
-<details>
+- <details>
 
   <summary>Development Setup</summary>
 
-### On Windows or Linux
-```Bash
-# On Windows start the DOCKER SOFTWARE FIRST!
-git clone https://github.com/israice/CrazyWalk-Game.git
-cd CrazyWalk-Game
-docker compose -f docker-compose.dev.yml up --build
-```
-```Bash
-# or run using python
-git clone https://github.com/israice/CrazyWalk-Game.git
-cd CrazyWalk-Game
-python server.py
-```
+  ### On Windows or Linux
+  ```Bash
+  # On Windows start the DOCKER SOFTWARE FIRST!
+  git clone https://github.com/israice/CrazyWalk-Game.git
+  cd CrazyWalk-Game
+  docker compose -f docker-compose.dev.yml up --build
+  ```
+  ```Bash
+  # or run using python
+  git clone https://github.com/israice/CrazyWalk-Game.git
+  cd CrazyWalk-Game
+  python server.py
+  ```
 
-</details>
+  </details>
 
 <!-- ---------------------- -->
 
-<details>
+- <details>
   <summary>Production Setup</summary>
 
-## For Linux
-```Bash
-# Step 1 - install cloudflared and login
-```
-```Bash
-# Step 2 - Link the DNS record
-## TUNNEL NAME: myTunnelName
-## SUBDOMAIN: mySubdomain
-## DOMAIN: myDomain
+  ## For Linux
+  ```Bash
+  # Step 1 - install cloudflared and login
+  ```
+  ```Bash
+  # Step 2 - Link the DNS record
+  ## TUNNEL NAME: myTunnelName
+  ## SUBDOMAIN: mySubdomain
+  ## DOMAIN: myDomain
 
-cloudflared tunnel create myTunnelName-tunnel
+  cloudflared tunnel create myTunnelName-tunnel
 
-cloudflared tunnel route dns myTunnelName-tunnel mySubdomain.myDomain.com
-```
-```Bash
-# Step 3 - add subdomain and port to config.yml
-cd ~/.cloudflared/
-nano config.yml
-```
-```Bash
-- hostname: crazywalk.weforks.org
-  service: http://10.0.0.5:80
-```
+  cloudflared tunnel route dns myTunnelName-tunnel mySubdomain.myDomain.com
+  ```
+  ```Bash
+  # Step 3 - add subdomain and port to config.yml
+  cd ~/.cloudflared/
+  nano config.yml
+  ```
+  ```Bash
+  - hostname: crazywalk.weforks.org
+    service: http://10.0.0.5:80
+  ```
 
 
-```Bash
-# Step 4 - restart cloudflared
-docker restart cloudflared
-```
-```Bash
-# Step 5 - Enter "Your Projects" folder first, then run the docker
-git clone https://github.com/israice/CrazyWalk-Game.git
-cd CrazyWalk-Game
-docker compose -f docker-compose.prod.yml up --build -d
-```
-```Bash
-# Resault
-https://crazywalk.weforks.org
-```
+  ```Bash
+  # Step 4 - restart cloudflared
+  docker restart cloudflared
+  ```
+  ```Bash
+  # Step 5 - Enter "Your Projects" folder first, then run the docker
+  git clone https://github.com/israice/CrazyWalk-Game.git
+  cd CrazyWalk-Game
+  docker compose -f docker-compose.prod.yml up --build -d
+  ```
+  ```Bash
+  # Resault
+  https://crazywalk.weforks.org
+  ```
 
-</details>
+  </details>
 
 <!-- ---------------------- -->
 
-<details>
+- <details>
   <summary>GitHub Webhook Setup</summary>
 
-## Configure Webhook in GitHub
+  ## Configure Webhook in GitHub
 
-1. Go to your repository settings on GitHub.
-2. Click on **Webhooks** -> **Add webhook**.
-3. **Payload URL**: `https://crazywalk.weforks.org:9000/push_and_update_server` (Ensure port 9000 is exposed and routed correctly).
-4. **Content type**: `application/x-www-form-urlencoded`.
-5. **Secret**: Generate a strong secret and add it to your `.env` file or environment variables as `AUTOUPDATE_WEBHOOK_FROM_GITHUB`.
-6. **Which events would you like to trigger this webhook?**: Select "Just the push event".
-7. Click **Add webhook**.
+  1. Go to your repository settings on GitHub.
+  2. Click on **Webhooks** -> **Add webhook**.
+  3. **Payload URL**: `https://crazywalk.weforks.org/push_and_update_server`
+  4. **Content type**: `application/json`.
+  5. **Secret**: Generate a strong secret and add it to your `.env` file or environment variables as `AUTOUPDATE_WEBHOOK_FROM_GITHUB`.
+  6. **Which events would you like to trigger this webhook?**: Select "Just the push event".
+  7. Click **Add webhook**.
 
-## Server Configuration
+  ## Server Configuration
 
-Ensure your `docker-compose.prod.yml` has the `AUTOUPDATE_WEBHOOK_FROM_GITHUB` environment variable set. You can pass it when running docker compose:
+  Ensure your `docker-compose.prod.yml` has the `AUTOUPDATE_WEBHOOK_FROM_GITHUB` environment variable set. You can pass it when running docker compose:
 
-```Bash
-# inside .env file
-AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" 
-```
-```Bash
-docker compose -f docker-compose.prod.yml up -d --build
-```
-</details>
-
-<!-- ---------------------- -->
-
-<details>
-  <summary>Github Cheetsheet</summary>
-
-## dev icons
-
-✅ ☑️ ✔️ ✳️ ❌ ❎ ✖️ 🔁 🔂 🔄
-🚀 ⚙️ 💻 🔥 🧪 🐞 📝 🛠️ 🔄 🕒
-📈 📉 🗂️ 📦 🎯 📚 🧰 🏁 🔔 💡
-🛑 🔍 🏗️ 🧩 🧭 🛡️ 🍀 🌐 📢 🧯
-🛫 🎉 🧿 🖥️ 💾 🧬 🧑‍💻 🧑‍🔬 📊 📋
-📌 📎 🖱️ 🖨️ 🗃️ 📂 🗒️ 🛒 🧹 🖊️
-🗑️ 🕹️ 🧲 🧱 🏷️ 🏆 🥇 📜 📅 🗓️ 🔗
-🔒 🔓 🗝️ 🧊 🧞 🧺 🧳 📡 🏢 🏭
-🏠 🏘️ 🏚️ 🌟 🎨 🧡 💙 💚 💛 💜
-🩵 🩷 🔋 🧨 🧤 🧦 🧥 🧢 🧴 🧵
-🧶 🛎️ 🛏️ 🛋️ 🚪 🚧 🚦 🚥 🚨 🚒
-🚑 🚓 🗄️ 🗳️ 📫 📪 📬 📭 📮 📨
-📩 📤 📥 📧 🔬 🔭 🕵️‍♂️ 🕵️‍♀️ 🧑‍🏫
-🧑‍🔧 🧑‍🔩 🧑‍🎨 🧑‍🚀 🧑‍✈️ 🧑‍🚒 🧑‍⚕️ 🧑‍🎤 🔨 🔧
-🔩 🗜️ 🖲️ 💾 💿 📀 📼 🧫 ⚡ 🌀
-🌪️ 🛸 🎲 🎮 🐛 🐜 🦠 ⏫ ⏬ ⏩
-⏪ ⏭️ ⏮️ 🆗 🆕 🆙
-🪙 🪙 💰 💴 💵 💶 💷 💸 💳 🏦
-⚠️ ❗ ❕ ❓ ❔ ℹ️ ♻️ ⛔ 🚫
-⬆️ ⬇️ ⬅️ ➡️ ↗️ ↘️ ↙️ ↖️ ⤴️ ⤵️ 
-↩️ ↪️ 🔼 🔽 ▶️ ⏯️ ⏸️ ⏹️ ⏺️ ⏏️ 
-◀️ 🔀 🔃 🔙 🔚 🔛 🔜 🔝 ➕ ➖ 
-➗ ✴️ ❇️ ✨ ⭐ 🟢 🟡 🔴 🔵 ⚪
-⚫ 🟣 🟤 🟧 🟥 🟦 🟩 🟨 🟪 🟫
-⬛ ⬜ ◼️ ◻️ ◽ ◾ 💬 🗨️ 🗯️ 📞 
-☎️ 📱 📲 📳 🔕 🔇 🔈 🔉 🔊 🎙️ 
-🎚️ 🎛️ 🎧 📺 📻 📄 📃 📑 🧾 📰
-🗞️ 📁 📇 🖇️ 📍 🧷 ✂️ 📏 📐 🧮 
-🖋️ 🖌️ ⌨️ 💽 🔌 🔦 🛜 📶 🛰️ ☁️ 
-🌩️ 🌫️ 🌤️ 🛢️ ⚗️ 🗺️ 🔑 🧠 🤖 🐧 
-🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄 
-🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
-
-## start or update server
-```Bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
-
-## stop server
-```Bash
-docker compose -f docker-compose.prod.yml down
-```
-
-## see last 10 commits
-
-```Bash
-git log --oneline -n 10
-```
-
-</details>
+  ```Bash
+  # inside .env file
+  AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" 
+  ```
+  ```Bash
+  docker compose -f docker-compose.prod.yml up -d --build
+  ```
+  </details>
 
 <!-- ---------------------- -->
 
-<details open>
+- <details>
+  <summary>Dev Cheetsheet</summary>
+
+  ## dev icons
+
+  ✅ ☑️ ✔️ ✳️ ❌ ❎ ✖️ 🔁 🔂 🔄
+  🚀 ⚙️ 💻 🔥 🧪 🐞 📝 🛠️ 🔄 🕒
+  📈 📉 🗂️ 📦 🎯 📚 🧰 🏁 🔔 💡
+  🛑 🔍 🏗️ 🧩 🧭 🛡️ 🍀 🌐 📢 🧯
+  🛫 🎉 🧿 🖥️ 💾 🧬 🧑‍💻 🧑‍🔬 📊 📋
+  📌 📎 🖱️ 🖨️ 🗃️ 📂 🗒️ 🛒 🧹 🖊️
+  🗑️ 🕹️ 🧲 🧱 🏷️ 🏆 🥇 📜 📅 🗓️ 🔗
+  🔒 🔓 🗝️ 🧊 🧞 🧺 🧳 📡 🏢 🏭
+  🏠 🏘️ 🏚️ 🌟 🎨 🧡 💙 💚 💛 💜
+  🩵 🩷 🔋 🧨 🧤 🧦 🧥 🧢 🧴 🧵
+  🧶 🛎️ 🛏️ 🛋️ 🚪 🚧 🚦 🚥 🚨 🚒
+  🚑 🚓 🗄️ 🗳️ 📫 📪 📬 📭 📮 📨
+  📩 📤 📥 📧 🔬 🔭 🕵️‍♂️ 🕵️‍♀️ 🧑‍🏫
+  🧑‍🔧 🧑‍🔩 🧑‍🎨 🧑‍🚀 🧑‍✈️ 🧑‍🚒 🧑‍⚕️ 🧑‍🎤 🔨 🔧
+  🔩 🗜️ 🖲️ 💾 💿 📀 📼 🧫 ⚡ 🌀
+  🌪️ 🛸 🎲 🎮 🐛 🐜 🦠 ⏫ ⏬ ⏩
+  ⏪ ⏭️ ⏮️ 🆗 🆕 🆙
+  🪙 🪙 💰 💴 💵 💶 💷 💸 💳 🏦
+  ⚠️ ❗ ❕ ❓ ❔ ℹ️ ♻️ ⛔ 🚫
+  ⬆️ ⬇️ ⬅️ ➡️ ↗️ ↘️ ↙️ ↖️ ⤴️ ⤵️ 
+  ↩️ ↪️ 🔼 🔽 ▶️ ⏯️ ⏸️ ⏹️ ⏺️ ⏏️ 
+  ◀️ 🔀 🔃 🔙 🔚 🔛 🔜 🔝 ➕ ➖ 
+  ➗ ✴️ ❇️ ✨ ⭐ 🟢 🟡 🔴 🔵 ⚪
+  ⚫ 🟣 🟤 🟧 🟥 🟦 🟩 🟨 🟪 🟫
+  ⬛ ⬜ ◼️ ◻️ ◽ ◾ 💬 🗨️ 🗯️ 📞 
+  ☎️ 📱 📲 📳 🔕 🔇 🔈 🔉 🔊 🎙️ 
+  🎚️ 🎛️ 🎧 📺 📻 📄 📃 📑 🧾 📰
+  🗞️ 📁 📇 🖇️ 📍 🧷 ✂️ 📏 📐 🧮 
+  🖋️ 🖌️ ⌨️ 💽 🔌 🔦 🛜 📶 🛰️ ☁️ 
+  🌩️ 🌫️ 🌤️ 🛢️ ⚗️ 🗺️ 🔑 🧠 🤖 🐧 
+  🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄 
+  🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
+
+  ## start or update server
+  ```Bash
+  docker compose -f docker-compose.prod.yml up --build -d
+  ```
+
+  ## stop server
+  ```Bash
+  docker compose -f docker-compose.prod.yml down
+  ```
+
+  ## see last 10 commits
+
+  ```Bash
+  git log --oneline -n 10
+  ```
+
+  </details>
+
+<!-- ---------------------- -->
+
+- <details open>
   <summary>Dev Logs</summary>
 
-- [x] v0.0.1 - project folders and files structure created
-- dev since 2022, dev from strach started 12.11.2025 
-- full project step by step flow inside README.md
-- create .gitignore file
-- create github repository
-- project first folders and files structure created
-- [x] v0.0.2 - test hello world docker on local
-- hello world html page created
-- docker compose file created
-- [x] v0.0.3 - prod docker on linux server
-- added setup instructions to README.md
-- test the subdomain crazywalk.weforks.org
-- [x] v0.0.4 - create webhook from github to auto update server docker
-- added webhook server and dockerfile
-- make pull on server to update
-- [x] v0.0.5 - update env in dockerfile build
-- [x] v0.0.6 - make a test commit to make sure server updated
-- [x] v0.0.7 - retest server updated
-- [x] v0.0.8 - A_home_page created with city detection and background map
-- A_home_page maximum zoom fixed to city center
-- A_home_page added pre loading gif in future sponsored by NAME
-- [x] v0.0.9 - if small screen then do not show Iphone image
-- [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
-- README.md updated
+  - [x] v0.0.1 - project folders and files structure created
+  - dev since 2022, dev from strach started 12.11.2025 
+  - full project step by step flow inside README.md
+  - create .gitignore file
+  - create github repository
+  - project first folders and files structure created
+  - [x] v0.0.2 - test hello world docker on local
+  - hello world html page created
+  - docker compose file created
+  - [x] v0.0.3 - prod docker on linux server
+  - added setup instructions to README.md
+  - test the subdomain crazywalk.weforks.org
+  - [x] v0.0.4 - create webhook from github to auto update server docker
+  - added webhook server and dockerfile
+  - make pull on server to update
+  - [x] v0.0.5 - update env in dockerfile build
+  - [x] v0.0.6 - make a test commit to make sure server updated
+  - [x] v0.0.7 - retest server updated
+  - [x] v0.0.8 - A_home_page created with city detection and background map
+  - A_home_page maximum zoom fixed to city center
+  - A_home_page added pre loading gif in future sponsored by NAME
+  - [x] v0.0.9 - if small screen then do not show Iphone image
+  - [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
+  - README.md updated
 
 
-## update repository
+  ## update repository
 
-```Bash
-git add .
-git commit -m "v0.0.10 - README.md updated"
-git push
-```
+  ```Bash
+  git add .
+  git commit -m "v0.0.10 - README.md updated"
+  git push
+  ```
 
-</details>
-
-</blockquote>
+  </details>
 
 </details>
