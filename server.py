@@ -61,7 +61,7 @@ Initializer.load_env()
 
 # Configuration
 PORT = int(os.environ.get("SERVER_PORT", 8000))
-DIRECTORY = os.environ.get("FRONTEND_INDEX_PAGE", "CORE/FRONTEND/A_home_page")
+DIRECTORY = os.environ.get("FRONTEND_INDEX_PAGE", "CORE/FRONTEND")
 
 if not os.environ.get("SERVER_PORT"):
     logger.warning("SERVER_PORT not found in .env, defaulting to 8000")
@@ -100,10 +100,98 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests, including API proxies."""
+        if self.path.startswith('/api/locate'):
+            self.handle_locate()
+            return
         if self.path.startswith('/api/reverse') or self.path.startswith('/api/search'):
             self.proxy_nominatim()
             return
         super().do_GET()
+
+    def handle_locate(self):
+        """
+        Handle /api/locate request.
+        Takes lat/lon, reverse geocodes to find city, 
+        then optionally searches for city center to return canonical coordinates.
+        Returns: { 'city': 'City Name', 'lat': 0.0, 'lon': 0.0 }
+        """
+        try:
+            # Parse params
+            parsed_path = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_path.query)
+            lat = params.get('lat', [None])[0]
+            lon = params.get('lon', [None])[0]
+
+            if not lat or not lon:
+                self.send_error(400, "Missing lat or lon parameters")
+                return
+            
+            user_lat = float(lat)
+            user_lon = float(lon)
+            
+            # Default fallback values
+            city = "Unknown City"
+            target_lat = user_lat
+            target_lon = user_lon
+            
+            headers = {'User-Agent': 'CrazyWalk/1.0'}
+            api_timeout = 3 # seconds
+
+            # 1. Reverse Geocode to get City Name
+            try:
+                reverse_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&accept-language=en"
+                req = urllib.request.Request(reverse_url, headers=headers)
+                
+                with urllib.request.urlopen(req, timeout=api_timeout) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        address = data.get('address', {})
+                        city = address.get('city') or address.get('town') or address.get('village') or \
+                               address.get('hamlet') or address.get('state') or "Unknown City"
+            except Exception as e:
+                logger.warning(f"Reverse geocoding failed: {e}")
+                # Continue with defaults
+
+            # 2. (Optional) Search for City Center
+            # Only try if we found a valid city name
+            if city != "Unknown City":
+                try:
+                    encoded_q = urllib.parse.quote(city)
+                    search_url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_q}&limit=1&accept-language=en"
+                    req_search = urllib.request.Request(search_url, headers=headers)
+                    
+                    with urllib.request.urlopen(req_search, timeout=api_timeout) as response:
+                        if response.status == 200:
+                            search_data = json.loads(response.read().decode())
+                            if search_data:
+                                target_lat = float(search_data[0]['lat'])
+                                target_lon = float(search_data[0]['lon'])
+                except Exception as e:
+                    logger.warning(f"City search failed: {e}")
+                    # Continue with user coords as target
+
+            # Construct Response
+            result = {
+                "city": city.upper(),
+                "lat": target_lat,
+                "lon": target_lon,
+                "user_lat": user_lat,
+                "user_lon": user_lon
+            }
+
+            # Send Headers
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*') 
+            self.end_headers()
+            
+            # Send Body
+            self.wfile.write(json.dumps(result).encode())
+
+        except Exception as e:
+            logger.error(f"Locate Fatal Error: {e}")
+            self.send_error(500, f"Server Error: {str(e)}")
+
 
     def proxy_nominatim(self):
         """Proxy requests to Nominatim to avoid CORS."""

@@ -386,6 +386,18 @@
   - README.md updated
   - [x] v0.0.11 - Logo changed
   - [x] v0.0.12 - changed to backend logic for city request
+  - [x] v0.0.13 - B_map_page created with geo detection
+  - added link to GUEST button 
+  - added button of sendwich in right top corner
+  - added GPS icon next to sendwich button
+  - added user marker on map
+
+  - fix marker so he will not move on map move
+  - fixed small screen UI
+  - added top bar with cocial icons
+  - fixed 
+  - [x] v0.0.14 - B_map_page marker added in center of map
+  - [x] v0.0.15 - 32.05673, 34.76875 logic to GPS icon
   - 
 
 
@@ -393,7 +405,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.12 - changed to backend logic for city request"
+  git commit -m "v0.0.13 - B_map_page created with geo detection"
   git push
   ```
 

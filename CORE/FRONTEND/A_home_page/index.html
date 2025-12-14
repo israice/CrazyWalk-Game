@@ -471,14 +471,14 @@
             <i class="fa-solid fa-triangle-exclamation" style="font-size: 8vh; color: white; margin-bottom: 2vh;"></i>
             <h1>CONNECTION ERROR</h1>
             <p id="error-message">Unable to verify location. <br> Please check your internet or GPS settings.</p>
-            <button class="btn-retry" onclick="location.reload()">RETRY</button>
+            <button class="btn-retry" id="retry-btn">RETRY</button>
         </div>
 
         <div class="ui-overlay" id="ui-overlay">
             <div class="header">
                 <img src="components/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
                 <h1>CrazyWalk</h1>
-                <h2>Walk & Earn Game 2</h2>
+                <h2>Walk & Earn Game</h2>
             </div>
 
             <!-- Middle Section: Grows to fill space -->
@@ -572,73 +572,102 @@
                 subdomains: 'abcd'
             }).addTo(map);
 
-            if ("geolocation" in navigator) {
+            const startGeolocation = () => {
                 loadingGif.style.display = 'block';
+                errorScreen.style.display = 'none';
 
-                setTimeout(() => {
-                    console.log("DEBUG: Requesting Geolocation...");
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            console.log("DEBUG: Location Found!", position);
-                            const userLat = position.coords.latitude;
-                            const userLon = position.coords.longitude;
+                // Safety Timeout (e.g., if user ignores prompt or browser hangs)
+                const safetyTimeout = setTimeout(() => {
+                    console.warn("DEBUG: Safety Timeout Triggered");
+                    showError("Request timed out.<br>Please check your GPS or connection.");
+                }, 7000);
 
-                            // Use local proxy to avoid CORS
-                            fetch(`./api/reverse?lat=${userLat}&lon=${userLon}`)
-                                .then(response => {
-                                    if (!response.ok) throw new Error("API Network Error");
-                                    return response.json();
-                                })
-                                .then(data => {
-                                    const address = data.address;
-                                    const city = address.city || address.town || address.village || address.hamlet || address.state || "Unknown City";
-                                    cityLabel.textContent = city.toUpperCase();
+                if (!("geolocation" in navigator)) {
+                    clearTimeout(safetyTimeout);
+                    showError("Geolocation is not supported<br>by your browser.");
+                    return;
+                }
 
-                                    // Use local proxy for search too
-                                    return fetch(`./api/search?q=${encodeURIComponent(city)}&limit=1`);
-                                })
-                                .then(response => {
-                                    if (!response.ok) throw new Error("API Network Error");
-                                    return response.json();
-                                })
-                                .then(searchData => {
-                                    let targetLat = userLat;
-                                    let targetLon = userLon;
+                console.log("DEBUG: Requesting Geolocation...");
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        clearTimeout(safetyTimeout); // Got location, cancel safety timer
+                        console.log("DEBUG: Location Found!", position);
+                        const userLat = position.coords.latitude;
+                        const userLon = position.coords.longitude;
 
-                                    if (searchData && searchData.length > 0) {
-                                        targetLat = searchData[0].lat;
-                                        targetLon = searchData[0].lon;
-                                    }
+                        // Use server-side logic to determine location
+                        fetch(`/api/locate?lat=${userLat}&lon=${userLon}`)
+                            .then(response => {
+                                if (!response.ok) throw new Error("API Network Error");
+                                return response.json();
+                            })
+                            .then(data => {
+                                // Update UI with server-provided data
+                                cityLabel.textContent = data.city;
 
-                                    map.setView([targetLat, targetLon], 17, { animate: false });
-                                    revealContent();
-                                })
-                                .catch(err => {
-                                    console.error("DEBUG: Nominatim Error:", err);
-                                    showError(`Unable to connect to Geolocation API.<br><small>${err.message}</small>`);
-                                });
-                        },
-                        (error) => {
-                            console.error("DEBUG: Geolocation Error Callback:", error);
-                            // Show red screen if user denied or timeout
-                            if (error.code === error.PERMISSION_DENIED) {
-                                showError("Location Access Denied.<br>Please enable GPS permissions.");
-                            } else if (error.code === error.TIMEOUT) {
-                                showError("Location Request Timed Out.<br>Please try again.");
-                            } else {
-                                showError(`Unable to retrieve location.<br><small>${error.message}</small>`);
-                            }
-                        },
-                        {
-                            enableHighAccuracy: false,
-                            timeout: 10000,
-                            maximumAge: 60000
+                                // Map view logic:
+                                // "data.lat" and "data.lon" are the CANONICAL city center coordinates (from search)
+                                // "data.user_lat" and "data.user_lon" are the user's RAW coordinates
+                                // For A_home_page, we want to center on the CITY to look nice.
+
+                                map.setView([data.lat, data.lon], 17, { animate: false });
+                                revealContent();
+                            })
+                            .catch(err => {
+                                console.error("DEBUG: Location API Error:", err);
+                                showError(`Unable to connect to Server.<br><small>${err.message}</small>`);
+                            });
+                    },
+                    (error) => {
+                        clearTimeout(safetyTimeout); // Got error, cancel safety timer
+                        console.error("DEBUG: Geolocation Error Callback:", error);
+                        if (error.code === error.PERMISSION_DENIED) {
+                            showError("Location Access Denied.<br>Please enable GPS permissions.");
+                        } else if (error.code === error.TIMEOUT) {
+                            showError("Location Request Timed Out.<br>Check your GPS signal.");
+                        } else {
+                            showError(`Unable to retrieve location.<br><small>${error.message}</small>`);
                         }
-                    );
-                }, 1000);
-            } else {
-                showError("Geolocation is not supported<br>by your browser.");
-            }
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            };
+
+            // Retry button now triggers the function directly (User Gesture)
+            document.getElementById('retry-btn').addEventListener('click', startGeolocation);
+
+            // Initial auto-start (might warn, but we try)
+            setTimeout(startGeolocation, 1000);
+
+            // GUEST Button Logic - AJAX Load B_map_page
+            document.querySelector('.btn-guest').addEventListener('click', () => {
+                const targetUrl = '../B_map_page/index.html';
+
+                fetch(targetUrl)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to load page');
+                        return response.text();
+                    })
+                    .then(html => {
+                        // We need to fix relative paths since we are staying on A_home_page URL
+                        // Injecting a base tag is the robust way to handle this
+                        const baseTag = '<base href="../B_map_page/">';
+                        const fixedHtml = html.replace('<head>', `<head>${baseTag}`);
+
+                        document.open();
+                        document.write(fixedHtml);
+                        document.close();
+                    })
+                    .catch(err => {
+                        console.error('Navigation Error:', err);
+                        alert('Error loading map page. Please try again.');
+                    });
+            });
 
         });
     </script>

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Location</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Container for the map content */
+        .black-square {
+            position: absolute;
+            width: 146vh;
+            height: 82vh;
+            background-color: #050505;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            overflow: hidden;
+            /* Ensure map doesn't spill out */
+        }
+
+        /* The Map itself */
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #050505;
+            opacity: 0;
+            transition: opacity 0.8s ease-in-out;
+            z-index: 1;
+        }
+
+        /* Loader GIF */
+        #loading-gif {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            /* Centered in the square */
+            width: 150vh;
+            /* Adjust size as appropriate */
+            height: 150vh;
+            object-fit: contain;
+            z-index: 10;
+            transition: opacity 0.6s ease-out;
+        }
+
+        /* Center Marker GIF */
+        #center-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 15vh;
+            /* Adjust size based on visual need */
+            height: auto;
+            transform: translate(-50%, -50%);
+            /* Perfectly centered */
+            z-index: 20;
+            /* Above map and loader */
+            pointer-events: none;
+            /* Let clicks pass through to map if needed */
+            display: none;
+            /* Hidden until map is ready */
+        }
+
+        /* The Phone Frame */
+        .phone-frame {
+            height: 200vh;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-90deg);
+            z-index: 100;
+            /* On top of everything */
+            pointer-events: none;
+        }
+
+        /* Top Right Controls */
+        .top-controls {
+            position: absolute;
+            top: 4vh;
+            right: 4vh;
+            display: flex;
+            gap: 2vh;
+            z-index: 50;
+            /* Above map and center marker, below phone frame */
+        }
+
+        .control-btn {
+            width: 6vh;
+            height: 6vh;
+            background-color: rgba(30, 30, 30, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1vh;
+            /* Slightly rounded square */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .control-btn:active {
+            background-color: rgba(60, 60, 60, 0.9);
+        }
+
+        .control-btn svg {
+            width: 60%;
+            height: 60%;
+            fill: white;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1024px) {
+            .phone-frame {
+                display: none !important;
+            }
+
+            .black-square {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            .top-controls {
+                top: 2vh;
+                right: 2vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="black-square">
+        <div id="map"></div>
+
+        <div class="top-controls">
+            <!-- GPS Button -->
+            <div class="control-btn" id="gps-btn">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                </svg>
+            </div>
+
+            <!-- Sandwich/Menu Button -->
+            <div class="control-btn" id="menu-btn">
+                <svg viewBox="0 0 24 24">
+                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                </svg>
+            </div>
+        </div>
+        <img id="loading-gif" src="components/earth.gif" alt="Loading...">
+        <img id="center-marker" src="components/marker.gif" alt="Center Marker">
+    </div>
+    <img class="phone-frame" src="components/iphone.png" alt="Phone Frame">
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mapElement = document.getElementById('map');
+            const loadingGif = document.getElementById('loading-gif');
+            const markerElement = document.getElementById('center-marker');
+            let hasRevealed = false;
+            let watchId = null;
+
+            // Initialize Map
+            const map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false,
+                zoomSnap: 0,
+            }).setView([0, 0], 3);
+
+            // Dark Matter No Labels Layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+                maxZoom: 20,
+                subdomains: 'abcd'
+            }).addTo(map);
+
+            const revealMap = () => {
+                if (hasRevealed) return;
+                hasRevealed = true;
+                loadingGif.style.opacity = '0';
+                mapElement.style.opacity = '1';
+                markerElement.style.display = 'block';
+                setTimeout(() => {
+                    loadingGif.style.display = 'none';
+                }, 600);
+            };
+
+            const startLocationWatch = () => {
+                if (!("geolocation" in navigator)) {
+                    alert("Geolocation not supported by this browser.");
+                    return;
+                }
+
+                // User requested "no updates", so we use getCurrentPosition to fetch ONCE.
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        const accuracy = position.coords.accuracy;
+
+                        console.log(`Location Found: ${lat}, ${lon} (Accuracy: ${accuracy}m)`);
+
+                        fetch(`/api/locate?lat=${lat}&lon=${lon}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                map.setView([data.user_lat, data.user_lon], 19);
+                                revealMap();
+                            })
+                            .catch(err => {
+                                console.warn("Locate API Error:", err);
+                                map.setView([lat, lon], 19);
+                                revealMap();
+                            });
+                    },
+                    (error) => {
+                        console.warn("Geolocation Error:", error);
+                        if (!hasRevealed) {
+                            if (error.code === error.PERMISSION_DENIED) {
+                                alert("Please allow location access to see your exact position.");
+                            }
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 20000,
+                        maximumAge: 0
+                    }
+                );
+            };
+
+            // Start immediately
+            // Brief delay to prevent UI jank on load
+            setTimeout(startLocationWatch, 1000);
+        });
+    </script>
+</body>
+
+</html>
