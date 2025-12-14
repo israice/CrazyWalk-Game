@@ -26,8 +26,8 @@
 ### Last Dev Update
 - v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
 <div align="center">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" width="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-2.png" alt="Dashboard" width="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-2.png" alt="Dashboard" height="300">
 </div>
 <!-- ---------------------- -->
 
