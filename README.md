@@ -372,13 +372,14 @@ git log --oneline -n 10
 [X] v0.0.8 - A_home_page created with city detection and background map
 - A_home_page maximum zoom fixed to city center
 - A_home_page added pre loading gif in future sponsored by NAME
-[ ] v0.0.9 - если маленкий экран то не отоброжать Iphone
+[X] v0.0.9 - if small screen then do not show Iphone image
+
 
 ## update repository
 
 ```Bash
 git add .
-git commit -m "v0.0.8 - A_home_page created with city detection and background map"
+git commit -m "v0.0.9 - if small screen then do not show Iphone image"
 git push
 ```
 

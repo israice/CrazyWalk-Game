@@ -9,8 +9,20 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --primary-color: #00f3ff;
+            --secondary-color: #00ff88;
+            --glass-bg: rgba(20, 20, 20, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-glow: 0 0 10px rgba(0, 243, 255, 0.3);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -25,30 +37,36 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            font-family: 'Poppins', sans-serif;
+            color: white;
         }
 
         .black-square {
             position: absolute;
             width: 42vh;
             height: 72vh;
-            background-color: black;
+            background-color: #050505;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 0;
             overflow: hidden;
-            /* Ensure map doesn't spill out */
+            border-radius: 3vh;
+            /* Rounded corners like a phone screen */
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.15);
         }
 
         #map {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            background: #000;
-            /* Fallback */
+            background: #050505;
             opacity: 0;
-            /* Hide map initially to avoid flash */
-            transition: opacity 0.5s ease-in;
+            transition: opacity 0.8s ease-in-out;
+            z-index: 1;
+            filter: sepia(100%) hue-rotate(180deg) saturate(1.8) contrast(1.1) brightness(1.3);
         }
 
         #loading-gif {
@@ -59,31 +77,228 @@
             height: 100%;
             object-fit: cover;
             z-index: 500;
-            /* Above map, below label */
             background: black;
-            transition: opacity 0.5s ease-out;
+            transition: opacity 0.6s ease-out;
         }
 
-        #city-label {
+        /* FULL HEIGHT FLEX CONTAINER */
+        .ui-overlay {
             position: absolute;
-            bottom: 0;
+            top: 0;
             left: 0;
             width: 100%;
-            padding: 15px 0;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 100%);
-            color: rgba(255, 255, 255, 0.8);
+            height: 100%;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            padding: 4vh 2.5vh 3vh 2.5vh;
+            /* Top, Right, Bottom, Left */
+            pointer-events: auto;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, transparent 40%, rgba(0, 0, 0, 0.9) 100%);
+        }
+
+        /* 1. HEADER section */
+        .header {
             text-align: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 1.2rem;
-            font-weight: 300;
+            flex-shrink: 0;
+            margin-bottom: 2vh;
+        }
+
+        .logo-icon {
+            font-size: 4vh;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 5px rgba(0, 243, 255, 0.8));
+            animation: pulse 3s infinite alternate;
+        }
+
+        @keyframes pulse {
+            to {
+                transform: scale(1.05);
+                filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.6));
+            }
+        }
+
+        h1 {
+            font-size: 3.2vh;
+            font-weight: 800;
+            margin: 0.5vh 0 0;
+            line-height: 1;
+            background: linear-gradient(to right, #fff, #ddd);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            font-size: 1.3vh;
+            font-weight: 600;
+            color: var(--secondary-color);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-top: 0.3vh;
+            opacity: 0.9;
+        }
+
+        /* 2. MIDDLE SECTION (Menu + Legal) - Flex Grow to take space */
+        .middle-section {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 3vh;
+            width: 100%;
+        }
+
+        .menu-links {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5vh;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 1.5vh;
+            padding: 1.2vh 1.5vh;
+            border-radius: 1.5vh;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s, background 0.2s;
+            cursor: pointer;
+        }
+
+        .menu-item:active {
+            transform: scale(0.98);
+        }
+
+        .menu-item span {
+            font-size: 1.5vh;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .icon-circle {
+            width: 3vh;
+            height: 3vh;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4vh;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .icon-info {
+            color: var(--primary-color);
+        }
+
+        .icon-video {
+            color: #ff4757;
+        }
+
+        /* Legal - Subtle */
+        .legal-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8vh;
+            padding: 0 0.5vh;
+        }
+
+        .legal-item {
+            display: flex;
+            align-items: center;
+            gap: 1vh;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 1.1vh;
+            cursor: pointer;
+        }
+
+        .legal-item b {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+        }
+
+        input[type="checkbox"] {
+            appearance: none;
+            width: 1.6vh;
+            height: 1.6vh;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            display: grid;
+            place-content: center;
+        }
+
+        input[type="checkbox"]:checked {
+            background: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+
+        input[type="checkbox"]:checked::after {
+            content: '✓';
+            font-size: 1.2vh;
+            color: black;
+            font-weight: 800;
+        }
+
+        /* 3. BOTTOM ACTIONS */
+        .action-buttons {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2vh;
+            margin-top: 1vh;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1.5vh;
+            border-radius: 1.5vh;
+            font-size: 1.6vh;
+            font-weight: 700;
+            text-transform: uppercase;
             letter-spacing: 1px;
-            z-index: 1000;
-            /* Above everything */
+            border: none;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, #00f3ff, #0063cc);
+            color: black;
+        }
+
+        .btn-guest {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+        }
+
+        /* City Label - Pinned absolutely to bottom of container to sit BEHIND overlay but visible */
+        #city-label {
+            position: absolute;
+            bottom: 12vh;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.5vh;
+            font-weight: 600;
+            letter-spacing: 2px;
             pointer-events: none;
-            /* Let touches pass through */
             opacity: 0;
-            /* Hide initially */
-            transition: opacity 0.5s ease-in;
+            transition: opacity 1s;
+            z-index: 101;
+            /* Between map and UI elements */
+            text-transform: uppercase;
         }
 
         img.iphone-frame {
@@ -92,9 +307,96 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            z-index: 1;
+            z-index: 200;
             pointer-events: none;
-            /* Allow clicks to pass through frame to map */
+            filter: drop-shadow(0 20px 50px rgba(0, 0, 0, 0.9));
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            img.iphone-frame {
+                display: none;
+            }
+
+            .black-square {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+                box-shadow: none;
+                background-color: black;
+            }
+
+            .ui-overlay {
+                /* Floating HUD in center, matching desktop size */
+                width: 42vh;
+                height: 72vh;
+                max-width: 100vw;
+                /* Safety */
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 4vh 2.5vh 3vh 2.5vh;
+                /* Restore desktop padding */
+                border-radius: 3vh;
+                /* Optional: smooth corners for the gradient box */
+                justify-content: space-between;
+                /* Ensure vertical spacing matches desktop */
+            }
+
+            /* Restore fonts to VH units to match desktop "same size" feel, 
+               since container height is fixed to 72vh again */
+            .logo-icon {
+                font-size: 4vh;
+            }
+
+            h1 {
+                font-size: 3.2vh;
+            }
+
+            h2 {
+                font-size: 1.3vh;
+            }
+
+            .btn {
+                font-size: 1.6vh;
+                padding: 1.5vh;
+            }
+
+            .menu-item span {
+                font-size: 1.5vh;
+            }
+
+            .icon-circle {
+                width: 3vh;
+                height: 3vh;
+                font-size: 1.4vh;
+            }
+
+            .legal-item {
+                font-size: 1.1vh;
+            }
+
+            #city-label {
+                /* Pin inside the floating overlay or relative to it? 
+                   The label is outside ui-overlay in DOM (child of black-square).
+                   Since black-square is full screen, city-label is at bottom of SCREEN.
+                   To match "same place", we should move it or adjust it.
+                   User said "located in the same places". 
+                   On desktop, city-label is at bottom of black-square (72vh).
+                   On mobile, black-square is 100vh.
+                   So city-label is at bottom of screen (100vh).
+                   This is probably fine as it leaves the map clear.
+                   But if user insists strictly "same place relative to UI",
+                   we might need to move it. 
+                   "located in the same places in the center of the screen" implies the whole composition.
+                   Let's keep city-label at screen bottom for now as it looks better map-wise, 
+                   or move it up to 12vh from center bottom?
+                   Let's stick to screen bottom for better map visibility and cleaner UI box.
+                */
+                font-size: 2vh;
+                bottom: 8vh;
+                /* Lift slightly on mobile */
+            }
         }
     </style>
 </head>
@@ -103,6 +405,43 @@
     <div class="black-square">
         <div id="map"></div>
         <img id="loading-gif" src="components/earth.gif" alt="Loading...">
+
+        <div class="ui-overlay" id="ui-overlay">
+            <div class="header">
+                <i class="fa-solid fa-location-dot logo-icon"></i>
+                <h1>CrazyWalk</h1>
+                <h2>WalkEarn Game</h2>
+            </div>
+
+            <!-- Middle Section: Grows to fill space -->
+            <div class="middle-section">
+                <div class="menu-links">
+                    <div class="menu-item">
+                        <div class="icon-circle icon-info"><i class="fa-solid fa-info"></i></div>
+                        <span>Step By Step Instructions</span>
+                    </div>
+                    <div class="menu-item">
+                        <div class="icon-circle icon-video"><i class="fa-solid fa-play"></i></div>
+                        <span>Video Explanation</span>
+                    </div>
+                </div>
+
+                <div class="legal-section">
+                    <label class="legal-item">
+                        <input type="checkbox"> <span>I agree to <b>Terms of Use</b></span>
+                    </label>
+                    <label class="legal-item">
+                        <input type="checkbox"> <span>I agree to <b>Privacy Policy</b></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-login">LOGIN</button>
+                <button class="btn btn-guest">GUEST</button>
+            </div>
+        </div>
+
         <div id="city-label"></div>
     </div>
     <img class="iphone-frame" src="components/iphone.png" alt="iphone">
@@ -116,22 +455,21 @@
             const cityLabel = document.getElementById('city-label');
             const mapElement = document.getElementById('map');
             const loadingGif = document.getElementById('loading-gif');
+            const uiOverlay = document.getElementById('ui-overlay');
 
-            // Function to reveal map and interactives together
             const revealContent = () => {
                 loadingGif.style.opacity = '0';
-                mapElement.style.opacity = '1';
+                mapElement.style.opacity = '1'; /* Map full opacity, filters do the darkening */
                 cityLabel.style.opacity = '1';
+                uiOverlay.style.opacity = '1';
                 setTimeout(() => {
                     loadingGif.style.display = 'none';
-                }, 500);
+                }, 600);
             };
 
-            // 1. Initialize Map with interactions DISABLED
             const map = L.map('map', {
                 zoomControl: false,
                 attributionControl: false,
-                // Disable all zoom/interaction
                 dragging: false,
                 touchZoom: false,
                 doubleClickZoom: false,
@@ -140,13 +478,11 @@
                 keyboard: false
             });
 
-            // 2. Add Dark Matter NoLabels Tile Layer
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
                 maxZoom: 20,
                 subdomains: 'abcd'
             }).addTo(map);
 
-            // 3. Geolocation Logic
             if ("geolocation" in navigator) {
                 loadingGif.style.display = 'block';
 
@@ -155,7 +491,6 @@
                         const userLat = position.coords.latitude;
                         const userLon = position.coords.longitude;
 
-                        // 4. Reverse Geocoding to find City
                         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}`)
                             .then(response => response.json())
                             .then(data => {
@@ -163,7 +498,6 @@
                                 const city = address.city || address.town || address.village || address.hamlet || address.state || "Unknown City";
                                 cityLabel.textContent = city.toUpperCase();
 
-                                // 5. Search for City Center
                                 return fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`);
                             })
                             .then(response => response.json())
@@ -176,10 +510,7 @@
                                     targetLon = searchData[0].lon;
                                 }
 
-                                // Apply view instantly
                                 map.setView([targetLat, targetLon], 17, { animate: false });
-
-                                // Map is ready and text is set -> Reveal All
                                 revealContent();
                             })
                             .catch(err => {
