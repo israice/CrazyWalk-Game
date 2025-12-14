@@ -8,6 +8,8 @@ import urllib.parse
 
 PORT = 9000
 SECRET = os.environ.get("AUTOUPDATE_WEBHOOK_FROM_GITHUB", "").encode("utf-8")
+import threading
+UpdateLock = threading.Lock()
 
 class WebhookHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
@@ -48,9 +50,17 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         
         # Run update in a separate thread
         import threading
-        threading.Thread(target=self.run_update).start()
+        if not UpdateLock.locked():
+             threading.Thread(target=self.run_update).start()
+        else:
+             print("Update already in progress. Skipping.", flush=True)
 
     def run_update(self):
+        # Double check lock or just use it as context if we were blocking, 
+        # but here we just want to skip if locked.
+        if not UpdateLock.acquire(blocking=False):
+             return
+        
         try:
             print("Received valid webhook. Starting update process...", flush=True)
             
@@ -76,6 +86,8 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
             print(f"Error during update: {e}", flush=True)
         except Exception as e:
             print(f"Unexpected error: {e}", flush=True)
+        finally:
+            UpdateLock.release()
 
 if __name__ == "__main__":
     # Ensure we are in the right directory (though Docker workdir should handle this)

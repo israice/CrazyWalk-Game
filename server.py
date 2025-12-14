@@ -5,6 +5,9 @@ import sys
 import signal
 import threading
 import logging
+import urllib.request
+import urllib.parse
+import json
 from typing import Any
 
 # Configure logging
@@ -71,6 +74,18 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
+    def end_headers(self):
+        """Add caching headers to static files."""
+        # Default: Cache assets (images, css) for 1 hour
+        cache_ctrl = "public, max-age=3600"
+        
+        # Don't cache HTML files so users always get the latest code/fixes
+        if hasattr(self, 'path') and (self.path.endswith('.html') or self.path == '/' or self.path == ''):
+             cache_ctrl = "no-cache, no-store, must-revalidate"
+
+        self.send_header("Cache-Control", cache_ctrl)
+        super().end_headers()
+
     def log_message(self, format: str, *args: Any) -> None:
         """Override to filter specific 404s and use standard logging."""
         # Filter out Chrome DevTools 404 noise
@@ -83,10 +98,80 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                      self.log_date_time_string(),
                      format % args))
 
+    def do_GET(self):
+        """Handle GET requests, including API proxies."""
+        if self.path.startswith('/api/reverse') or self.path.startswith('/api/search'):
+            self.proxy_nominatim()
+            return
+        super().do_GET()
+
+    def proxy_nominatim(self):
+        """Proxy requests to Nominatim to avoid CORS."""
+        try:
+            # Parse internal request
+            parsed_path = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_path.query)
+            
+            # Construct target URL based on endpoint
+            if self.path.startswith('/api/reverse'):
+                # Extract lat/lon
+                lat = params.get('lat', [None])[0]
+                lon = params.get('lon', [None])[0]
+                if not lat or not lon:
+                    self.send_error(400, "Missing lat/lon")
+                    return
+                target_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&accept-language=en"
+                
+            elif self.path.startswith('/api/search'):
+                # Extract query
+                q = params.get('q', [None])[0]
+                limit = params.get('limit', ['1'])[0]
+                if not q:
+                    self.send_error(400, "Missing query")
+                    return
+                # Encode query params properly
+                encoded_q = urllib.parse.quote(q)
+                target_url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_q}&limit={limit}&accept-language=en"
+            
+            # Make request with User-Agent (Required by OSM)
+            req = urllib.request.Request(target_url, headers={'User-Agent': 'CrazyWalk/1.0'})
+            
+            with urllib.request.urlopen(req) as response:
+                data = response.read()
+                
+            # Send response back to frontend
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*') 
+            self.end_headers()
+            self.wfile.write(data)
+            
+        except Exception as e:
+            logger.error(f"Proxy error: {e}")
+            self.send_error(500, f"Proxy error: {str(e)}")
+
 class ThreadedHTTPServer(socketserver.ThreadingTCPServer):
     """Multi-threaded server to handle concurrent requests."""
     allow_reuse_address = True
     daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        """Override to silence disconnect errors."""
+        # Get the exception info
+        exc_type, exc_value, _ = sys.exc_info()
+        
+        # Check for known connection dropping errors
+        # WinError 10053 = Connection aborted by host machine
+        # BrokenPipeError = Client closed before we finished
+        if exc_type is ConnectionAbortedError or exc_type is BrokenPipeError:
+            return  # Ignore these common occurrences
+            
+        # For Windows specifically, check the errno/winerror if available
+        if hasattr(exc_value, 'winerror') and exc_value.winerror == 10053:
+            return
+
+        # Log real errors normally
+        super().handle_error(request, client_address)
 
 def run_server():
     Initializer.setup_working_directory()
