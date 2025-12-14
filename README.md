@@ -195,7 +195,7 @@
   <summary>Dev</summary>
 
 
-<details>
+- <details>
 
   <summary>Development Setup</summary>
 
