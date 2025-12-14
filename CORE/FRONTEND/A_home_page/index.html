@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Page</title>
+    <title>CrazyWalk</title>
+    <link rel="icon" type="image/png" href="components/crazywalk_logo.png">
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -100,7 +101,7 @@
             padding: 4vh 2.5vh 3vh 2.5vh;
             /* Top, Right, Bottom, Left */
             pointer-events: auto;
-            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, transparent 40%, rgba(0, 0, 0, 0.9) 100%);
+            /* background: transparent; */
         }
 
         /* 1. HEADER section */
@@ -110,14 +111,13 @@
             margin-bottom: 1vh;
         }
 
-        .logo-icon {
-            font-size: 8vh;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .logo-img {
+            height: 12vh;
+            /* Adjusted size */
+            width: auto;
             filter: drop-shadow(0 0 5px rgba(0, 243, 255, 0.8));
             animation: pulse 3s infinite alternate;
+            margin-bottom: 1vh;
         }
 
         @keyframes pulse {
@@ -279,6 +279,8 @@
 
         .btn-guest {
             background: white;
+            font-size: 2.0vh;
+            font-weight: bold;
             color: black;
             border: 1px solid white;
             backdrop-filter: none;
@@ -312,9 +314,9 @@
         }
 
         /* Mobile Responsive */
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             img.iphone-frame {
-                display: none;
+                display: none !important;
             }
 
             .black-square {
@@ -343,8 +345,9 @@
             }
 
             /* RESTORED & INCREASED fonts for mobile readability */
-            .logo-icon {
-                font-size: 8vh;
+            .logo-img {
+                height: 15vh;
+                /* Larger on mobile */
             }
 
             h1 {
@@ -396,6 +399,58 @@
                 /* Lift slightly on mobile */
             }
         }
+
+        /* ERROR SCREEN */
+        #error-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ff0033;
+            /* Bright Red */
+            z-index: 1000;
+            display: none;
+            /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 5vh;
+        }
+
+        #error-screen h1 {
+            font-size: 4vh;
+            color: white;
+            background: none;
+            -webkit-text-fill-color: white;
+            margin-bottom: 2vh;
+        }
+
+        #error-screen p {
+            font-size: 2vh;
+            color: white;
+            opacity: 0.9;
+            max-width: 80%;
+            margin-bottom: 4vh;
+        }
+
+        .btn-retry {
+            background: white;
+            color: #ff0033;
+            border: none;
+            padding: 1.5vh 4vh;
+            font-size: 2vh;
+            font-weight: 700;
+            border-radius: 1vh;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s;
+        }
+
+        .btn-retry:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 
@@ -404,9 +459,17 @@
         <div id="map"></div>
         <img id="loading-gif" src="components/earth.gif" alt="Loading...">
 
+        <!-- Red Error Screen -->
+        <div id="error-screen">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size: 8vh; color: white; margin-bottom: 2vh;"></i>
+            <h1>CONNECTION ERROR</h1>
+            <p id="error-message">Unable to verify location. <br> Please check your internet or GPS settings.</p>
+            <button class="btn-retry" onclick="location.reload()">RETRY</button>
+        </div>
+
         <div class="ui-overlay" id="ui-overlay">
             <div class="header">
-                <i class="fa-solid fa-location-dot logo-icon"></i>
+                <img src="components/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
                 <h1>CrazyWalk</h1>
                 <h2>Walk & Earn Game</h2>
             </div>
@@ -453,6 +516,8 @@
             const mapElement = document.getElementById('map');
             const loadingGif = document.getElementById('loading-gif');
             const uiOverlay = document.getElementById('ui-overlay');
+            const errorScreen = document.getElementById('error-screen');
+            const errorMessage = document.getElementById('error-message');
 
             const revealContent = () => {
                 loadingGif.style.opacity = '0';
@@ -462,6 +527,26 @@
                 setTimeout(() => {
                     loadingGif.style.display = 'none';
                 }, 600);
+            };
+
+            const showError = (msg) => {
+                // On mobile, avoid the "Red Screen" and iPhone frame overlay issues
+                // Revert to simple alert and show UI so user isn't blocked on black screen
+                if (window.innerWidth <= 1024) {
+                    const plainMsg = msg.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '');
+                    // Small delay to ensure loading gif doesn't conflict
+                    setTimeout(() => {
+                        alert(plainMsg);
+                    }, 100);
+                    revealContent();
+                    return;
+                }
+
+                loadingGif.style.display = 'none';
+                uiOverlay.style.display = 'none';
+                mapElement.style.display = 'none';
+                errorScreen.style.display = 'flex';
+                errorMessage.innerHTML = msg;
             };
 
             const map = L.map('map', {
@@ -489,7 +574,10 @@
                         const userLon = position.coords.longitude;
 
                         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}`)
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) throw new Error("API Network Error");
+                                return response.json();
+                            })
                             .then(data => {
                                 const address = data.address;
                                 const city = address.city || address.town || address.village || address.hamlet || address.state || "Unknown City";
@@ -497,7 +585,10 @@
 
                                 return fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`);
                             })
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) throw new Error("API Network Error");
+                                return response.json();
+                            })
                             .then(searchData => {
                                 let targetLat = userLat;
                                 let targetLon = userLon;
@@ -512,26 +603,28 @@
                             })
                             .catch(err => {
                                 console.error("Geocoding/Search error:", err);
-                                cityLabel.textContent = "EARTH";
-                                map.setView([userLat, userLon], 17, { animate: false });
-                                revealContent();
+                                showError(`Unable to connect to Geolocation API.<br><small>${err.message}</small>`);
                             });
                     },
                     (error) => {
                         console.warn("Geolocation denied or error:", error);
-                        cityLabel.textContent = "LOCATION DENIED";
-                        map.setView([0, 0], 2, { animate: false });
-                        revealContent();
+                        // Show red screen if user denied or timeout
+                        if (error.code === error.PERMISSION_DENIED) {
+                            showError("Location Access Denied.<br>Please enable GPS permissions.");
+                        } else if (error.code === error.TIMEOUT) {
+                            showError("Location Request Timed Out.<br>Please try again.");
+                        } else {
+                            showError(`Unable to retrieve location.<br><small>${error.message}</small>`);
+                        }
                     },
                     {
                         enableHighAccuracy: true,
-                        timeout: 5000,
+                        timeout: 10000, // 10 seconds timeout
                         maximumAge: 0
                     }
                 );
             } else {
-                cityLabel.textContent = "NO GPS";
-                revealContent();
+                showError("Geolocation is not supported<br>by your browser.");
             }
         });
     </script>

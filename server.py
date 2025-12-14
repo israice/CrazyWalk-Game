@@ -73,10 +73,8 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, format: str, *args: Any) -> None:
         """Override to filter specific 404s and use standard logging."""
-        path = args[0] if args else ""
-        
         # Filter out Chrome DevTools 404 noise
-        if "com.chrome.devtools.json" in path:
+        if hasattr(self, 'path') and "com.chrome.devtools.json" in self.path:
             return
             
         # Log everything else normally using our logger
