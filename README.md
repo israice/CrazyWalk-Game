@@ -391,6 +391,7 @@
   - [x] v0.0.13 - B_map_page created with geo detection
   - added link to GUEST button 
   - added button of sendwich in right top corner
+  - Fix production 404 by enforcing correct server root
 
   - added GPS icon next to sendwich button
   - added user marker on map
@@ -409,7 +410,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.13 - added button of sendwich in right top corner"
+  git commit -m "v0.0.13 - Fix production 404 by enforcing correct server root"
   git push
   ```
 

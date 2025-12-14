@@ -21,6 +21,7 @@ services:
       - .env
     environment:
       - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
+      - FRONTEND_INDEX_PAGE=CORE/FRONTEND
     networks:
       - pc2-net
 
