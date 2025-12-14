@@ -195,6 +195,8 @@
   <summary>Dev</summary>
 
 
+<blockquote>
+
 <details>
 
   <summary>Development Setup</summary>
@@ -388,5 +390,7 @@ git push
 ```
 
 </details>
+
+</blockquote>
 
 </details>
