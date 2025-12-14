@@ -190,7 +190,7 @@
             let hasRevealed = false;
 
             // Default coordinates
-            const DEFAULT_LAT = 32.05693;
+            const DEFAULT_LAT = 32.05688;
             const DEFAULT_LON = 34.76878;
             let isGpsActive = false;
             let hasPreciseFix = false; // Flag to prevent LowAcc from overwriting HighAcc
@@ -211,10 +211,17 @@
             // Custom Marker Icon
             const customIcon = L.divIcon({
                 className: 'custom-marker',
-                html: '<img src="/B_map_page/components/marker.gif" style="width: 15vh; height: auto; display: block; transform: translate(-50%, -50%);">',
+                html: `
+                    <div style="transform: translate(-50%, calc(-50% + 1vh)) rotate(0deg); position: relative; display: flex; align-items: center; justify-content: center;">
+                        <div style="position: absolute; width: 8vh; height: 8vh; background-color: #9900ff; border-radius: 50%; box-shadow: 0 0 15px #9900ff; opacity: 0.4; transform: perspective(500px) rotateX(45deg); margin-top: 50px;
+"></div>
+                        <img src="/B_map_page/components/marker.gif" style="position: relative; z-index: 2; width: 15vh; height: auto;">
+                    </div>
+                `,
                 iconSize: null,
                 iconAnchor: [0, 0]
             });
+
 
             // Create Marker pinned to map
             const userMarker = L.marker([DEFAULT_LAT, DEFAULT_LON], { icon: customIcon }).addTo(map);
