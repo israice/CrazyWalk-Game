@@ -411,7 +411,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.13 - fixing GPS icon next to sendwich button"
+  git commit -m "v0.0.13 - fixing GPS icon next to sendwich button 2"
   git push
   ```
 

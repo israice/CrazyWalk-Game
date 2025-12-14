@@ -189,6 +189,7 @@
             const DEFAULT_LAT = 32.05693;
             const DEFAULT_LON = 34.76878;
             let isGpsActive = false;
+            let hasPreciseFix = false; // Flag to prevent LowAcc from overwriting HighAcc
 
             // Initialize Map at DEFAULT location immediately
             const map = L.map('map', {
@@ -203,13 +204,12 @@
                 subdomains: 'abcd'
             }).addTo(map);
 
-            // Custom Marker Icon (using divIcon to support vh sizing/CSS)
+            // Custom Marker Icon
             const customIcon = L.divIcon({
-                className: 'custom-marker', // Needs empty class or custom styling helper
-                // transform: translate(-50%, -50%) centers the image on the lat/lon anchor
+                className: 'custom-marker',
                 html: '<img src="components/marker.gif" style="width: 15vh; height: auto; display: block; transform: translate(-50%, -50%);">',
-                iconSize: null, // Let CSS control size
-                iconAnchor: [0, 0] // We handle centering via CSS transform
+                iconSize: null,
+                iconAnchor: [0, 0]
             });
 
             // Create Marker pinned to map
@@ -228,50 +228,68 @@
             // Reveal immediately since we have default coords
             setTimeout(revealMap, 500);
 
+            // Reusable function to process coordinates (Client-Side First)
+            const processCoordinates = (lat, lon, accuracy, label) => {
+                console.log(`DEBUG: [Map Page] Processing ${label} Position: ${lat}, ${lon} (Acc: ${accuracy}m)`);
+
+                // If High Accuracy already found, ignore "Low Accuracy" updates that arrive late
+                if (label === 'LOW_ACCURACY' && hasPreciseFix) {
+                    console.log("DEBUG: Ignoring Low Accuracy update (Precise already found).");
+                    return;
+                }
+
+                // If this is High Accuracy, mark it
+                if (label === 'HIGH_ACCURACY') {
+                    hasPreciseFix = true;
+                }
+
+                // UPDATE MAP IMMEDIATELY (No Server Wait)
+                if (isGpsActive) {
+                    const newLatLng = [lat, lon];
+                    map.setView(newLatLng, 18);
+                    userMarker.setLatLng(newLatLng);
+
+                    // Visual feedback for accuracy warning (only for High Acc to prevent spam)
+                    if (label === 'HIGH_ACCURACY' && accuracy > 200) {
+                        console.warn(`Warning: GPS signal weak (${Math.round(accuracy)}m).`);
+                    }
+                }
+
+                // Background: Send to server just for city lookup/logging (optional)
+                fetch(`/api/locate?lat=${lat}&lon=${lon}`)
+                    .then(res => res.json())
+                    .then(data => console.log("DEBUG: Server ack:", data)) // Just log it
+                    .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
+            };
+
             const startLocationWatch = () => {
-                console.log("DEBUG: [Map Page] Requesting GPS position...");
+                console.log("DEBUG: [Map Page] Starting Parallel Geolocation Strategy...");
                 if (!("geolocation" in navigator)) {
                     alert("Geolocation not supported by this browser.");
                     return;
                 }
 
+                hasPreciseFix = false; // Reset flag on new toggle
+
+                // 1. FAST LANE (Low Accuracy, Cached ok) - Timeout 5s
                 navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
+                    (pos) => processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'LOW_ACCURACY'),
+                    (err) => console.warn("DEBUG: Fast Lane (Low Acc) failed:", err),
+                    { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
+                );
 
-                        console.log(`DEBUG: [Map Page] GPS Found: ${lat}, ${lon}`);
-
-                        fetch(`/api/locate?lat=${lat}&lon=${lon}`)
-                            .then(res => res.json())
-                            .then(data => {
-                                // Only update if GPS is still active
-                                if (isGpsActive) {
-                                    const newLatLng = [data.user_lat, data.user_lon];
-                                    map.setView(newLatLng, 18);
-                                    userMarker.setLatLng(newLatLng);
-                                }
-                            })
-                            .catch(err => {
-                                console.warn("DEBUG: [Warning] Locate API Error:", err);
-                                if (isGpsActive) {
-                                    const newLatLng = [lat, lon];
-                                    map.setView(newLatLng, 18);
-                                    userMarker.setLatLng(newLatLng);
-                                }
-                            });
-                    },
-                    (error) => {
-                        console.warn("DEBUG: [Warning] Geolocation Error:", error);
-                        if (error.code === error.PERMISSION_DENIED) {
-                            alert("Please allow location access.");
+                // 2. PRECISION LANE (High Accuracy, Fresh) - Timeout 20s
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'HIGH_ACCURACY'),
+                    (err) => {
+                        console.warn("DEBUG: Precision Lane (High Acc) failed:", err);
+                        if (err.code === err.TIMEOUT && !hasPreciseFix) {
+                            console.log("DEBUG: High Accuracy timed out. Relying on Low Accuracy result if available.");
+                        } else if (err.code === err.PERMISSION_DENIED) {
+                            alert("Please allow Location Access to use GPS.");
                         }
                     },
-                    {
-                        enableHighAccuracy: false,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
                 );
             };
 
@@ -289,6 +307,7 @@
                     // Turn OFF
                     console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
                     gpsBtn.classList.remove('active');
+                    hasPreciseFix = false;
                     map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
                     userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
                 }
