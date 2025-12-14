@@ -190,7 +190,7 @@
 
 <!-- ---------------------- -->
 
-<details open>
+<details>
 
   <summary>Dev</summary>
 
@@ -353,38 +353,29 @@ git log --oneline -n 10
 <details open>
   <summary>Dev Logs</summary>
 
-[X] v0.0.1 - project folders and files structure created
+- [x] v0.0.1 - project folders and files structure created
 - dev since 2022, dev from strach started 12.11.2025 
 - full project step by step flow inside README.md
 - create .gitignore file
 - create github repository
 - project first folders and files structure created
-
-[X] v0.0.2 - test hello world docker on local
+- [x] v0.0.2 - test hello world docker on local
 - hello world html page created
 - docker compose file created
-
-[X] v0.0.3 - prod docker on linux server
+- [x] v0.0.3 - prod docker on linux server
 - added setup instructions to README.md
 - test the subdomain crazywalk.weforks.org
-
-[X] v0.0.4 - create webhook from github to auto update server docker
+- [x] v0.0.4 - create webhook from github to auto update server docker
 - added webhook server and dockerfile
 - make pull on server to update
-
-[X] v0.0.5 - update env in dockerfile build
-
-[X] v0.0.6 - make a test commit to make sure server updated
-
-[X] v0.0.7 - retest server updated
-
-[ X ] v0.0.8 - A_home_page created with city detection and background map
+- [x] v0.0.5 - update env in dockerfile build
+- [x] v0.0.6 - make a test commit to make sure server updated
+- [x] v0.0.7 - retest server updated
+- [x] v0.0.8 - A_home_page created with city detection and background map
 - A_home_page maximum zoom fixed to city center
 - A_home_page added pre loading gif in future sponsored by NAME
-
-[ x ] v0.0.9 - if small screen then do not show Iphone image
-
-[x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
+- [x] v0.0.9 - if small screen then do not show Iphone image
+- [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
 - **Mobile First**: Fixed aspect ratio UI overlay, larger responsive fonts for touch.
 - **Matrix Green Theme**: Custom "Bio-Digital" palette (Spring Green #00ff9d + Electric Cyan #00b8ff).
 - **Glowing Map**: OpenStreetMap integration with high-contrast filters for "Neon Roads" effect.
