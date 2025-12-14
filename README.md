@@ -390,8 +390,8 @@
   - [x] v0.0.12 - changed to backend logic for city request
   - [x] v0.0.13 - B_map_page created with geo detection
   - added link to GUEST button 
-
   - added button of sendwich in right top corner
+
   - added GPS icon next to sendwich button
   - added user marker on map
   - fix URL
@@ -409,7 +409,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.13 - added link to GUEST button"
+  git commit -m "v0.0.13 - added button of sendwich in right top corner"
   git push
   ```
 

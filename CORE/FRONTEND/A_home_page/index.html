@@ -478,7 +478,7 @@
             <div class="header">
                 <img src="components/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
                 <h1>CrazyWalk</h1>
-                <h2>Walk & Earn Game</h2>
+                <h2>Walk & Earn Game - v0.0.13</h2>
             </div>
 
             <!-- Middle Section: Grows to fill space -->
@@ -663,7 +663,8 @@
 
             // GUEST Button Logic - AJAX Load B_map_page
             document.querySelector('.btn-guest').addEventListener('click', () => {
-                const targetUrl = '../B_map_page/index.html';
+                console.log("DEBUG: Guest button clicked. Attempting to fetch B_map_page...");
+                const targetUrl = '/B_map_page/index.html'; // Use absolute path from server root
 
                 fetch(targetUrl)
                     .then(response => {

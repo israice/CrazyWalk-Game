@@ -68,6 +68,14 @@ if not os.environ.get("SERVER_PORT"):
 if not os.environ.get("FRONTEND_INDEX_PAGE"):
     logger.warning("FRONTEND_INDEX_PAGE not found in .env, defaulting to CORE/FRONTEND/A_home_page")
 
+logger.info(f"Server starting.")
+logger.info(f"Current Working Directory: {os.getcwd()}")
+logger.info(f"Serving Directory: {DIRECTORY}")
+full_path = os.path.abspath(DIRECTORY)
+logger.info(f"Full Serving Path: {full_path}")
+if not os.path.exists(full_path):
+    logger.error(f"CRITICAL: Serving directory does not exist: {full_path}")
+
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
     """Custom handler to filter out known noise and improve logging."""
     
