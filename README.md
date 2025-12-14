@@ -348,6 +348,11 @@
   ```Bash
   git fetch origin; git checkout master; git reset --hard ba78799; git clean -fdX;
   ```
+  ```Bash
+  git push origin master --force
+  ```
+
+
   </details>
 
 <!-- ---------------------- -->

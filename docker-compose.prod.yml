@@ -1,5 +1,5 @@
 services:
-  crazywalk-game:
+  app:
     build: .
     restart: always
     ports:
@@ -7,7 +7,7 @@ services:
     networks:
       - pc2-net
 
-  autoupdate_webhook_from_github:
+  webhook:
     build:
       context: ./CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB
       dockerfile: Dockerfile
