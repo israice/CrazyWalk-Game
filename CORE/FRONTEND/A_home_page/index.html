@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Page</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .black-square {
+            position: absolute;
+            width: 42vh;
+            height: 72vh;
+            background-color: black;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            overflow: hidden;
+            /* Ensure map doesn't spill out */
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            /* Fallback */
+            opacity: 0;
+            /* Hide map initially to avoid flash */
+            transition: opacity 0.5s ease-in;
+        }
+
+        #loading-gif {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 500;
+            /* Above map, below label */
+            background: black;
+            transition: opacity 0.5s ease-out;
+        }
+
+        #city-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 100%);
+            color: rgba(255, 255, 255, 0.8);
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 1.2rem;
+            font-weight: 300;
+            letter-spacing: 1px;
+            z-index: 1000;
+            /* Above everything */
+            pointer-events: none;
+            /* Let touches pass through */
+            opacity: 0;
+            /* Hide initially */
+            transition: opacity 0.5s ease-in;
+        }
+
+        img.iphone-frame {
+            height: 100vh;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            pointer-events: none;
+            /* Allow clicks to pass through frame to map */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="black-square">
+        <div id="map"></div>
+        <img id="loading-gif" src="components/earth.gif" alt="Loading...">
+        <div id="city-label"></div>
+    </div>
+    <img class="iphone-frame" src="components/iphone.png" alt="iphone">
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cityLabel = document.getElementById('city-label');
+            const mapElement = document.getElementById('map');
+            const loadingGif = document.getElementById('loading-gif');
+
+            // Function to reveal map and interactives together
+            const revealContent = () => {
+                loadingGif.style.opacity = '0';
+                mapElement.style.opacity = '1';
+                cityLabel.style.opacity = '1';
+                setTimeout(() => {
+                    loadingGif.style.display = 'none';
+                }, 500);
+            };
+
+            // 1. Initialize Map with interactions DISABLED
+            const map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false,
+                // Disable all zoom/interaction
+                dragging: false,
+                touchZoom: false,
+                doubleClickZoom: false,
+                scrollWheelZoom: false,
+                boxZoom: false,
+                keyboard: false
+            });
+
+            // 2. Add Dark Matter NoLabels Tile Layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+                maxZoom: 20,
+                subdomains: 'abcd'
+            }).addTo(map);
+
+            // 3. Geolocation Logic
+            if ("geolocation" in navigator) {
+                loadingGif.style.display = 'block';
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLon = position.coords.longitude;
+
+                        // 4. Reverse Geocoding to find City
+                        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                const address = data.address;
+                                const city = address.city || address.town || address.village || address.hamlet || address.state || "Unknown City";
+                                cityLabel.textContent = city.toUpperCase();
+
+                                // 5. Search for City Center
+                                return fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1`);
+                            })
+                            .then(response => response.json())
+                            .then(searchData => {
+                                let targetLat = userLat;
+                                let targetLon = userLon;
+
+                                if (searchData && searchData.length > 0) {
+                                    targetLat = searchData[0].lat;
+                                    targetLon = searchData[0].lon;
+                                }
+
+                                // Apply view instantly
+                                map.setView([targetLat, targetLon], 17, { animate: false });
+
+                                // Map is ready and text is set -> Reveal All
+                                revealContent();
+                            })
+                            .catch(err => {
+                                console.error("Geocoding/Search error:", err);
+                                cityLabel.textContent = "EARTH";
+                                map.setView([userLat, userLon], 17, { animate: false });
+                                revealContent();
+                            });
+                    },
+                    (error) => {
+                        console.warn("Geolocation denied or error:", error);
+                        cityLabel.textContent = "LOCATION DENIED";
+                        map.setView([0, 0], 2, { animate: false });
+                        revealContent();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                cityLabel.textContent = "NO GPS";
+                revealContent();
+            }
+        });
+    </script>
+</body>
+
+</html>

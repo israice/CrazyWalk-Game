@@ -40,7 +40,7 @@
  - if gueast read ID from loacalstorage if not exist create in csv and save ID in localstorage
 - buttom header with city name
 - terms and conditions button with comming soon sign
-- video button with comming soon video
+- video button with comming soon icon
 - icon leaderboard
 
 ### login using email page
@@ -280,7 +280,11 @@ https://crazywalk.weforks.org
 Ensure your `docker-compose.prod.yml` has the `AUTOUPDATE_WEBHOOK_FROM_GITHUB` environment variable set. You can pass it when running docker compose:
 
 ```Bash
-AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" docker compose -f docker-compose.prod.yml up -d --build
+# inside .env file
+AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" 
+```
+```Bash
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 </details>
 
@@ -353,31 +357,28 @@ git log --oneline -n 10
 - create .gitignore file
 - create github repository
 - project first folders and files structure created
-
 [X] v0.0.2 - test hello world docker on local
 - hello world html page created
 - docker compose file created
-
 [X] v0.0.3 - prod docker on linux server
 - added setup instructions to README.md
 - test the subdomain crazywalk.weforks.org
-
 [X] v0.0.4 - create webhook from github to auto update server docker
 - added webhook server and dockerfile
 - make pull on server to update
-
 [X] v0.0.5 - update env in dockerfile build
-
 [X] v0.0.6 - make a test commit to make sure server updated
-
 [X] v0.0.7 - retest server updated
-
+[X] v0.0.8 - A_home_page created with city detection and background map
+- A_home_page maximum zoom fixed to city center
+- A_home_page added pre loading gif in future sponsored by NAME
+[ ] v0.0.9 - если маленкий экран то не отоброжать Iphone
 
 ## update repository
 
 ```Bash
 git add .
-git commit -m "v0.0.7 - retest server updated test7"
+git commit -m "v0.0.8 - A_home_page created with city detection and background map"
 git push
 ```
 
