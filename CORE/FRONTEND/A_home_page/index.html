@@ -200,50 +200,44 @@
             color: #ff4757;
         }
 
-        /* Legal - Subtle */
+        /* Legal - Centered Links */
         .legal-section {
+            width: 100%;
             display: flex;
-            flex-direction: column;
-            gap: 0.8vh;
-            padding: 0 0.5vh;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 2vh;
+            margin-bottom: 1.5vh;
+            flex-shrink: 0;
         }
 
         .legal-item {
-            display: flex;
-            align-items: center;
-            gap: 1vh;
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 1.1vh;
-            cursor: pointer;
-        }
-
-        .legal-item b {
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
-        }
-
-        input[type="checkbox"] {
-            appearance: none;
-            width: 1.6vh;
-            height: 1.6vh;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 4px;
-            background: rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            display: grid;
-            place-content: center;
-        }
-
-        input[type="checkbox"]:checked {
-            background: var(--secondary-color);
-            border-color: var(--secondary-color);
-        }
-
-        input[type="checkbox"]:checked::after {
-            content: '✓';
+            color: rgba(255, 255, 255, 0.5);
             font-size: 1.2vh;
-            color: black;
-            font-weight: 800;
+            text-decoration: none;
+            transition: color 0.3s;
+            position: relative;
+        }
+
+        .legal-item::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            bottom: -2px;
+            left: 0;
+            background-color: rgba(255, 255, 255, 0.3);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+
+        .legal-item:hover {
+            color: white;
+        }
+
+        .legal-item:hover::after {
+            transform: scaleX(1);
         }
 
         /* 3. BOTTOM ACTIONS */
@@ -276,17 +270,14 @@
         }
 
         .btn-guest {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(5px);
+            background: white;
+            color: black;
+            border: 1px solid white;
+            backdrop-filter: none;
         }
 
-        /* City Label - Pinned absolutely to bottom of container to sit BEHIND overlay but visible */
+        /* City Label - Now part of the flex flow */
         #city-label {
-            position: absolute;
-            bottom: 12vh;
-            left: 0;
             width: 100%;
             text-align: center;
             color: rgba(255, 255, 255, 0.5);
@@ -296,9 +287,9 @@
             pointer-events: none;
             opacity: 0;
             transition: opacity 1s;
-            z-index: 101;
-            /* Between map and UI elements */
             text-transform: uppercase;
+            margin-top: 3vh;
+            /* Spacing from buttons */
         }
 
         img.iphone-frame {
@@ -410,7 +401,7 @@
             <div class="header">
                 <i class="fa-solid fa-location-dot logo-icon"></i>
                 <h1>CrazyWalk</h1>
-                <h2>WalkEarn Game</h2>
+                <h2>Walk & Earn Game</h2>
             </div>
 
             <!-- Middle Section: Grows to fill space -->
@@ -426,23 +417,22 @@
                     </div>
                 </div>
 
-                <div class="legal-section">
-                    <label class="legal-item">
-                        <input type="checkbox"> <span>I agree to <b>Terms of Use</b></span>
-                    </label>
-                    <label class="legal-item">
-                        <input type="checkbox"> <span>I agree to <b>Privacy Policy</b></span>
-                    </label>
-                </div>
+            </div>
+
+            <!-- Legal Links Centered Above Login -->
+            <div class="legal-section">
+                <a href="#" class="legal-item">Terms of Use</a>
+                <a href="#" class="legal-item">Privacy Policy</a>
             </div>
 
             <div class="action-buttons">
                 <button class="btn btn-login">LOGIN</button>
                 <button class="btn btn-guest">GUEST</button>
             </div>
-        </div>
 
-        <div id="city-label"></div>
+            <!-- Moved City Label Inside Overlay -->
+            <div id="city-label"></div>
+        </div>
     </div>
     <img class="iphone-frame" src="components/iphone.png" alt="iphone">
 

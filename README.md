@@ -373,13 +373,14 @@ git log --oneline -n 10
 - A_home_page maximum zoom fixed to city center
 - A_home_page added pre loading gif in future sponsored by NAME
 [X] v0.0.9 - if small screen then do not show Iphone image
+[X] v0.0.10 - testing UI on mobile
 
 
 ## update repository
 
 ```Bash
 git add .
-git commit -m "v0.0.9 - if small screen then do not show Iphone image"
+git commit -m "v0.0.10 - testing UI on mobile"
 git push
 ```
 
