@@ -24,9 +24,11 @@
 > https://crazywalk.weforks.org/
 
 ### Last Dev Update
-- v0.0.1 - project folders and files structure created
-![alt text](CORE/DATA/DEV_SCREENSHOTS/v.0.0.1.png)
-
+- v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
+<div align="center">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" width="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-2.png" alt="Dashboard" width="300">
+</div>
 <!-- ---------------------- -->
 
 <details>
@@ -351,36 +353,49 @@ git log --oneline -n 10
 <details open>
   <summary>Dev Logs</summary>
 
-[x] v0.0.1 - project folders and files structure created
+[X] v0.0.1 - project folders and files structure created
 - dev since 2022, dev from strach started 12.11.2025 
 - full project step by step flow inside README.md
 - create .gitignore file
 - create github repository
 - project first folders and files structure created
+
 [X] v0.0.2 - test hello world docker on local
 - hello world html page created
 - docker compose file created
+
 [X] v0.0.3 - prod docker on linux server
 - added setup instructions to README.md
 - test the subdomain crazywalk.weforks.org
+
 [X] v0.0.4 - create webhook from github to auto update server docker
 - added webhook server and dockerfile
 - make pull on server to update
+
 [X] v0.0.5 - update env in dockerfile build
+
 [X] v0.0.6 - make a test commit to make sure server updated
+
 [X] v0.0.7 - retest server updated
+
 [X] v0.0.8 - A_home_page created with city detection and background map
 - A_home_page maximum zoom fixed to city center
 - A_home_page added pre loading gif in future sponsored by NAME
+
 [X] v0.0.9 - if small screen then do not show Iphone image
-[X] v0.0.10 - testing UI on mobile
+
+[X] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
+- **Mobile First**: Fixed aspect ratio UI overlay, larger responsive fonts for touch.
+- **Matrix Green Theme**: Custom "Bio-Digital" palette (Spring Green #00ff9d + Electric Cyan #00b8ff).
+- **Glowing Map**: OpenStreetMap integration with high-contrast filters for "Neon Roads" effect.
+- **UX Polish**: Glassmorphism cards, single-line legal links, improved gradients.
 
 
 ## update repository
 
 ```Bash
 git add .
-git commit -m "v0.0.10 - testing UI on mobile test3"
+git commit -m "v0.0.10 - Premium UI Overhaul & Mobile-First Redesign"
 git push
 ```
 
