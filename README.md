@@ -255,15 +255,15 @@
     - marker added in center of map
     - all browsers support added
     - fixed CORS error
+  - [x] v0.0.22 - added top bar with cocial icons
   - ### Next Tasks
-    - added top bar with cocial icons
 
 
   ## update repository
 
   ```Bash
   git add .
-  git commit -m "v0.0.21 - fixed CORS error"
+  git commit -m "v0.0.22 - added top bar with cocial icons"
   git push
   ```
 
