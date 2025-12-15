@@ -15,6 +15,7 @@
     <img alt="GitHub forks" src="https://img.shields.io/github/forks/israice/CrazyWalk-Game?style=for-the-badge&logo=github" />
   </a>
   <img alt="Last commit" src="https://img.shields.io/github/last-commit/israice/CrazyWalk-Game?style=for-the-badge" />
+  <img alt="Visitor Badge" src="https://visitor-badge.laobi.icu/badge?page_id=israice.CrazyWalk-Game" />
 </p>
 
 
