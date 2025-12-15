@@ -24,11 +24,14 @@
 > https://crazywalk.weforks.org/
 
 ### Last Dev Update
-- v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
+- v0.0.19 - added buttons to menu when activated
 <div align="center">
   <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-2.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.19-1.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.19-2.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.19-3.png" alt="Dashboard" height="300">
 </div>
+
 <!-- ---------------------- -->
 
 <details>
@@ -385,7 +388,7 @@
     - A_home_page added pre loading gif in future sponsored by NAME
   - [x] v0.0.9 - if small screen then do not show Iphone image
   - [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
-   - README.md updated
+    - README.md updated
   - [x] v0.0.11 - Logo changed
   - [x] v0.0.12 - changed to backend logic for city request
   - [x] v0.0.13 - B_map_page created with geo detection
@@ -403,18 +406,19 @@
   - [x] v0.0.17 - added purple marker circle under the marker
   - [x] v0.0.18 - added top bar as separated component
   - [x] v0.0.19 - added buttons to menu when activated
+    - added new version screenshots to README.md
 
-  - rotate screen to horizontal when small screen
-  - fixed movile horizontal screen UI do it only when small
-  - added top bar with cocial icons
-  - B_map_page marker added in center of map
+    - rotate screen to horizontal when small screen
+    - fixed movile horizontal screen UI do it only when small
+    - added top bar with cocial icons
+    - B_map_page marker added in center of map
 
 
   ## update repository
 
   ```Bash
   git add .
-  git commit -m "v0.0.19 - added buttons to menu when activated"
+  git commit -m "v0.0.19 - added new version screenshots to README.md"
   git push
   ```
 
