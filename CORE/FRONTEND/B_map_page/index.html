@@ -207,7 +207,9 @@
             // Dark Matter No Labels Layer
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
                 maxZoom: 20,
-                subdomains: 'abcd'
+                subdomains: 'abcd',
+                updateWhenIdle: false, // Load tiles during drag
+                keepBuffer: 10         // Keep more tiles in memory to avoid grey gaps
             }).addTo(map);
 
             // Custom Marker Icon
@@ -231,6 +233,7 @@
             const revealMap = () => {
                 if (hasRevealed) return;
                 hasRevealed = true;
+                map.invalidateSize(); // Ensure map knows its true size after layout settles
                 loadingGif.style.opacity = '0';
                 mapElement.style.opacity = '1';
                 setTimeout(() => {
