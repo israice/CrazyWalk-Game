@@ -254,6 +254,7 @@
   - [x] v0.0.21 - fixed movile horizontal screen UI do it only when small
     - marker added in center of map
     - all browsers support added
+    - fixed CORS error
   - ### Next Tasks
     - added top bar with cocial icons
 
@@ -262,7 +263,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.21 - all browsers support added"
+  git commit -m "v0.0.21 - fixed CORS error"
   git push
   ```
 

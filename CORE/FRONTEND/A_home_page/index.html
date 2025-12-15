@@ -681,30 +681,10 @@
             // Initial auto-start (might warn, but we try)
             setTimeout(startGeolocation, 1000);
 
-            // GUEST Button Logic - AJAX Load B_map_page
+            // GUEST Button Logic - Standard Navigation
             document.querySelector('.btn-guest').addEventListener('click', () => {
-                console.log("DEBUG: Guest button clicked. Attempting to fetch B_map_page...");
-                const targetUrl = '/B_map_page/index.html'; // Use absolute path from server root
-
-                fetch(targetUrl)
-                    .then(response => {
-                        if (!response.ok) throw new Error('Failed to load page');
-                        return response.text();
-                    })
-                    .then(html => {
-                        // We need to fix relative paths since we are staying on A_home_page URL
-                        // Injecting a base tag is the robust way to handle this
-                        const baseTag = '<base href="/B_map_page/">';
-                        const fixedHtml = html.replace('<head>', `<head>${baseTag}`);
-
-                        document.open();
-                        document.write(fixedHtml);
-                        document.close();
-                    })
-                    .catch(err => {
-                        console.error('Navigation Error:', err);
-                        alert('Error loading map page. Please try again.');
-                    });
+                console.log("DEBUG: Guest button clicked. Navigating to B_map_page...");
+                window.location.href = '/B_map_page/index.html';
             });
 
         });
