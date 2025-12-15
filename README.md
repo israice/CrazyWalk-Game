@@ -253,6 +253,7 @@
     - added new version screenshots to README.md
     - more README.md updates
   - [x] v0.0.20 - rotate screen to horizontal when small screen
+    - fixed drag map on mobile
 
     - fixed movile horizontal screen UI do it only when small
     - added top bar with cocial icons
@@ -263,7 +264,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.20 - rotate screen to horizontal when small screen"
+  git commit -m "v0.0.20 - fixed drag map on mobile"
   git push
   ```
 

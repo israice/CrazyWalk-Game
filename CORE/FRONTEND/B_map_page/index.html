@@ -122,6 +122,69 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+    <!-- PATCH: Fix Drag for Rotated Map on Mobile -->
+    <script>
+        // Wait for Leaflet to load
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof L === 'undefined') return;
+
+            const originalOnMove = L.Draggable.prototype._onMove;
+            L.Draggable.prototype._onMove = function (e) {
+                // Check if we are in the "Rotated Mobile" mode
+                if (window.innerWidth <= 1024) {
+                    if (e.touches && e.touches.length > 1) { this._moved = true; return; }
+                    var first = (e.touches && e.touches.length === 1 ? e.touches[0] : e);
+                    var newPoint = new L.Point(first.clientX, first.clientY);
+                    var offset = newPoint.subtract(this._startPoint);
+
+                    // ROTATION MANIPULATION (90deg CW)
+                    // Screen Y (Down) -> Map X (Right) -> Visually Down relative to rotated map?
+                    // Let's trace:
+                    // Map is rotated 90deg CW.
+                    // Map Local X+ points SCREEN DOWN.
+                    // Map Local Y+ points SCREEN LEFT.
+
+                    // User drags SCREEN DOWN (Screen Y+). 
+                    // We want Map to move SCREEN DOWN (Local X+).
+                    // So Screen Y+ should map to Local X+.
+
+                    // User drags SCREEN RIGHT (Screen X+).
+                    // We want Map to move SCREEN RIGHT (Local Y-).
+                    // So Screen X+ should map to Local Y-.
+
+                    var rotatedOffset = new L.Point(offset.y, -offset.x);
+
+                    if (!rotatedOffset.x && !rotatedOffset.y) { return; }
+                    if (Math.abs(rotatedOffset.x) + Math.abs(rotatedOffset.y) < this.options.clickTolerance) { return; }
+
+                    e.preventDefault();
+
+                    if (!this._moved) {
+                        this.fire('dragstart');
+                        this._moved = true;
+                        this._startPos = L.DomUtil.getPosition(this._element).subtract(rotatedOffset);
+                        L.DomUtil.addClass(document.body, 'leaflet-dragging');
+                        this._lastTarget = e.target || e.srcElement;
+                        if (window.SVGElementInstance && this._lastTarget instanceof SVGElementInstance) {
+                            this._lastTarget = this._lastTarget.correspondingUseElement;
+                        }
+                        L.DomUtil.addClass(this._lastTarget, 'leaflet-drag-target');
+                    }
+
+                    this._newPos = this._startPos.add(rotatedOffset);
+                    this._animated = true;
+
+                    L.Util.cancelAnimFrame(this._animRequest);
+                    this._lastEvent = e;
+                    this._animRequest = L.Util.requestAnimFrame(this._updatePosition, this, true);
+                } else {
+                    // Desktop / Non-rotated: Use default behavior
+                    originalOnMove.call(this, e);
+                }
+            };
+        });
+    </script>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const mapElement = document.getElementById('map');
