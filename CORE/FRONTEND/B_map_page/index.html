@@ -253,25 +253,45 @@
             // Function to initialize events after HTML is injected
             const initTopBarEvents = () => {
                 const gpsBtn = document.getElementById('gps-btn');
-                if (!gpsBtn) return;
+                const menuBtn = document.getElementById('menu-btn');
+                const topBar = document.getElementById('top-bar'); // Uses the ID we added
 
-                gpsBtn.addEventListener('click', () => {
-                    isGpsActive = !isGpsActive;
-
-                    if (isGpsActive) {
-                        // Turn ON
-                        console.log("DEBUG: GPS Toggled ON");
-                        gpsBtn.classList.add('active');
-                        startLocationWatch();
-                    } else {
-                        // Turn OFF
-                        console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
-                        gpsBtn.classList.remove('active');
-                        hasPreciseFix = false;
-                        map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
-                        userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
+                // Helper to close menu if needed
+                const closeMenu = () => {
+                    if (topBar && topBar.classList.contains('expanded')) {
+                        topBar.classList.remove('expanded');
                     }
-                });
+                };
+
+                if (gpsBtn) {
+                    gpsBtn.addEventListener('click', () => {
+                        isGpsActive = !isGpsActive;
+
+                        if (isGpsActive) {
+                            // Turn ON
+                            console.log("DEBUG: GPS Toggled ON");
+                            gpsBtn.classList.add('active');
+                            startLocationWatch();
+                        } else {
+                            // Turn OFF
+                            console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
+                            gpsBtn.classList.remove('active');
+                            hasPreciseFix = false;
+                            map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
+                            userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
+                        }
+                    });
+                }
+
+                if (menuBtn && topBar) {
+                    menuBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent map click from immediately closing it if we add that later
+                        topBar.classList.toggle('expanded');
+                    });
+                }
+
+                // Optional: Close menu when clicking outside (on map)
+                mapElement.addEventListener('click', closeMenu);
             };
         });
     </script>

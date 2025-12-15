@@ -363,45 +363,46 @@
   <summary>Dev Logs</summary>
 
   - [x] v0.0.1 - project folders and files structure created
-  - dev since 2022, dev from strach started 12.11.2025 
-  - full project step by step flow inside README.md
-  - create .gitignore file
-  - create github repository
-  - project first folders and files structure created
+    - dev since 2022, dev from strach started 12.11.2025 
+    - full project step by step flow inside README.md
+    - create .gitignore file
+    - create github repository
+    - project first folders and files structure created
   - [x] v0.0.2 - test hello world docker on local
-  - hello world html page created
-  - docker compose file created
+    - hello world html page created
+    - docker compose file created
   - [x] v0.0.3 - prod docker on linux server
-  - added setup instructions to README.md
-  - test the subdomain crazywalk.weforks.org
+    - added setup instructions to README.md
+    - test the subdomain crazywalk.weforks.org
   - [x] v0.0.4 - create webhook from github to auto update server docker
-  - added webhook server and dockerfile
-  - make pull on server to update
+    - added webhook server and dockerfile
+    - make pull on server to update
   - [x] v0.0.5 - update env in dockerfile build
   - [x] v0.0.6 - make a test commit to make sure server updated
   - [x] v0.0.7 - retest server updated
   - [x] v0.0.8 - A_home_page created with city detection and background map
-  - A_home_page maximum zoom fixed to city center
-  - A_home_page added pre loading gif in future sponsored by NAME
+    - A_home_page maximum zoom fixed to city center
+    - A_home_page added pre loading gif in future sponsored by NAME
   - [x] v0.0.9 - if small screen then do not show Iphone image
   - [x] v0.0.10 - Premium UI Overhaul & Mobile-First Redesign
-  - README.md updated
+   - README.md updated
   - [x] v0.0.11 - Logo changed
   - [x] v0.0.12 - changed to backend logic for city request
   - [x] v0.0.13 - B_map_page created with geo detection
-  - added link to GUEST button 
-  - added button of sendwich in right top corner
-  - Fix production 404 by enforcing correct server root
-  - added user marker on map
-  - added GPS icon next to sendwich button
-  - marker to center and purple color no borders circle under the marker
+    - added link to GUEST button 
+    - added button of sendwich in right top corner
+    - Fix production 404 by enforcing correct server root
+    - added user marker on map
+    - added GPS icon next to sendwich button
+    - marker to center and purple color no borders circle under the marker
   - [x] v0.0.14 - fix real location logic
   - [x] v0.0.15 - 32.05673, 34.76875 logic to GPS icon
-  - B_map_page marker added in center of map
-  - fix marker so he will not move on map move
+    - B_map_page marker added in center of map
+    - fix marker so he will not move on map move
   - [x] v0.0.16 - fix URL
   - [x] v0.0.17 - added purple marker circle under the marker
   - [x] v0.0.18 - added top bar as separated component
+  - [x] v0.0.19 - added buttons to menu when activated
 
   - rotate screen to horizontal when small screen
   - fixed movile horizontal screen UI do it only when small
@@ -413,7 +414,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.18 - added top bar as separated component"
+  git commit -m "v0.0.19 - added buttons to menu when activated"
   git push
   ```
 
