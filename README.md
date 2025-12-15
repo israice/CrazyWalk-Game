@@ -256,6 +256,7 @@
     - all browsers support added
     - fixed CORS error
   - [x] v0.0.22 - added top bar with cocial icons
+    - fixed spacing between icons
   - ### Next Tasks
 
 
@@ -263,7 +264,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.22 - added top bar with cocial icons"
+  git commit -m "v0.0.22 - fixed spacing between icons"
   git push
   ```
 

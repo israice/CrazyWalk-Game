@@ -101,20 +101,22 @@
         /* Revert fill to white as per new style */
     }
 
+    /* Hide Social Group when expanded */
+    .top-controls.expanded .social-group {
+        display: none;
+    }
+
+    /* Hide GPS when expanded to replace with Settings */
+    .top-controls.expanded #gps-btn {
+        display: none;
+    }
+
     /* New Menu Items Container */
     .menu-items {
         display: flex;
         gap: 4vh;
         display: none;
-        /* Hidden by default */
-        /* If parent is flex-end, margin-right: auto pushes this element to the LEFT. 
-           This replicates the 'floating left' behavior for menu items if desired. 
-           Let's assume we want them on the left side of the bar? 
-           Original code didn't specify position well, just 'flex'. 
-           But usually expanded menu items are on the left or center. 
-           Let's leave standard flex behavior. 
-        */
-        margin-right: 4vh;
+        /* margin-right removed to let parent gap handle spacing */
     }
 
     .top-controls.expanded .menu-items {
@@ -130,11 +132,6 @@
         left: 50%;
         transform: translateX(-50%);
         pointer-events: auto;
-    }
-
-    /* Hide Social Group when expanded (same as GPS) */
-    .top-controls.expanded .social-group {
-        display: none;
     }
 
     /* Mobile Responsive Adjustments for Social Icons */
