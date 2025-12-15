@@ -189,18 +189,14 @@
   docker compose -f docker-compose.prod.yml down
   ```
 
-  ## see last 10 commits
+  ## hard reset and rollback to previous commit
 
   ```Bash
   git log --oneline -n 10
   ```
   ```Bash
-  git fetch origin; git checkout master; git reset --hard ba78799; git clean -fdX;
+  git reset --hard ba78799;
   ```
-  ```Bash
-  git push origin master --force
-  ```
-
 
   </details>
 
@@ -255,18 +251,17 @@
   - [x] v0.0.20 - rotate screen to horizontal when small screen
     - fixed drag map on mobile
     - fixed extended map area buffer
-    - fixed GPS button logic
-
-    - fixed movile horizontal screen UI do it only when small
+  - [x] v0.0.21 - fixed movile horizontal screen UI do it only when small
+    - marker added in center of map
+  - ### Next Tasks
     - added top bar with cocial icons
-    - B_map_page marker added in center of map
 
 
   ## update repository
 
   ```Bash
   git add .
-  git commit -m "v0.0.20 - fixed GPS button logic"
+  git commit -m "v0.0.21 - fixed movile horizontal screen UI do it only when small"
   git push
   ```
 
