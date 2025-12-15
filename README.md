@@ -401,18 +401,19 @@
   - fix marker so he will not move on map move
   - [x] v0.0.16 - fix URL
   - [x] v0.0.17 - added purple marker circle under the marker
-  - [x] v0.0.18 - rotate screen to horizontal when small screen
+  - [x] v0.0.18 - added top bar as separated component
+
+  - rotate screen to horizontal when small screen
   - fixed movile horizontal screen UI do it only when small
   - added top bar with cocial icons
-  - [x] v0.0.19 - B_map_page marker added in center of map
-  - 
+  - B_map_page marker added in center of map
 
 
   ## update repository
 
   ```Bash
   git add .
-  git commit -m "v0.0.17 - added purple marker circle under the marker"
+  git commit -m "v0.0.18 - added top bar as separated component"
   git push
   ```
 

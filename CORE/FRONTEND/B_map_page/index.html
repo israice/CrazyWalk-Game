@@ -82,46 +82,7 @@
             pointer-events: none;
         }
 
-        /* Top Right Controls */
-        .top-controls {
-            position: absolute;
-            top: 4vh;
-            right: 4vh;
-            display: flex;
-            gap: 2vh;
-            z-index: 50;
-            /* Above map, below phone frame */
-        }
 
-        .control-btn {
-            width: 6vh;
-            height: 6vh;
-            background-color: rgba(30, 30, 30, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(5px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 1vh;
-            /* Slightly rounded square */
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .control-btn.active {
-            border: 2px solid red;
-            background-color: rgba(60, 60, 60, 0.9);
-        }
-
-        .control-btn:active {
-            background-color: rgba(60, 60, 60, 0.9);
-        }
-
-        .control-btn svg {
-            width: 60%;
-            height: 60%;
-            fill: white;
-        }
 
         /* Leaflet DivIcon Custom Style for Marker */
         .leaftlet-div-icon {
@@ -141,16 +102,7 @@
                 border-radius: 0;
             }
 
-            .top-controls {
-                top: 2vh;
-                right: 2vh;
-            }
 
-            /* Larger icons for mobile */
-            .control-btn {
-                width: 8vh;
-                height: 8vh;
-            }
         }
     </style>
 </head>
@@ -159,22 +111,7 @@
     <div class="black-square">
         <div id="map"></div>
 
-        <div class="top-controls">
-            <!-- GPS Button -->
-            <div class="control-btn" id="gps-btn">
-                <svg viewBox="0 0 24 24">
-                    <path
-                        d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-                </svg>
-            </div>
-
-            <!-- Sandwich/Menu Button -->
-            <div class="control-btn" id="menu-btn">
-                <svg viewBox="0 0 24 24">
-                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-                </svg>
-            </div>
-        </div>
+        <div id="top-bar-container"></div>
         <img id="loading-gif" src="/B_map_page/components/earth.gif" alt="Loading...">
     </div>
     <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
@@ -304,25 +241,38 @@
                 );
             };
 
-            // GPS Button Logic
-            const gpsBtn = document.getElementById('gps-btn');
-            gpsBtn.addEventListener('click', () => {
-                isGpsActive = !isGpsActive;
+            // Load Top Bar Component dynamically
+            fetch('/B_map_page/components/top_bar.html')
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('top-bar-container').innerHTML = html;
+                    initTopBarEvents();
+                })
+                .catch(err => console.error('Error loading top bar:', err));
 
-                if (isGpsActive) {
-                    // Turn ON
-                    console.log("DEBUG: GPS Toggled ON");
-                    gpsBtn.classList.add('active');
-                    startLocationWatch();
-                } else {
-                    // Turn OFF
-                    console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
-                    gpsBtn.classList.remove('active');
-                    hasPreciseFix = false;
-                    map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
-                    userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
-                }
-            });
+            // Function to initialize events after HTML is injected
+            const initTopBarEvents = () => {
+                const gpsBtn = document.getElementById('gps-btn');
+                if (!gpsBtn) return;
+
+                gpsBtn.addEventListener('click', () => {
+                    isGpsActive = !isGpsActive;
+
+                    if (isGpsActive) {
+                        // Turn ON
+                        console.log("DEBUG: GPS Toggled ON");
+                        gpsBtn.classList.add('active');
+                        startLocationWatch();
+                    } else {
+                        // Turn OFF
+                        console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
+                        gpsBtn.classList.remove('active');
+                        hasPreciseFix = false;
+                        map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
+                        userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
+                    }
+                });
+            };
         });
     </script>
 </body>
