@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Map Location</title>
     <script>
         // Mask URL to show only root address
@@ -23,12 +24,20 @@
         body {
             width: 100vw;
             height: 100vh;
+            /* Fallback */
+            height: 100dvh;
+            /* Dynamic viewport height */
             overflow: hidden;
             background-color: #000;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
         }
 
         /* Container for the map content */
@@ -98,6 +107,9 @@
 
             .black-square {
                 width: 100vh;
+                /* Fallback */
+                width: 100dvh;
+                /* Match dynamic screen height when rotated */
                 height: 100vw;
                 border-radius: 0;
                 transform: translate(-50%, -50%) rotate(90deg);

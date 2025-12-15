@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>CrazyWalk</title>
     <script>
         // Mask URL to show only root address
@@ -46,7 +47,11 @@
 
         body {
             width: 100vw;
+            width: 100vw;
             height: 100vh;
+            /* Fallback for older browsers */
+            height: 100dvh;
+            /* Dynamic viewport height for mobile browsers */
             overflow: hidden;
             background-color: black;
             display: flex;
@@ -54,6 +59,16 @@
             justify-content: center;
             font-family: 'Poppins', sans-serif;
             color: white;
+            -webkit-user-select: none;
+            /* Safari */
+            -ms-user-select: none;
+            /* IE 10 and IE 11 */
+            user-select: none;
+            /* Standard syntax */
+            -webkit-tap-highlight-color: transparent;
+            /* Remove tap highlight on mobile */
+            touch-action: none;
+            /* Prevent default touch actions like scroll/zoom */
         }
 
         .black-square {
