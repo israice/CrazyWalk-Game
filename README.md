@@ -255,6 +255,7 @@
   - [x] v0.0.20 - rotate screen to horizontal when small screen
     - fixed drag map on mobile
     - fixed extended map area buffer
+    - fixed GPS button logic
 
     - fixed movile horizontal screen UI do it only when small
     - added top bar with cocial icons
@@ -265,7 +266,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.20 - fixed extended map area buffer"
+  git commit -m "v0.0.20 - fixed GPS button logic"
   git push
   ```
 
