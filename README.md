@@ -191,11 +191,14 @@
 
   ## hard reset and rollback to previous commit
 
-  ```Bash
+  ```Powershell
   git log --oneline -n 10
   ```
-  ```Bash
-  git reset --hard ba78799;
+  ```Powershell
+  Move-Item .env $env:TEMP\.env.backup
+  git reset --hard 247478e
+  Move-Item $env:TEMP\.env.backup .env
+  git push --force
   ```
 
   </details>
@@ -257,6 +260,7 @@
     - fixed CORS error
   - [x] v0.0.22 - added top bar with cocial icons
     - fixed spacing between icons
+  - [x] v0.0.23 - created plan for polygons development
   - ### Next Tasks
 
 
@@ -264,7 +268,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.22 - fixed spacing between icons"
+  git commit -m "v0.0.23 - created plan for polygons development"
   git push
   ```
 
