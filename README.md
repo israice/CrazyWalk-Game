@@ -252,8 +252,8 @@
   - [x] v0.0.19 - added buttons to menu when activated
     - added new version screenshots to README.md
     - more README.md updates
+  - [x] v0.0.20 - rotate screen to horizontal when small screen
 
-    - rotate screen to horizontal when small screen
     - fixed movile horizontal screen UI do it only when small
     - added top bar with cocial icons
     - B_map_page marker added in center of map
@@ -263,7 +263,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.19 - more README.md updates"
+  git commit -m "v0.0.20 - rotate screen to horizontal when small screen"
   git push
   ```
 
