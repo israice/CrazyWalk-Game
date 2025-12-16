@@ -131,12 +131,12 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                  })
                  
                  # Add Green Circles (Equidistant)
-                 # Target ~50m spacing.
+                 # Target ~15m spacing.
                  total_length = dist
-                 target_spacing = 50.0
+                 target_spacing = 15.0
                  
                  # Calculate number of segments
-                 # e.g. 140m / 50 = 2.8 -> 3 segments -> 46.6m each
+                 # e.g. 140m / 15 = 2.8 -> 3 segments -> 46.6m each
                  num_segments = int(round(total_length / target_spacing))
                  if num_segments < 1: num_segments = 1
                  
@@ -149,6 +149,7 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                      target_idx = 0
                      
                      # Traverse path to place circles
+                     line_green_count = 0
                      for i in range(len(path) - 1):
                          p1 = path[i]
                          p2 = path[i+1]
@@ -165,20 +166,23 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                              new_lon = p1[1] + (p2[1] - p1[1]) * ratio
                              
                              green_circles.append({'lat': new_lat, 'lon': new_lon})
+                             line_green_count += 1
                              target_idx += 1
                          
                          current_path_dist += seg_len
+                     
+                     white_lines[-1]['green_count'] = line_green_count
 
     # CSV IO: Write Outputs
     # 1. White Lines
     with open(os.path.join(data_dir, 'AC_create_white_lines.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
-        # start_lat, start_lon, end_lat, end_lon, length, path_json
-        writer.writerow(['start_lat', 'start_lon', 'end_lat', 'end_lon', 'length', 'path_json'])
+        # start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
+        writer.writerow(['start_lat', 'start_lon', 'end_lat', 'end_lon', 'length', 'green_count', 'path_json'])
         for wl in white_lines:
             s = wl['start']
             e = wl['end']
-            writer.writerow([s[0], s[1], e[0], e[1], wl['length'], json.dumps(wl['path'])])
+            writer.writerow([s[0], s[1], e[0], e[1], wl['length'], wl.get('green_count', 0), json.dumps(wl['path'])])
             
     # 2. Green Circles
     with open(os.path.join(data_dir, 'AC_green_circles.csv'), 'w', newline='') as f:

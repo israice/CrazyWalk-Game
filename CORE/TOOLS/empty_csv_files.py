@@ -2,10 +2,10 @@ import csv
 import os
 
 FILES = {
-    'js/balloons.csv': ['lat', 'lng'],
-    'js/cross.csv': ['lat', 'lng', 'count'],
-    'js/polygons.csv': ['id', 'geometry'],
-    'js/roads.csv': ['id', 'type', 'geometry'],
+    # '../BACKEND/AA_temp_red_lines.csv': ['lat', 'lng'],
+    '../BACKEND/AB_add_blue_circles.csv': ['id', 'lat', 'lon', 'connections'],
+    # '../BACKEND/AA_temp_green_circles.csv': ['id', 'geometry'],
+    # # '../BACKEND/AA_temp_white_lines.csv': ['id', 'type', 'geometry'],
 }
 
 def reset_data():

@@ -21,7 +21,8 @@ def create_red_lines(lat, lon, region_size=0.005):
     
     # Overpass Query
     # [timeout:25] tells the server to work for up to 25 seconds.
-    overpass_url = "https://overpass-api.de/api/interpreter"
+    # Overpass Query
+    # [timeout:25] tells the server to work for up to 25 seconds.
     query = f"""
     [out:json][timeout:25];
     (
@@ -36,11 +37,37 @@ def create_red_lines(lat, lon, region_size=0.005):
         'User-Agent': 'CrazyWalk-Game/1.0 (contact@crazywalk.org)'
     }
 
-    try:
-        response = requests.post(overpass_url, data=query, headers=headers, timeout=30)
-        response.raise_for_status()
-        data = response.json()
+    # List of Overpass servers to try
+    overpass_servers = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+    ]
+    
+    import time
+    
+    response = None
+    data = None
+    
+    for attempt in range(len(overpass_servers) * 2): # Try servers twice
+        server_url = overpass_servers[attempt % len(overpass_servers)]
+        try:
+            logger.info(f"AA: Requesting roads from {server_url} (Attempt {attempt+1})")
+            response = requests.post(server_url, data=query, headers=headers, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            # If successful, break loop
+            logger.info("AA: Overpass request successful.")
+            break
+        except Exception as e:
+            logger.warning(f"AA: Failed to fetch from {server_url}: {e}")
+            time.sleep(1) # Brief pause before retry
+            
+    if not data:
+        logger.error("AA: All Overpass servers failed. Returning empty.")
+        return [], []
         
+    try:
         # Process Nodes
         nodes = {node['id']: (node['lat'], node['lon']) for node in data['elements'] if node['type'] == 'node'}
         

@@ -145,68 +145,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- PATCH: Fix Drag for Rotated Map on Mobile -->
-    <script>
-        // Wait for Leaflet to load
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof L === 'undefined') return;
-
-            const originalOnMove = L.Draggable.prototype._onMove;
-            L.Draggable.prototype._onMove = function (e) {
-                // Check if we are in the "Rotated Mobile" mode
-                if (window.innerWidth <= 1024) {
-                    if (e.touches && e.touches.length > 1) { this._moved = true; return; }
-                    var first = (e.touches && e.touches.length === 1 ? e.touches[0] : e);
-                    var newPoint = new L.Point(first.clientX, first.clientY);
-                    var offset = newPoint.subtract(this._startPoint);
-
-                    // ROTATION MANIPULATION (90deg CW)
-                    // Screen Y (Down) -> Map X (Right) -> Visually Down relative to rotated map?
-                    // Let's trace:
-                    // Map is rotated 90deg CW.
-                    // Map Local X+ points SCREEN DOWN.
-                    // Map Local Y+ points SCREEN LEFT.
-
-                    // User drags SCREEN DOWN (Screen Y+). 
-                    // We want Map to move SCREEN DOWN (Local X+).
-                    // So Screen Y+ should map to Local X+.
-
-                    // User drags SCREEN RIGHT (Screen X+).
-                    // We want Map to move SCREEN RIGHT (Local Y-).
-                    // So Screen X+ should map to Local Y-.
-
-                    var rotatedOffset = new L.Point(offset.y, -offset.x);
-
-                    if (!rotatedOffset.x && !rotatedOffset.y) { return; }
-                    if (Math.abs(rotatedOffset.x) + Math.abs(rotatedOffset.y) < this.options.clickTolerance) { return; }
-
-                    e.preventDefault();
-
-                    if (!this._moved) {
-                        this.fire('dragstart');
-                        this._moved = true;
-                        this._startPos = L.DomUtil.getPosition(this._element).subtract(rotatedOffset);
-                        L.DomUtil.addClass(document.body, 'leaflet-dragging');
-                        this._lastTarget = e.target || e.srcElement;
-                        if (window.SVGElementInstance && this._lastTarget instanceof SVGElementInstance) {
-                            this._lastTarget = this._lastTarget.correspondingUseElement;
-                        }
-                        L.DomUtil.addClass(this._lastTarget, 'leaflet-drag-target');
-                    }
-
-                    this._newPos = this._startPos.add(rotatedOffset);
-                    this._animated = true;
-
-                    L.Util.cancelAnimFrame(this._animRequest);
-                    this._lastEvent = e;
-                    this._animRequest = L.Util.requestAnimFrame(this._updatePosition, this, true);
-                } else {
-                    // Desktop / Non-rotated: Use default behavior
-                    originalOnMove.call(this, e);
-                }
-            };
-        });
-    </script>
+    <!-- Map Controls Logic -->
+    <script src="/B_map_page/components/map_controls.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -218,45 +158,48 @@
             const DEFAULT_LAT = 32.05688;
             const DEFAULT_LON = 34.76878;
             let isGpsActive = false;
-            let hasPreciseFix = false; // Flag to prevent LowAcc from overwriting HighAcc
+            let hasPreciseFix = false;
 
-            // Initialize Map at DEFAULT location immediately
-            const map = L.map('map', {
-                zoomControl: false,
-                attributionControl: false,
-                zoomSnap: 0,
-            }).setView([DEFAULT_LAT, DEFAULT_LON], 18);
+            // Initialize Map via MapControls (Centralized Logic)
+            const controls = new MapControls('map', [DEFAULT_LAT, DEFAULT_LON], {
+                defaultZoom: 18,
+                minZoom: 3,  // Unrestricted Zoom Out
+                maxZoom: 18  // Max Zoom In
+            });
+            const map = controls.getMap();
 
-            // Dark Matter No Labels Layer
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-                maxZoom: 20,
-                subdomains: 'abcd',
-                updateWhenIdle: false, // Load tiles during drag
-                keepBuffer: 10         // Keep more tiles in memory to avoid grey gaps
-            }).addTo(map);
+            // Initialize Layer Groups
+            const groupsLayer = L.layerGroup().addTo(map);
+            const detailsLayer = L.layerGroup().addTo(map);
 
-            // Custom Marker Icon
+            // Visibility Rules
+            // 1. Details (Polygons, Lines, Circles) -> Visible ONLY at Zoom 18
+            controls.addVisibilityRule(detailsLayer, 18);
+
+            // 2. Groups (Monolith) -> Always visible 18+ (base layer)
+            // controls.addVisibilityRule(groupsLayer, 18);
+
+            // Custom Marker Icon (Visual)
+            // Goal: Purple Circle (Shadow) is centered on the LatLon (Anchor). GIF stands on top.
             const customIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `
-                    <div style="transform: translate(-50%, calc(-50% + 1vh)) rotate(0deg); position: relative; display: flex; align-items: center; justify-content: center;">
-                        <div style="position: absolute; width: 8vh; height: 8vh; background-color: #9900ff; border-radius: 50%; box-shadow: 0 0 15px #9900ff; opacity: 0.4; transform: perspective(500px) rotateX(45deg); margin-top: 50px;
-"></div>
-                        <img src="/B_map_page/components/marker.gif" style="position: relative; z-index: 2; width: 15vh; height: auto;">
+                    <div style="transform: translate(-50%, -50%); position: relative; display: flex; align-items: center; justify-content: center;">
+                        <div style="position: absolute; width: 6vh; height: 6vh; background-color: #9900ff; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px #9900ff; opacity: 0.8; transform: perspective(500px) rotateX(45deg);"></div>
+                        <img src="/B_map_page/components/marker.gif" style="position: relative; z-index: 2; width: 12vh; height: auto; transform: translateY(-25%); bottom: 2vh;">
                     </div>
                 `,
                 iconSize: null,
                 iconAnchor: [0, 0]
             });
 
-
             // Create Marker pinned to map
             const userMarker = L.marker([DEFAULT_LAT, DEFAULT_LON], {
                 icon: customIcon,
-                zIndexOffset: 1000 // Ensure it is above everything else
+                zIndexOffset: 1000
             }).addTo(map);
 
-            // Reveal Map Logic
+            // Reveal Map Logic (Visual Transition)
             const revealMap = () => {
                 if (hasRevealed) return;
                 hasRevealed = true;
@@ -269,8 +212,7 @@
                 }, 600);
             };
 
-            // REMOVED: Immediate timeout. Now we wait for Data OR Safety Timer.
-            // Safety: If data takes too long (>30s), reveal anyway.
+            // Safety Reveal
             setTimeout(() => {
                 if (!hasRevealed) {
                     console.warn("DEBUG: Safety Reveal Triggered (Data took too long)");
@@ -278,61 +220,50 @@
                 }
             }, 30000);
 
-            // Reusable function to process coordinates (Client-Side First)
+            // Reusable function to process coordinates (Logic)
             const processCoordinates = (lat, lon, accuracy, label) => {
                 console.log(`DEBUG: [Map Page] Processing ${label} Position: ${lat}, ${lon} (Acc: ${accuracy}m)`);
 
-                // If High Accuracy already found, ignore "Low Accuracy" updates that arrive late
                 if (label === 'LOW_ACCURACY' && hasPreciseFix) {
                     console.log("DEBUG: Ignoring Low Accuracy update (Precise already found).");
                     return;
                 }
 
-                // If this is High Accuracy, mark it
                 if (label === 'HIGH_ACCURACY') {
                     hasPreciseFix = true;
                 }
 
-                // UPDATE MAP IMMEDIATELY (No Server Wait)
-                if (isGpsActive) {
-                    const newLatLng = [lat, lon];
-                    map.setView(newLatLng, 18);
-                    userMarker.setLatLng(newLatLng);
+                // Use Controls to update position (Enforces map follow rules)
+                controls.updateUserPosition(userMarker, lat, lon, isGpsActive);
 
-                    // Visual feedback for accuracy warning (only for High Acc to prevent spam)
+                if (isGpsActive) {
                     if (label === 'HIGH_ACCURACY' && accuracy > 200) {
                         console.warn(`Warning: GPS signal weak (${Math.round(accuracy)}m).`);
                     }
-                }
 
-                // Background: Send to server just for city lookup/logging (optional)
-                fetch(`/api/locate?lat=${lat}&lon=${lon}`)
-                    .then(res => res.json())
-                    .then(data => console.log("DEBUG: Server ack:", data)) // Just log it
-                    .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
-
-                // GAME LOGIC: Fetch Roads/Polygons
-                // Changed to load on FIRST fix (Low or High) for testing visibility.
-
-                // If GPS is active, we trigger a reload for the new location.
-                if (isGpsActive) {
-                    // Check if we already loaded for this session to avoid loop? 
-                    // No, let's just trigger it. Debouncing would be better but simple logic first.
-                    // Wait, if we trigger it every update, it will spam. 
-                    // Let's rely on 'window.hasLoadedGpsData' flag for this session.
+                    // Trigger Data Load if this is a fresh session
                     if (!window.hasLoadedGpsData) {
                         window.hasLoadedGpsData = true;
                         console.log("DEBUG: Triggering GPS Game Data Load (Accuracy: " + label + ")");
                         loadGameData(lat, lon);
                     }
                 }
+
+                // Background: Send to server
+                fetch(`/api/locate?lat=${lat}&lon=${lon}`)
+                    .then(res => res.json())
+                    .then(data => console.log("DEBUG: Server ack:", data))
+                    .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
             };
 
             const loadGameData = (lat, lon) => {
                 console.log("DEBUG: Fetching Game Data...");
-                // reuse loading gif if desired, or just show it quietly
-                // loadingGif.style.display = 'block'; 
-                // loadingGif.style.opacity = '0.5';
+
+                // Show Loading GIF and dim map (Visual Transition)
+                loadingGif.style.display = 'block';
+                loadingGif.style.opacity = '1';
+                mapElement.style.opacity = '0.3';
+                hasRevealed = false;
 
                 console.log(`DEBUG: Fetching Game Data from /api/game_data?lat=${lat}&lon=${lon}`);
 
@@ -343,33 +274,47 @@
                     })
                     .then(data => {
                         console.log("DEBUG: Game Data JSON Received. Keys:", Object.keys(data));
-                        console.log(`DEBUG: Counts -> RedLines: ${data.red_lines?.length}, BlueCircles: ${data.blue_circles?.length}, WhiteLines: ${data.white_lines?.length}, Polygons: ${data.polygons?.length}`);
                         renderGameElements(data);
-                        revealMap(); // Success! Reveal map with data.
+                        revealMap();
                     })
                     .catch(err => {
                         console.error("DEBUG: Game Data Failed", err);
-                        revealMap(); // Reveal even if failed so user isn't stuck
+                        revealMap();
                     });
             };
 
+            // VISUALS: Rendering Colors and Layers
             const renderGameElements = (data) => {
                 console.log("DEBUG: Starting Render...");
 
-                // 1. Polygons (Bottom Layer)
+                // 0. Groups (Monolith) - Managed by Layer Group for Visibility Rules
+                groupsLayer.clearLayers();
+                detailsLayer.clearLayers();
+
+                if (data.groups) {
+                    console.log(`DEBUG: Rendering ${data.groups.length} Groups into LayerGroup`);
+                    data.groups.forEach(group => {
+                        L.polygon(group.coords, {
+                            color: '#333',       // Visual Rule
+                            stroke: false,
+                            fillColor: '#222',
+                            fillOpacity: 0.3,
+                            weight: 0
+                        }).addTo(groupsLayer);
+                    });
+                }
+
+                // 1. Polygons (Details)
                 if (data.polygons) {
                     data.polygons.forEach(poly => {
-                        // poly.coords is list of [lat, lon]
                         L.polygon(poly.coords, {
-                            color: 'purple',
+                            color: 'purple',    // Visual Rule
                             fillColor: 'purple',
                             fillOpacity: 0.1,
-                            weight: 0 // Optional: Remove border if desired, but keeping default
-                        }).addTo(map);
+                            weight: 0
+                        }).addTo(detailsLayer);
 
-                        // Center percentage label
                         if (poly.center) {
-                            // Backend returns [lat, lon] for center (shapely x=lat, y=lon in our construction)
                             L.marker([poly.center[0], poly.center[1]], {
                                 icon: L.divIcon({
                                     className: 'poly-label',
@@ -377,31 +322,33 @@
                                     iconSize: [20, 20],
                                     iconAnchor: [10, 10]
                                 })
-                            }).addTo(map);
+                            }).addTo(detailsLayer);
                         }
                     });
                 }
 
-                // 2. Red Lines
+                // 2. Red Lines (Base or Details? Assuming Details as it is clutter)
+                // Actually assuming details.
                 if (data.red_lines && data.red_lines.length > 0) {
-                    console.log(`DEBUG: Rendering ${data.red_lines.length} Red Lines`);
                     data.red_lines.forEach(line => {
-                        // line is list of [lat, lon] (Visual line)
-                        L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(map);
+                        L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(detailsLayer);
                     });
-                } else {
-                    console.log("DEBUG: No Red Lines to render.");
                 }
 
-                // 3. White Lines
+                // 3. White Lines (Details)
                 if (data.white_lines) {
+                    controls.setSnapLines(data.white_lines); // Enable Snapping
                     data.white_lines.forEach(line => {
-                        // line.path is list of [lat, lon]
-                        L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(map);
+                        L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(detailsLayer);
                     });
+
+                    // FORCE RESNAP: Now that lines are known, update marker to closest point
+                    const currentPos = userMarker.getLatLng();
+                    console.log("DEBUG: Re-snapping after line load...");
+                    controls.updateUserPosition(userMarker, currentPos.lat, currentPos.lng, isGpsActive);
                 }
 
-                // 4. Blue Circles (Intersections) - on top of lines
+                // 4. Blue Circles (Details)
                 if (data.blue_circles) {
                     data.blue_circles.forEach(circle => {
                         const marker = L.circleMarker([circle.lat, circle.lon], {
@@ -409,13 +356,13 @@
                             color: 'blue',
                             fillColor: '#00ccff',
                             fillOpacity: 0.8
-                        }).addTo(map);
+                        }).addTo(detailsLayer);
 
                         marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
                     });
                 }
 
-                // 5. Green Circles - on top of lines
+                // 5. Green Circles (Details)
                 if (data.green_circles) {
                     data.green_circles.forEach(circle => {
                         L.circleMarker([circle.lat, circle.lon], {
@@ -423,9 +370,12 @@
                             color: 'green',
                             fillColor: '#00ff00',
                             fillOpacity: 1
-                        }).addTo(map);
+                        }).addTo(detailsLayer);
                     });
                 }
+
+                // Triggers visibility check immediately
+                controls.checkVisibility();
             };
 
             const startLocationWatch = () => {
@@ -435,22 +385,22 @@
                     return;
                 }
 
-                hasPreciseFix = false; // Reset flag on new toggle
+                hasPreciseFix = false;
 
-                // 1. FAST LANE (Low Accuracy, Cached ok) - Timeout 5s
+                // 1. FAST LANE
                 navigator.geolocation.getCurrentPosition(
                     (pos) => processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'LOW_ACCURACY'),
                     (err) => console.warn("DEBUG: Fast Lane (Low Acc) failed:", err),
                     { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
                 );
 
-                // 2. PRECISION LANE (High Accuracy, Fresh) - Timeout 20s
+                // 2. PRECISION LANE
                 navigator.geolocation.getCurrentPosition(
                     (pos) => processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'HIGH_ACCURACY'),
                     (err) => {
                         console.warn("DEBUG: Precision Lane (High Acc) failed:", err);
                         if (err.code === err.TIMEOUT && !hasPreciseFix) {
-                            console.log("DEBUG: High Accuracy timed out. Relying on Low Accuracy result if available.");
+                            console.log("DEBUG: High Accuracy timed out.");
                         } else if (err.code === err.PERMISSION_DENIED) {
                             alert("Please allow Location Access to use GPS.");
                         }
@@ -459,7 +409,7 @@
                 );
             };
 
-            // Load Top Bar Component dynamically
+            // Navigation / Top Bar Logic 
             fetch('/B_map_page/components/top_bar.html')
                 .then(response => response.text())
                 .then(html => {
@@ -469,23 +419,14 @@
                 .catch(err => console.error('Error loading top bar:', err));
 
             // Initial Auto-Start
-            // User requested DEFAULT location first.
             isGpsActive = false;
-            // Load polygons for the default location immediately
             loadGameData(DEFAULT_LAT, DEFAULT_LON);
 
-            // Function to initialize events after HTML is injected
             const initTopBarEvents = () => {
                 const gpsBtn = document.getElementById('gps-btn');
                 const menuBtn = document.getElementById('menu-btn');
-                const topBar = document.getElementById('top-bar'); // Uses the ID we added
+                const topBar = document.getElementById('top-bar');
 
-                // Auto-set GPS button to active since we started it (REMOVED)
-                /* if (gpsBtn && isGpsActive) {
-                    gpsBtn.classList.add('active');
-                } */
-
-                // Helper to close menu if needed
                 const closeMenu = () => {
                     if (topBar && topBar.classList.contains('expanded')) {
                         topBar.classList.remove('expanded');
@@ -497,29 +438,31 @@
                         isGpsActive = !isGpsActive;
 
                         if (isGpsActive) {
-                            // Turn ON
                             console.log("DEBUG: GPS Toggled ON");
                             gpsBtn.classList.add('active');
                             startLocationWatch();
                         } else {
-                            // Turn OFF
                             console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
                             gpsBtn.classList.remove('active');
                             hasPreciseFix = false;
-                            map.setView([DEFAULT_LAT, DEFAULT_LON], 18);
+
+                            // Use Controls to reset view
+                            controls.resetView(DEFAULT_LAT, DEFAULT_LON);
                             userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
+
+                            // Trigger load to show animation and refresh data
+                            loadGameData(DEFAULT_LAT, DEFAULT_LON);
                         }
                     });
                 }
 
                 if (menuBtn && topBar) {
                     menuBtn.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent map click from immediately closing it if we add that later
+                        e.stopPropagation();
                         topBar.classList.toggle('expanded');
                     });
                 }
 
-                // Optional: Close menu when clicking outside (on map)
                 mapElement.addEventListener('click', closeMenu);
             };
         });

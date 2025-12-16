@@ -25,8 +25,18 @@ def create_groups_of_polygons(polygons=None):
                 reader = csv.reader(f)
                 next(reader, None)
                 for row in reader:
-                    if len(row) >= 4:
-                        # id, center_lat, center_lon, coords_json
+                    if len(row) >= 5:
+                        # New format: id, center_lat, center_lon, total_points, coords_json
+                        coords = json.loads(row[4])
+                        # Convert to tuples for Shapely
+                        coords_tuples = [tuple(p) for p in coords]
+                        
+                        polygons.append({
+                            'id': row[0],
+                            'coords': coords_tuples
+                        })
+                    elif len(row) >= 4:
+                        # Old format: id, center_lat, center_lon, coords_json
                         coords = json.loads(row[3])
                         # Convert to tuples for Shapely
                         coords_tuples = [tuple(p) for p in coords]

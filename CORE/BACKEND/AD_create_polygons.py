@@ -27,20 +27,33 @@ def create_polygons(white_lines=None):
                 reader = csv.reader(f)
                 next(reader, None)
                 for row in reader:
-                    if len(row) >= 6:
-                        # start_lat, start_lon, end_lat, end_lon, length, path_json
+                    if len(row) >= 7:
+                        # New format: start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
                         start = (float(row[0]), float(row[1]))
                         end = (float(row[2]), float(row[3]))
-                        path = json.loads(row[5])
-                        # Convert path list-of-lists to list-of-tuples if needed, 
-                        # but json loads as lists. Utils usually handle both. 
-                        # Converting to tuples to match internal logic consistency
+                        green_count = int(row[5])
+                        path = json.loads(row[6])
                         path_tuples = [tuple(p) for p in path]
                         
                         white_lines.append({
                             'start': start,
                             'end': end,
-                            'path': path_tuples
+                            'path': path_tuples,
+                            'green_count': green_count
+                        })
+                    elif len(row) >= 6:
+                        # Old format fallback
+                        start = (float(row[0]), float(row[1]))
+                        end = (float(row[2]), float(row[3]))
+                        green_count = 0
+                        path = json.loads(row[5])
+                        path_tuples = [tuple(p) for p in path]
+                        
+                        white_lines.append({
+                            'start': start,
+                            'end': end,
+                            'path': path_tuples,
+                            'green_count': 0
                         })
     
     # Build NetworkX Graph
@@ -51,7 +64,7 @@ def create_polygons(white_lines=None):
         u = line['start']
         v = line['end']
         # Add edge with geometry as attribute
-        G.add_edge(u, v, path=line['path'])
+        G.add_edge(u, v, path=line['path'], green_count=line.get('green_count', 0))
         
     polygons_data = []
     
@@ -65,6 +78,8 @@ def create_polygons(white_lines=None):
             
             # Construct polygon geometry by stitching edge paths
             coords = []
+            
+            total_green_circles = 0
             
             # Iterate through the cycle edges
             # Cycle is [n1, n2, n3, ...]. We need edges (n1,n2), (n2,n3), ..., (last, n1)
@@ -83,6 +98,7 @@ def create_polygons(white_lines=None):
                     current_segment = [u, v]
                 else:
                     path = edge_data['path'] # List of (lat, lon) tuples
+                    total_green_circles += edge_data.get('green_count', 0)
                     
                     # Check direction.
                     p_start = path[0]
@@ -113,11 +129,17 @@ def create_polygons(white_lines=None):
             # Center (Centroid)
             center = poly.centroid
             
+            # Calculate 100% Value
+            # Sum of Green Circles on edges + Number of Blue Circles (Vertices)
+            # len(cycle) gives number of unique vertices in the simple cycle
+            total_points = total_green_circles + len(cycle)
+            
             polygons_data.append({
                 'id': f"poly_{len(polygons_data)}",
                 'coords': coords,
                 'center': (center.x, center.y),
-                'percentage': 0 
+                'percentage': 0, # Current progress (0 initially)
+                'total_points': total_points
             })
             
     except Exception as e:
@@ -126,13 +148,14 @@ def create_polygons(white_lines=None):
     # CSV IO: Write Polygons
     with open(os.path.join(data_dir, 'AD_create_polygons.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
-        # id, center_lat, center_lon, coords_json
-        writer.writerow(['id', 'center_lat', 'center_lon', 'coords_json'])
+        # id, center_lat, center_lon, total_points, coords_json
+        writer.writerow(['id', 'center_lat', 'center_lon', 'total_points', 'coords_json'])
         for poly in polygons_data:
             writer.writerow([
                 poly['id'], 
                 poly['center'][0], 
                 poly['center'][1], 
+                poly['total_points'],
                 json.dumps(poly['coords'])
             ])
 
