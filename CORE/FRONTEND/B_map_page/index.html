@@ -376,7 +376,23 @@
 
                 // Triggers visibility check immediately
                 controls.checkVisibility();
+
+                // 6. Update Navigation Graph
+                controls.updateGraph(data.green_circles, data.blue_circles);
             };
+
+            // Listen for keyboard navigation requests
+            document.addEventListener('map-move-request', (e) => {
+                const { lat, lon } = e.detail;
+                // Move marker directly without re-snapping (we assume the graph node is already snapped/valid)
+                // But utilizing updateUserPosition ensures consistency if we want it.
+                // However, updateUserPosition calls getSnappedPosition AGAIN.
+                // If graph nodes are accurate, this is fine.
+                controls.updateUserPosition(userMarker, lat, lon, isGpsActive);
+
+                // Ensure map centers on it
+                map.panTo([lat, lon]);
+            });
 
             const startLocationWatch = () => {
                 console.log("DEBUG: [Map Page] Starting Parallel Geolocation Strategy...");
