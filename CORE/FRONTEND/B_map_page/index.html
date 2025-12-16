@@ -291,6 +291,14 @@
                 groupsLayer.clearLayers();
                 detailsLayer.clearLayers();
 
+                // Track Layers for Hiding Logic
+                // Key: "lat,lon" (Fixed precision 6) -> Layer
+                const circleLayerMap = new Map();
+                const addToMap = (lat, lon, layer) => {
+                    const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+                    circleLayerMap.set(key, layer);
+                };
+
                 if (data.groups) {
                     console.log(`DEBUG: Rendering ${data.groups.length} Groups into LayerGroup`);
                     data.groups.forEach(group => {
@@ -359,18 +367,20 @@
                         }).addTo(detailsLayer);
 
                         marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
+                        addToMap(circle.lat, circle.lon, marker);
                     });
                 }
 
                 // 5. Green Circles (Details)
                 if (data.green_circles) {
                     data.green_circles.forEach(circle => {
-                        L.circleMarker([circle.lat, circle.lon], {
+                        const marker = L.circleMarker([circle.lat, circle.lon], {
                             radius: 4,
                             color: 'green',
                             fillColor: '#00ff00',
                             fillOpacity: 1
                         }).addTo(detailsLayer);
+                        addToMap(circle.lat, circle.lon, marker);
                     });
                 }
 
@@ -379,6 +389,40 @@
 
                 // 6. Update Navigation Graph (Strict Topology)
                 controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
+
+                // 7. Setup Auto-Hiding Logic (Closure retains circleLayerMap)
+                setupNodeHiding(circleLayerMap);
+            };
+
+            let currentHiddenLayer = null;
+            const setupNodeHiding = (layerMap) => {
+                const checkAndHide = () => {
+                    const pos = userMarker.getLatLng();
+                    const key = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+
+                    // Logic Change: Do NOT restore previous layers.
+                    // Circles should stay hidden once visited (Pac-Man style).
+
+                    const target = layerMap.get(key);
+                    if (target) {
+                        // Check if already hidden to avoid redundant style calcs
+                        if (target.options.opacity !== 0) {
+                            target.setStyle({ opacity: 0, fillOpacity: 0 });
+                            if (target.getTooltip && target.getTooltip()) {
+                                target.closeTooltip();
+                            }
+                        }
+                    }
+                };
+
+                // Run immediately
+                checkAndHide();
+
+                if (userMarker._hideHandler) {
+                    userMarker.off('move', userMarker._hideHandler);
+                }
+                userMarker._hideHandler = checkAndHide;
+                userMarker.on('move', checkAndHide);
             };
 
             // Listen for keyboard navigation requests
