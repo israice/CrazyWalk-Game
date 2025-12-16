@@ -126,7 +126,7 @@
             box-shadow: none;
             color: white;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 20px;
             text-shadow: 0 0 2px black;
         }
     </style>
@@ -251,7 +251,10 @@
 
 
             // Create Marker pinned to map
-            const userMarker = L.marker([DEFAULT_LAT, DEFAULT_LON], { icon: customIcon }).addTo(map);
+            const userMarker = L.marker([DEFAULT_LAT, DEFAULT_LON], {
+                icon: customIcon,
+                zIndexOffset: 1000 // Ensure it is above everything else
+            }).addTo(map);
 
             // Reveal Map Logic
             const revealMap = () => {
@@ -332,7 +335,7 @@
                 // loadingGif.style.opacity = '0.5';
 
                 console.log(`DEBUG: Fetching Game Data from /api/game_data?lat=${lat}&lon=${lon}`);
-                
+
                 fetch(`/api/game_data?lat=${lat}&lon=${lon}`)
                     .then(res => {
                         console.log("DEBUG: Response Status:", res.status);
@@ -352,66 +355,19 @@
 
             const renderGameElements = (data) => {
                 console.log("DEBUG: Starting Render...");
-                // 1. Red Lines
-                if (data.red_lines && data.red_lines.length > 0) {
-                    console.log(`DEBUG: Rendering ${data.red_lines.length} Red Lines`);
-                    data.red_lines.forEach(line => {
-                        // line is list of [lat, lon] (Visual line)
-                        L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(map);
-                    });
-                } else {
-                    console.log("DEBUG: No Red Lines to render.");
-                }
 
-                // 2. Blue Circles (Intersections)
-                if (data.blue_circles) {
-                    data.blue_circles.forEach(circle => {
-                        const marker = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 8,
-                            color: 'blue',
-                            fillColor: '#00ccff',
-                            fillOpacity: 0.8
-                        }).addTo(map);
-
-                        // White circle inside with number? Leaflet CircleMarker doesn't support text directly.
-                        // Use a DivIcon or Tooltip?
-                        // User requested: "in blue circles a white circle, on it number of red lines"
-                        // Simplifying: Tooltip or just the marker for now.
-                        marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
-                    });
-                }
-
-                // 3. White Lines
-                if (data.white_lines) {
-                    data.white_lines.forEach(line => {
-                        // line.path is list of [lat, lon]
-                        L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(map);
-                    });
-                }
-
-                // 4. Green Circles
-                if (data.green_circles) {
-                    data.green_circles.forEach(circle => {
-                        L.circleMarker([circle.lat, circle.lon], {
-                            radius: 4,
-                            color: 'green',
-                            fillColor: '#00ff00',
-                            fillOpacity: 1
-                        }).addTo(map);
-                    });
-                }
-
-                // 5. Polygons
+                // 1. Polygons (Bottom Layer)
                 if (data.polygons) {
                     data.polygons.forEach(poly => {
                         // poly.coords is list of [lat, lon]
                         L.polygon(poly.coords, {
                             color: 'purple',
                             fillColor: 'purple',
-                            fillOpacity: 0.1
+                            fillOpacity: 0.1,
+                            weight: 0 // Optional: Remove border if desired, but keeping default
                         }).addTo(map);
 
-                        // Center percentage
+                        // Center percentage label
                         if (poly.center) {
                             // Backend returns [lat, lon] for center (shapely x=lat, y=lon in our construction)
                             L.marker([poly.center[0], poly.center[1]], {
@@ -423,6 +379,51 @@
                                 })
                             }).addTo(map);
                         }
+                    });
+                }
+
+                // 2. Red Lines
+                if (data.red_lines && data.red_lines.length > 0) {
+                    console.log(`DEBUG: Rendering ${data.red_lines.length} Red Lines`);
+                    data.red_lines.forEach(line => {
+                        // line is list of [lat, lon] (Visual line)
+                        L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(map);
+                    });
+                } else {
+                    console.log("DEBUG: No Red Lines to render.");
+                }
+
+                // 3. White Lines
+                if (data.white_lines) {
+                    data.white_lines.forEach(line => {
+                        // line.path is list of [lat, lon]
+                        L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(map);
+                    });
+                }
+
+                // 4. Blue Circles (Intersections) - on top of lines
+                if (data.blue_circles) {
+                    data.blue_circles.forEach(circle => {
+                        const marker = L.circleMarker([circle.lat, circle.lon], {
+                            radius: 8,
+                            color: 'blue',
+                            fillColor: '#00ccff',
+                            fillOpacity: 0.8
+                        }).addTo(map);
+
+                        marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
+                    });
+                }
+
+                // 5. Green Circles - on top of lines
+                if (data.green_circles) {
+                    data.green_circles.forEach(circle => {
+                        L.circleMarker([circle.lat, circle.lon], {
+                            radius: 4,
+                            color: 'green',
+                            fillColor: '#00ff00',
+                            fillOpacity: 1
+                        }).addTo(map);
                     });
                 }
             };

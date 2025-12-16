@@ -37,6 +37,32 @@ def run_list(lat, lon, region_size=0.0015):
     # 5. Groups
     # Reads from AD_create_polygons.csv
     groups = create_groups_of_polygons()
+
+    # --- RECALCULATE CONNECTIONS FOR VISUAL ACCURACY ---
+    # The 'connections' value in blue_circles currently reflects raw RED segments (noisy).
+    # We want it to reflect the visible WHITE lines connected to the node.
+    
+    # 1. Count connections from White Lines
+    wl_node_counts = {}
+    for wl in white_lines:
+        # white_lines uses 'start' and 'end' keys which are tuples (lat, lon)
+        s = wl['start'] 
+        e = wl['end']
+        wl_node_counts[s] = wl_node_counts.get(s, 0) + 1
+        wl_node_counts[e] = wl_node_counts.get(e, 0) + 1
+        
+    # 2. Update Blue Circles
+    for circle in blue_circles:
+        # circle is dict: {'id', 'lat', 'lon', 'connections'}
+        # Key for lookup matches the tuple format from white lines
+        node_key = (circle['lat'], circle['lon'])
+        
+        # Update with count from white lines (default to 0 if isolated)
+        new_count = wl_node_counts.get(node_key, 0)
+        circle['connections'] = new_count
+        
+    # ---------------------------------------------------
+    
     
     logger.info(f"A_create_polygons: Generated "
                 f"{len(red_visual)} red rays, "
