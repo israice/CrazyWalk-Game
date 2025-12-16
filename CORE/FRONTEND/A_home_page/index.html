@@ -597,11 +597,11 @@
                 errorScreen.style.display = 'none';
                 console.log(`DEBUG: [Step 1] Initializing Geolocation Sequence (Attempt ${retryCount + 1})...`);
 
-                // Safety Timeout - 10 seconds
+                // Safety Timeout - 25 seconds (must be longer than geoOptions.timeout check of 20s)
                 const safetyTimeout = setTimeout(() => {
-                    console.warn(`DEBUG: [Timeout] Safety Timeout Triggered (10s elapsed on attempt ${retryCount + 1})`);
+                    console.warn(`DEBUG: [Timeout] Safety Timeout Triggered (25s elapsed on attempt ${retryCount + 1})`);
                     showError("Request timed out.<br>Please check your GPS or connection.");
-                }, 10000);
+                }, 25000);
 
                 if (!("geolocation" in navigator)) {
                     clearTimeout(safetyTimeout);
@@ -611,6 +611,13 @@
                 }
 
                 console.log("DEBUG: [Step 2] Requesting browser coordinates...");
+                const geoOptions = {
+                    enableHighAccuracy: false, // Low accuracy is enough for City Name and much faster/reliable
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+                console.log("DEBUG: [Step 2a] Geolocation Options:", JSON.stringify(geoOptions));
+
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         clearTimeout(safetyTimeout); // Got location, cancel safety timer
@@ -620,31 +627,37 @@
                         console.log(`DEBUG: [Info] Raw Coordinates: Lat=${userLat}, Lon=${userLon}`);
 
                         // Use server-side logic to determine location
-                        console.log("DEBUG: [Step 4] Sending request to server /api/locate...");
-                        fetch(`/api/locate?lat=${userLat}&lon=${userLon}`)
+                        // Use client-side Geocoding (BigDataCloud) for speed and non-blocking
+                        console.log("DEBUG: [Step 4] Requesting City Name from BigDataCloud...");
+                        const bdcApiUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${userLat}&longitude=${userLon}&localityLanguage=en`;
+
+                        fetch(bdcApiUrl)
                             .then(response => {
-                                console.log(`DEBUG: [Step 5] Server responded with status: ${response.status}`);
-                                if (!response.ok) throw new Error("API Network Error");
+                                console.log(`DEBUG: [Step 5] BDC responded with status: ${response.status}`);
+                                if (!response.ok) throw new Error("BDC Network Error");
                                 return response.json();
                             })
                             .then(data => {
-                                console.log("DEBUG: [Step 6] Server Data Parsed:", data);
-                                // Update UI with server-provided data
-                                cityLabel.textContent = data.city;
+                                console.log("DEBUG: [Step 6] BDC Data Parsed:", data);
+                                // Update UI with BDC data
+                                // BDC fields: city, locality, principalSubdivision
+                                const cityName = data.city || data.locality || data.principalSubdivision || "Unknown Location";
+                                cityLabel.textContent = cityName;
 
                                 // Map view logic:
-                                // "data.lat" and "data.lon" are the CANONICAL city center coordinates (from search)
-                                // "data.user_lat" and "data.user_lon" are the user's RAW coordinates
-                                // For A_home_page, we want to center on the CITY to look nice.
+                                // Center on the USER'S actual location (UserLat/UserLon)
+                                // This is better for the game than jumping to a generic city center.
 
-                                console.log(`DEBUG: [Step 7] Updating Map View to: [${data.lat}, ${data.lon}]`);
-                                map.setView([data.lat, data.lon], 17, { animate: false });
+                                console.log(`DEBUG: [Step 7] Updating Map View to User Location: [${userLat}, ${userLon}]`);
+                                map.setView([userLat, userLon], 17, { animate: false });
                                 revealContent();
                                 console.log("DEBUG: [Success] Geolocation sequence complete.");
                             })
                             .catch(err => {
                                 console.error("DEBUG: [Error] Location API Error:", err);
-                                showError(`Unable to connect to Server.<br><small>${err.message}</small>`);
+                                // Even if city name fails, we should arguably still show the map?
+                                // Let's show error for now as requested.
+                                showError(`Unable to retrieve city name.<br><small>${err.message}</small>`);
                             });
                     },
                     (error) => {
@@ -667,19 +680,16 @@
                             showError(`Unable to retrieve location.<br><small>${error.message}</small>`);
                         }
                     },
-                    {
-                        enableHighAccuracy: false,
-                        timeout: 7000,
-                        maximumAge: Infinity
-                    }
+                    geoOptions // Pass options here
                 );
             };
 
             // Retry button now triggers the function directly (User Gesture)
             document.getElementById('retry-btn').addEventListener('click', startGeolocation);
 
-            // Initial auto-start (might warn, but we try)
-            setTimeout(startGeolocation, 1000);
+            // Initial auto-start (delayed to avoid immediate timeout/resource contention)
+            // User requested delay after GIF starts.
+            setTimeout(startGeolocation, 2000);
 
             // GUEST Button Logic - Standard Navigation
             document.querySelector('.btn-guest').addEventListener('click', () => {

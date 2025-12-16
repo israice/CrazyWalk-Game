@@ -118,6 +118,17 @@
 
 
         }
+
+        /* Label Styles */
+        .leaflet-tooltip.circle-label {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-shadow: 0 0 2px black;
+        }
     </style>
 </head>
 
@@ -242,10 +253,12 @@
             // Create Marker pinned to map
             const userMarker = L.marker([DEFAULT_LAT, DEFAULT_LON], { icon: customIcon }).addTo(map);
 
+            // Reveal Map Logic
             const revealMap = () => {
                 if (hasRevealed) return;
                 hasRevealed = true;
-                map.invalidateSize(); // Ensure map knows its true size after layout settles
+                console.log("DEBUG: Revealing Map...");
+                map.invalidateSize();
                 loadingGif.style.opacity = '0';
                 mapElement.style.opacity = '1';
                 setTimeout(() => {
@@ -253,8 +266,14 @@
                 }, 600);
             };
 
-            // Reveal immediately since we have default coords
-            setTimeout(revealMap, 500);
+            // REMOVED: Immediate timeout. Now we wait for Data OR Safety Timer.
+            // Safety: If data takes too long (>30s), reveal anyway.
+            setTimeout(() => {
+                if (!hasRevealed) {
+                    console.warn("DEBUG: Safety Reveal Triggered (Data took too long)");
+                    revealMap();
+                }
+            }, 30000);
 
             // Reusable function to process coordinates (Client-Side First)
             const processCoordinates = (lat, lon, accuracy, label) => {
@@ -288,6 +307,124 @@
                     .then(res => res.json())
                     .then(data => console.log("DEBUG: Server ack:", data)) // Just log it
                     .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
+
+                // GAME LOGIC: Fetch Roads/Polygons
+                // Changed to load on FIRST fix (Low or High) for testing visibility.
+
+                // If GPS is active, we trigger a reload for the new location.
+                if (isGpsActive) {
+                    // Check if we already loaded for this session to avoid loop? 
+                    // No, let's just trigger it. Debouncing would be better but simple logic first.
+                    // Wait, if we trigger it every update, it will spam. 
+                    // Let's rely on 'window.hasLoadedGpsData' flag for this session.
+                    if (!window.hasLoadedGpsData) {
+                        window.hasLoadedGpsData = true;
+                        console.log("DEBUG: Triggering GPS Game Data Load (Accuracy: " + label + ")");
+                        loadGameData(lat, lon);
+                    }
+                }
+            };
+
+            const loadGameData = (lat, lon) => {
+                console.log("DEBUG: Fetching Game Data...");
+                // reuse loading gif if desired, or just show it quietly
+                // loadingGif.style.display = 'block'; 
+                // loadingGif.style.opacity = '0.5';
+
+                console.log(`DEBUG: Fetching Game Data from /api/game_data?lat=${lat}&lon=${lon}`);
+                
+                fetch(`/api/game_data?lat=${lat}&lon=${lon}`)
+                    .then(res => {
+                        console.log("DEBUG: Response Status:", res.status);
+                        return res.json();
+                    })
+                    .then(data => {
+                        console.log("DEBUG: Game Data JSON Received. Keys:", Object.keys(data));
+                        console.log(`DEBUG: Counts -> RedLines: ${data.red_lines?.length}, BlueCircles: ${data.blue_circles?.length}, WhiteLines: ${data.white_lines?.length}, Polygons: ${data.polygons?.length}`);
+                        renderGameElements(data);
+                        revealMap(); // Success! Reveal map with data.
+                    })
+                    .catch(err => {
+                        console.error("DEBUG: Game Data Failed", err);
+                        revealMap(); // Reveal even if failed so user isn't stuck
+                    });
+            };
+
+            const renderGameElements = (data) => {
+                console.log("DEBUG: Starting Render...");
+                // 1. Red Lines
+                if (data.red_lines && data.red_lines.length > 0) {
+                    console.log(`DEBUG: Rendering ${data.red_lines.length} Red Lines`);
+                    data.red_lines.forEach(line => {
+                        // line is list of [lat, lon] (Visual line)
+                        L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(map);
+                    });
+                } else {
+                    console.log("DEBUG: No Red Lines to render.");
+                }
+
+                // 2. Blue Circles (Intersections)
+                if (data.blue_circles) {
+                    data.blue_circles.forEach(circle => {
+                        const marker = L.circleMarker([circle.lat, circle.lon], {
+                            radius: 8,
+                            color: 'blue',
+                            fillColor: '#00ccff',
+                            fillOpacity: 0.8
+                        }).addTo(map);
+
+                        // White circle inside with number? Leaflet CircleMarker doesn't support text directly.
+                        // Use a DivIcon or Tooltip?
+                        // User requested: "in blue circles a white circle, on it number of red lines"
+                        // Simplifying: Tooltip or just the marker for now.
+                        marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
+                    });
+                }
+
+                // 3. White Lines
+                if (data.white_lines) {
+                    data.white_lines.forEach(line => {
+                        // line.path is list of [lat, lon]
+                        L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(map);
+                    });
+                }
+
+                // 4. Green Circles
+                if (data.green_circles) {
+                    data.green_circles.forEach(circle => {
+                        L.circleMarker([circle.lat, circle.lon], {
+                            radius: 4,
+                            color: 'green',
+                            fillColor: '#00ff00',
+                            fillOpacity: 1
+                        }).addTo(map);
+                    });
+                }
+
+                // 5. Polygons
+                if (data.polygons) {
+                    data.polygons.forEach(poly => {
+                        // poly.coords is list of [lat, lon]
+                        L.polygon(poly.coords, {
+                            color: 'purple',
+                            fillColor: 'purple',
+                            fillOpacity: 0.1
+                        }).addTo(map);
+
+                        // Center percentage
+                        if (poly.center) {
+                            // Backend returns [lat, lon] for center (shapely x=lat, y=lon in our construction)
+                            L.marker([poly.center[0], poly.center[1]], {
+                                icon: L.divIcon({
+                                    className: 'poly-label',
+                                    html: `<div style="background:white; border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; color:black; font-size:10px; opacity: 0.8;">${poly.percentage}%</div>`,
+                                    iconSize: [20, 20],
+                                    iconAnchor: [10, 10]
+                                })
+                            }).addTo(map);
+                        }
+                    });
+                }
             };
 
             const startLocationWatch = () => {
@@ -330,11 +467,22 @@
                 })
                 .catch(err => console.error('Error loading top bar:', err));
 
+            // Initial Auto-Start
+            // User requested DEFAULT location first.
+            isGpsActive = false;
+            // Load polygons for the default location immediately
+            loadGameData(DEFAULT_LAT, DEFAULT_LON);
+
             // Function to initialize events after HTML is injected
             const initTopBarEvents = () => {
                 const gpsBtn = document.getElementById('gps-btn');
                 const menuBtn = document.getElementById('menu-btn');
                 const topBar = document.getElementById('top-bar'); // Uses the ID we added
+
+                // Auto-set GPS button to active since we started it (REMOVED)
+                /* if (gpsBtn && isGpsActive) {
+                    gpsBtn.classList.add('active');
+                } */
 
                 // Helper to close menu if needed
                 const closeMenu = () => {

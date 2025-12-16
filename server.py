@@ -115,8 +115,14 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith('/api/locate'):
             self.handle_locate()
             return
+        # Debugging request path
+        # logger.info(f"Checking Path: {self.path}") 
         if self.path.startswith('/api/reverse') or self.path.startswith('/api/search'):
             self.proxy_nominatim()
+            return
+        if self.path.startswith('/api/game_data'):
+            logger.info(f"Route Matched: /api/game_data")
+            self.handle_game_data()
             return
         super().do_GET()
 
@@ -249,6 +255,51 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Proxy error: {e}")
             self.send_error(500, f"Proxy error: {str(e)}")
+
+    def handle_game_data(self):
+        """
+        Handle /api/game_data.
+        Generates/Retrieves game elements (Lines, Polygons).
+        """
+        try:
+            # Parse params
+            parsed_path = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_path.query)
+            lat = float(params.get('lat', [0])[0])
+            lon = float(params.get('lon', [0])[0])
+            
+            if not lat or not lon:
+                self.send_error(400, "Missing lat/lon")
+                return
+
+            # Import here to avoid circular dependencies at top level if any
+            from CORE.BACKEND import A_create_polygons
+            
+            # Generate Data
+            data = A_create_polygons.run_list(lat, lon)
+            
+            # Send Response
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*') 
+            self.end_headers()
+            
+            # Use a custom JSON encoder if needed, or ensure data is basic types.
+            # Shapely objects (Polygon) or sets are not JSON serializable. 
+            # Review Modules:
+            # AA: returns list of tuples (lat, lon) -> JSON OK? No, tuple becomes list.
+            # AB: returns list of dicts -> JSON OK.
+            # AC: list of dicts -> JSON OK.
+            # AD: list of dicts, coords is list of tuples -> JSON OK.
+            # AE: list of dicts -> JSON OK.
+
+            self.wfile.write(json.dumps(data).encode())
+            
+        except Exception as e:
+            logger.error(f"Game Data Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.send_error(500, str(e))
 
 class ThreadedHTTPServer(socketserver.ThreadingTCPServer):
     """Multi-threaded server to handle concurrent requests."""
