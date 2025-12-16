@@ -188,4 +188,10 @@ def create_polygons(white_lines=None):
             ])
 
     logger.info(f"AD: Created {len(polygons_data)} polygons. Saved to CSV.")
-    return polygons_data
+    
+    # Collect all unique White Line IDs used in polygons
+    used_white_line_ids = set()
+    for poly in polygons_data:
+        used_white_line_ids.update(poly['boundary_white_lines'])
+        
+    return polygons_data, used_white_line_ids

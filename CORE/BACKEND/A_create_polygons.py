@@ -32,7 +32,43 @@ def run_list(lat, lon, region_size=0.0015):
     
     # 4. Polygons
     # Reads from AC_create_white_lines.csv
-    polygons = create_polygons()
+    # 4. Polygons
+    # Reads from AC_create_white_lines.csv
+    # AD returns tuple: (polygons_data, used_white_line_ids)
+    polygons, used_white_line_ids = create_polygons()
+    
+    # --- FILTER ORPHANED LINES ---
+    original_wl_count = len(white_lines)
+    original_gc_count = len(green_circles)
+    
+    # DEBUG: Inspect types
+    if white_lines:
+        first_id = white_lines[0].get('id')
+        logger.info(f"DEBUG: Sample WL ID: {first_id} (Type: {type(first_id)})")
+        logger.info(f"DEBUG: Sample WL ID (str): {str(first_id)}")
+    
+    if used_white_line_ids:
+        sample_used = list(used_white_line_ids)[0]
+        logger.info(f"DEBUG: Sample Used ID: {sample_used} (Type: {type(sample_used)})")
+        logger.info(f"DEBUG: Used IDs Set Size: {len(used_white_line_ids)}")
+    else:
+        logger.warning("DEBUG: used_white_line_ids is EMPTY!")
+        
+    # Check overlap
+    overlap_count = sum(1 for wl in white_lines if str(wl.get('id')) in used_white_line_ids)
+    logger.info(f"DEBUG: Overlap Count: {overlap_count}")
+
+    # Keep white lines only if their ID is in the used set
+    # AD returns IDs as strings (from CSV). AC returns IDs as ints.
+    # We must cast to string for comparison.
+    white_lines = [wl for wl in white_lines if str(wl.get('id')) in used_white_line_ids]
+    
+    # Keep green circles only if their line_id is in the used set
+    green_circles = [gc for gc in green_circles if str(gc.get('line_id')) in used_white_line_ids]
+    
+    logger.info(f"A: Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
+    logger.info(f"A: Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
+    # -----------------------------
     
     # 5. Groups
     # Reads from AD_create_polygons.csv
@@ -74,11 +110,15 @@ def run_list(lat, lon, region_size=0.0015):
             circle['connections'] = 0
             circle['connected_white_lines'] = []
             
+    # FILTER BLUE CIRCLES: distinct step after update
+    # Only keep intersections that are actually part of the playable network
+    blue_circles = [bc for bc in blue_circles if bc['connections'] > 0]
+            
     # ---------------------------------------------------
     
     
     logger.info(f"A_create_polygons: Generated "
-                f"{len(red_visual)} red rays, "
+                f"{len(red_visual)} red rays (suppressed), "
                 f"{len(blue_circles)} blue circles, "
                 f"{len(white_lines)} white lines, "
                 f"{len(polygons)} polygons.")
@@ -86,7 +126,7 @@ def run_list(lat, lon, region_size=0.0015):
     logger.info("A_create_polygons: Sequence complete.")
     
     return {
-        "red_lines": red_visual, # Return full ways for smooth rendering
+        "red_lines": [], # Suppress raw red lines to clean up map
         "blue_circles": blue_circles,
         "white_lines": white_lines,
         "green_circles": green_circles,

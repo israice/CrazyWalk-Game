@@ -43,6 +43,7 @@ class MapControls {
         this.map = L.map(this.elementId, {
             zoomControl: false,
             attributionControl: false,
+            keyboard: false, // Disable default Leaflet panning
             zoomSnap: this.config.zoomSnap,
             minZoom: this.config.minZoom,
             maxZoom: this.config.maxZoom

@@ -271,6 +271,7 @@
     - circles hide when visited
     - fixed blue circles number as one item
     - fixed group_of_polygons as one item
+    - deleted not in use white lines in end of polygons
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -284,7 +285,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.25 - fixed group_of_polygons as one item"
+  git commit -m "v0.0.25 - deleted not in use white lines in end of polygons"
   git push
   ```
 
