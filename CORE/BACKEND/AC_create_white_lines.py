@@ -130,7 +130,7 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                      'length': dist
                  })
                  
-                 # Add Green Circles (Equidistant)
+                     # Add Green Circles (Equidistant)
                  # Target ~15m spacing.
                  total_length = dist
                  target_spacing = 15.0
@@ -139,6 +139,13 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                  # e.g. 140m / 15 = 2.8 -> 3 segments -> 46.6m each
                  num_segments = int(round(total_length / target_spacing))
                  if num_segments < 1: num_segments = 1
+                 
+                 # Assign a simple ID to the White Line
+                 # Using hash of start/end for stability or just index?
+                 # Since we loop, we can just use index if we tracked it, but start/end is safer.
+                 # Let's use a generated ID based on coordinates for now, or just append later.
+                 # We will assign IDs after the loop or use a counter.
+                 # Actually, let's just use the list index at the end.
                  
                  if num_segments > 1:
                      step = total_length / num_segments
@@ -165,7 +172,12 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                              new_lat = p1[0] + (p2[0] - p1[0]) * ratio
                              new_lon = p1[1] + (p2[1] - p1[1]) * ratio
                              
-                             green_circles.append({'lat': new_lat, 'lon': new_lon})
+                             # We will assign line_id later
+                             green_circles.append({
+                                 'lat': new_lat, 
+                                 'lon': new_lon,
+                                 'temp_line_index': len(white_lines) - 1 # Ref to parent
+                             })
                              line_green_count += 1
                              target_idx += 1
                          
@@ -173,23 +185,35 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                      
                      white_lines[-1]['green_count'] = line_green_count
 
+    # Post-Loop: Assign IDs and linking
+    for i, wl in enumerate(white_lines):
+        wl['id'] = i  # Simple Integer ID
+    
+    # Update Green Circles with real ID
+    for gc in green_circles:
+        if 'temp_line_index' in gc:
+            parent_idx = gc.pop('temp_line_index')
+            gc['line_id'] = white_lines[parent_idx]['id']
+
     # CSV IO: Write Outputs
     # 1. White Lines
     with open(os.path.join(data_dir, 'AC_create_white_lines.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
-        # start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
-        writer.writerow(['start_lat', 'start_lon', 'end_lat', 'end_lon', 'length', 'green_count', 'path_json'])
+        # id, start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
+        writer.writerow(['id', 'start_lat', 'start_lon', 'end_lat', 'end_lon', 'length', 'green_count', 'path_json'])
         for wl in white_lines:
             s = wl['start']
             e = wl['end']
-            writer.writerow([s[0], s[1], e[0], e[1], wl['length'], wl.get('green_count', 0), json.dumps(wl['path'])])
+            writer.writerow([wl['id'], s[0], s[1], e[0], e[1], wl['length'], wl.get('green_count', 0), json.dumps(wl['path'])])
             
     # 2. Green Circles
     with open(os.path.join(data_dir, 'AC_green_circles.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['lat', 'lon'])
+        # lat, lon, line_id
+        writer.writerow(['lat', 'lon', 'line_id'])
         for gc in green_circles:
-            writer.writerow([gc['lat'], gc['lon']])
+            writer.writerow([gc['lat'], gc['lon'], gc.get('line_id', -1)])
 
     logger.info(f"AC: Created {len(white_lines)} white lines and {len(green_circles)} green circles. Saved to CSV.")
     return white_lines, green_circles
+

@@ -42,14 +42,23 @@ def run_list(lat, lon, region_size=0.0015):
     # The 'connections' value in blue_circles currently reflects raw RED segments (noisy).
     # We want it to reflect the visible WHITE lines connected to the node.
     
-    # 1. Count connections from White Lines
-    wl_node_counts = {}
+    # 1. Count connections and collect IDs from White Lines
+    wl_node_data = {} # Key: (lat, lon) -> {count: 0, line_ids: []}
+    
     for wl in white_lines:
         # white_lines uses 'start' and 'end' keys which are tuples (lat, lon)
         s = wl['start'] 
         e = wl['end']
-        wl_node_counts[s] = wl_node_counts.get(s, 0) + 1
-        wl_node_counts[e] = wl_node_counts.get(e, 0) + 1
+        lid = wl.get('id', -1)
+        
+        if s not in wl_node_data: wl_node_data[s] = {'count': 0, 'line_ids': []}
+        if e not in wl_node_data: wl_node_data[e] = {'count': 0, 'line_ids': []}
+        
+        wl_node_data[s]['count'] += 1
+        wl_node_data[s]['line_ids'].append(lid)
+        
+        wl_node_data[e]['count'] += 1
+        wl_node_data[e]['line_ids'].append(lid)
         
     # 2. Update Blue Circles
     for circle in blue_circles:
@@ -58,9 +67,13 @@ def run_list(lat, lon, region_size=0.0015):
         node_key = (circle['lat'], circle['lon'])
         
         # Update with count from white lines (default to 0 if isolated)
-        new_count = wl_node_counts.get(node_key, 0)
-        circle['connections'] = new_count
-        
+        if node_key in wl_node_data:
+            circle['connections'] = wl_node_data[node_key]['count']
+            circle['connected_white_lines'] = wl_node_data[node_key]['line_ids']
+        else:
+            circle['connections'] = 0
+            circle['connected_white_lines'] = []
+            
     # ---------------------------------------------------
     
     

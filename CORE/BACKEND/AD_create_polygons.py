@@ -27,8 +27,25 @@ def create_polygons(white_lines=None):
                 reader = csv.reader(f)
                 next(reader, None)
                 for row in reader:
-                    if len(row) >= 7:
-                        # New format: start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
+                    if len(row) >= 8:
+                        # NEWEST format: id, start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
+                        # row[0] is id
+                        start = (float(row[1]), float(row[2]))
+                        end = (float(row[3]), float(row[4]))
+                        green_count = int(row[6])
+                        path = json.loads(row[7])
+                        path_tuples = [tuple(p) for p in path]
+                        
+                        white_lines.append({
+                            'id': row[0],
+                            'start': start,
+                            'end': end,
+                            'path': path_tuples,
+                            'green_count': green_count
+                        })
+                    elif len(row) >= 7:
+                        # Previous format: start_lat, start_lon, end_lat, end_lon, length, green_count, path_json
+                        # Note: This format did NOT have an ID column.
                         start = (float(row[0]), float(row[1]))
                         end = (float(row[2]), float(row[3]))
                         green_count = int(row[5])
@@ -36,6 +53,7 @@ def create_polygons(white_lines=None):
                         path_tuples = [tuple(p) for p in path]
                         
                         white_lines.append({
+                            'id': -1, # No ID in this version
                             'start': start,
                             'end': end,
                             'path': path_tuples,
@@ -43,6 +61,7 @@ def create_polygons(white_lines=None):
                         })
                     elif len(row) >= 6:
                         # Old format fallback
+                        # ... (Logic remains, but we might miss ID. Assign one if needed, or assume -1)
                         start = (float(row[0]), float(row[1]))
                         end = (float(row[2]), float(row[3]))
                         green_count = 0
@@ -50,6 +69,7 @@ def create_polygons(white_lines=None):
                         path_tuples = [tuple(p) for p in path]
                         
                         white_lines.append({
+                             'id': -1,
                             'start': start,
                             'end': end,
                             'path': path_tuples,
@@ -63,8 +83,8 @@ def create_polygons(white_lines=None):
     for line in white_lines:
         u = line['start']
         v = line['end']
-        # Add edge with geometry as attribute
-        G.add_edge(u, v, path=line['path'], green_count=line.get('green_count', 0))
+        # Add edge with geometry as attribute AND ID
+        G.add_edge(u, v, path=line['path'], green_count=line.get('green_count', 0), line_id=line.get('id', -1))
         
     polygons_data = []
     
@@ -78,6 +98,7 @@ def create_polygons(white_lines=None):
             
             # Construct polygon geometry by stitching edge paths
             coords = []
+            boundary_ids = set()
             
             total_green_circles = 0
             
@@ -99,6 +120,11 @@ def create_polygons(white_lines=None):
                 else:
                     path = edge_data['path'] # List of (lat, lon) tuples
                     total_green_circles += edge_data.get('green_count', 0)
+                    
+                    # Collect ID
+                    lid = edge_data.get('line_id')
+                    if lid is not None and lid != -1:
+                        boundary_ids.add(lid)
                     
                     # Check direction.
                     p_start = path[0]
@@ -138,8 +164,9 @@ def create_polygons(white_lines=None):
                 'id': f"poly_{len(polygons_data)}",
                 'coords': coords,
                 'center': (center.x, center.y),
-                'percentage': 0, # Current progress (0 initially)
-                'total_points': total_points
+                'percentage': 0, 
+                'total_points': total_points,
+                'boundary_white_lines': list(boundary_ids)
             })
             
     except Exception as e:
@@ -148,14 +175,15 @@ def create_polygons(white_lines=None):
     # CSV IO: Write Polygons
     with open(os.path.join(data_dir, 'AD_create_polygons.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
-        # id, center_lat, center_lon, total_points, coords_json
-        writer.writerow(['id', 'center_lat', 'center_lon', 'total_points', 'coords_json'])
+        # id, center_lat, center_lon, total_points, boundary_white_lines, coords_json
+        writer.writerow(['id', 'center_lat', 'center_lon', 'total_points', 'boundary_white_lines', 'coords_json'])
         for poly in polygons_data:
             writer.writerow([
                 poly['id'], 
                 poly['center'][0], 
                 poly['center'][1], 
                 poly['total_points'],
+                json.dumps(poly['boundary_white_lines']),
                 json.dumps(poly['coords'])
             ])
 

@@ -25,8 +25,17 @@ def create_groups_of_polygons(polygons=None):
                 reader = csv.reader(f)
                 next(reader, None)
                 for row in reader:
-                    if len(row) >= 5:
-                        # New format: id, center_lat, center_lon, total_points, coords_json
+                    if len(row) >= 6:
+                        # NEWEST format: id, center_lat, center_lon, total_points, boundary_white_lines, coords_json
+                        coords = json.loads(row[5])
+                        coords_tuples = [tuple(p) for p in coords]
+                        
+                        polygons.append({
+                            'id': row[0],
+                            'coords': coords_tuples
+                        })
+                    elif len(row) >= 5:
+                        # Old format: id, center_lat, center_lon, total_points, coords_json
                         coords = json.loads(row[4])
                         # Convert to tuples for Shapely
                         coords_tuples = [tuple(p) for p in coords]
@@ -36,7 +45,7 @@ def create_groups_of_polygons(polygons=None):
                             'coords': coords_tuples
                         })
                     elif len(row) >= 4:
-                        # Old format: id, center_lat, center_lon, coords_json
+                        # Oldest format: id, center_lat, center_lon, coords_json
                         coords = json.loads(row[3])
                         # Convert to tuples for Shapely
                         coords_tuples = [tuple(p) for p in coords]
@@ -48,13 +57,20 @@ def create_groups_of_polygons(polygons=None):
 
     # Logic: Merge all polygons into one "Area"
     combined_area = None
+    # Keep track of shapely objects linked to IDs for later check
+    shapely_sources = []
+    
     if polygons:
         try:
-            shapely_polys = [Polygon(p['coords']) for p in polygons if len(p['coords']) >= 3]
-            # Validate
-            shapely_polys = [p if p.is_valid else p.buffer(0) for p in shapely_polys]
+            for p in polygons:
+                if len(p['coords']) >= 3:
+                     poly_shape = Polygon(p['coords'])
+                     if not poly_shape.is_valid:
+                         poly_shape = poly_shape.buffer(0)
+                     shapely_sources.append({'id': p['id'], 'geom': poly_shape})
             
-            combined_area = unary_union(shapely_polys)
+            geo_list = [s['geom'] for s in shapely_sources]
+            combined_area = unary_union(geo_list)
             
         except Exception as e:
             logger.error(f"AE: Error merging polygons: {e}")
@@ -79,18 +95,37 @@ def create_groups_of_polygons(polygons=None):
         for idx, geom in enumerate(geoms):
             # Outer boundary
             boundary = list(geom.exterior.coords)
+            
+            # Find which source polygons generated this piece
+            # Logic: If source polygon intersects this piece, it belongs to it.
+            # Since we did a Union, the piece covers the source.
+            member_ids = []
+            for source in shapely_sources:
+                # Use intersection check with small tolerance or area check
+                if geom.intersects(source['geom']):
+                     # Ensure it's not just a point touch (though for union it implies merger)
+                     # For robust check: intersection area > epsilon
+                     try:
+                         overlap = geom.intersection(source['geom']).area
+                         if overlap > 0.0000000001:
+                             member_ids.append(source['id'])
+                     except:
+                         pass # Ignore topological errors during check
+
             groups.append({
                 'id': f"area_{idx}",
                 'coords': boundary,
-                'type': 'monolith'
+                'type': 'monolith',
+                'polygon_ids': member_ids
             })
     
     # CSV IO: Write Groups
     with open(os.path.join(data_dir, 'AE_create_group_of_polygons.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['id', 'type', 'geometry_json'])
+        # id, type, geometry_json, polygon_ids
+        writer.writerow(['id', 'type', 'geometry_json', 'polygon_ids'])
         for g in groups:
-            writer.writerow([g['id'], g['type'], json.dumps(g['coords'])])
+            writer.writerow([g['id'], g['type'], json.dumps(g['coords']), json.dumps(g['polygon_ids'])])
         
     logger.info(f"AE: Created {len(groups)} monolithic area parts. Saved to CSV.")
     return groups
