@@ -128,6 +128,8 @@
             font-weight: bold;
             font-size: 20px;
             text-shadow: 0 0 2px black;
+            pointer-events: none;
+            /* Make tooltip transparent to clicks */
         }
     </style>
 </head>
@@ -138,6 +140,9 @@
 
         <div id="top-bar-container"></div>
         <img id="loading-gif" src="/B_map_page/components/earth.gif" alt="Loading...">
+        <div id="debug-overlay"
+            style="position: fixed; top: 10px; left: 10px; color: yellow; font-weight: bold; font-size: 16px; z-index: 9999; pointer-events: none; text-shadow: 1px 1px 2px black; font-family: monospace;">
+        </div>
     </div>
     <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
 
@@ -167,6 +172,93 @@
                 maxZoom: 18  // Max Zoom In
             });
             const map = controls.getMap();
+
+            // --- QUADRANT NAVIGATION HELPER ---
+            let lastInputTime = 0; // Debounce tracker
+            let blockMouseEvents = false; // Touch Lockout flag
+
+            const handleQuadrantInput = (x, y) => {
+                const now = Date.now();
+                if (now - lastInputTime < 350) return; // Debounce
+
+                lastInputTime = now;
+
+                const cx = window.innerWidth / 2;
+                const cy = window.innerHeight / 2;
+                const dx = x - cx;
+                const dy = y - cy;
+
+                let rawDirection = '';
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    rawDirection = dx > 0 ? 'RIGHT' : 'LEFT';
+                } else {
+                    rawDirection = dy > 0 ? 'DOWN' : 'UP';
+                }
+
+                const finalDirection = rawDirection;
+                const success = controls.moveSelection(finalDirection);
+
+                // Optional: Update Debug Overlay
+                const debugEl = document.getElementById('debug-overlay');
+                if (debugEl) {
+                    const status = success ? '<span style="color:lime">OK</span>' : '<span style="color:red">BLOCKED</span>';
+                    debugEl.innerHTML = `Tap: ${rawDirection}<br>Result: ${status}`;
+                }
+            };
+
+            // UI BLOCK CHECKER
+            const isUIInteraction = (e) => {
+                const target = e.target;
+                if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button')) {
+                    return true;
+                }
+                return false;
+            };
+
+            // GLOBAL LISTENERS (Attached to Window for reliability)
+            window.addEventListener('click', (e) => {
+                if (blockMouseEvents) return; // Ghost click prevention
+                if (isUIInteraction(e)) return;
+                handleQuadrantInput(e.clientX, e.clientY);
+            });
+
+            // RAW TOUCH (Window)
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchStartTime = 0;
+
+            window.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 1) return;
+                const t = e.touches[0];
+                touchStartX = t.clientX;
+                touchStartY = t.clientY;
+                touchStartTime = Date.now();
+            }, { passive: false });
+
+            window.addEventListener('touchend', (e) => {
+                const touchEndTime = Date.now();
+                const duration = touchEndTime - touchStartTime;
+
+                if (duration > 500) return; // Allow slower taps
+
+                const t = e.changedTouches[0];
+                const endX = t.clientX;
+                const endY = t.clientY;
+
+                if (isUIInteraction(e)) return;
+
+                const dist = Math.sqrt((endX - touchStartX) ** 2 + (endY - touchStartY) ** 2);
+
+                if (dist < 40) { // Generous movement threshold
+                    // LOCK MOUSE EVENTS TO PREVENT GHOST CLICK
+                    blockMouseEvents = true;
+                    setTimeout(() => { blockMouseEvents = false; }, 600);
+
+                    e.preventDefault();
+                    handleQuadrantInput(endX, endY);
+                }
+            }, { passive: false });
+            // ------------------------------------------------
 
             // Initialize Layer Groups
             const groupsLayer = L.layerGroup().addTo(map);
