@@ -267,6 +267,7 @@
     - fixed colores and placement of user marker
     - fixed marker size
   - [x] v0.0.25 - added keyboard navigation controls
+    - fixed keyboard navigation controls
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -280,7 +281,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.25 - added keyboard navigation controls"
+  git commit -m "v0.0.25 - fixed keyboard navigation controls"
   git push
   ```
 

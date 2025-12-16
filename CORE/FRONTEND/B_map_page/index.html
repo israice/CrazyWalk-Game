@@ -377,8 +377,8 @@
                 // Triggers visibility check immediately
                 controls.checkVisibility();
 
-                // 6. Update Navigation Graph
-                controls.updateGraph(data.green_circles, data.blue_circles);
+                // 6. Update Navigation Graph (Strict Topology)
+                controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
             };
 
             // Listen for keyboard navigation requests
