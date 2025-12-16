@@ -265,6 +265,7 @@
     - fixed Dockerfile
     - fixed blue circles number of white lines
     - fixed colores and placement of user marker
+    - fixed marker size
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -278,7 +279,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.24 - fixed colores and placement of user marker"
+  git commit -m "v0.0.24 - fixed marker size"
   git push
   ```
 
