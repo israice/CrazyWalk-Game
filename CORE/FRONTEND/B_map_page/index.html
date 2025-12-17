@@ -320,146 +320,248 @@
                     });
             };
 
-            // VISUALS: Rendering Colors and Layers
-            const renderGameElements = (data) => {
-                console.log("DEBUG: Starting Render...");
 
-                // 0. Groups (Monolith) - Managed by Layer Group for Visibility Rules
+            const renderGameElements = (data) => {
+                console.log("DEBUG: Starting Render with Progress Tracking...");
+
                 groupsLayer.clearLayers();
                 detailsLayer.clearLayers();
 
-                // Track Layers for Hiding Logic
-                // Key: "lat,lon" (Fixed precision 6) -> Layer
-                const circleLayerMap = new Map();
-                const addToMap = (lat, lon, layer) => {
+                // STATE STORAGE (Closure Scope)
+                const polygonState = new Map(); // ID -> { current: 0, total: N, polyLayer, labelLayer, lineIds }
+                const circleToPolyMap = new Map(); // "lat,lon" -> [ID, ID...]
+                const lineLayerMap = new Map(); // "lineID" -> Layer
+
+                // Helper to map a circle coord to polygons
+                const mapCircleToPolys = (lat, lon, polyList, whiteLineId = -1) => {
                     const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
-                    circleLayerMap.set(key, layer);
+
+                    // We need to know which polygons possess this circle.
+                    // A circle is on a polygon IF:
+                    // 1. It is a Blue Circle (Vertex) -> The polygon coords container it? Or we have adjacency?
+                    //    Actually, AD_create_polygons `total_points` is Green + Vertices.
+                    //    Vertices are strictly the Blue Circles.
+                    //    Green circles are on White Lines.
+                    //    We have `boundary_white_lines` list in Polygon Data.
+                    // 2. So:
+                    //    - If Green Circle: It belongs to all polygons that have its `line_id` in `boundary_white_lines`.
+                    //    - If Blue Circle: It belongs to polygons sharing that vertex. 
+                    //      We don't have explicit "Vertex -> Poly" map from backend.
+                    //      BUT, we can check if the Blue Circle Lat/Lon corresponds to a point in the Polygon's `coords`?
+                    //      Yes, Polygon `coords` are the vertices + intermediate steps? 
+                    //      Actually AD_create_polygons returns `coords` which is the trace.
+                    //      Checking point-in-list is robust.
+
+                    if (!circleToPolyMap.has(key)) circleToPolyMap.set(key, []);
+                    const list = circleToPolyMap.get(key);
+
+                    polyList.forEach(poly => {
+                        let isRelevant = false;
+                        // Check Green Stickiness (Line ID)
+                        if (whiteLineId !== -1 && poly.boundary_white_lines && poly.boundary_white_lines.includes(String(whiteLineId))) {
+                            isRelevant = true;
+                        }
+                        // Check Blue Stickiness (Vertex Match)
+                        // Approximate match for floats
+                        else if (whiteLineId === -1) {
+                            // This is a blue circle. Check if it matches a vertex of the polygon.
+                            // Optimization: Polygon coords is large.
+                            // But we normally only have ~10 polygons.
+                            // Let's assume strict equality on source data or small epsilon.
+                            // AD_create_polygons uses standard floats.
+                            // Let's use simple distance check against polygon CENTER? No.
+                            // Let's just assume if we are calculating efficiently, we should have validity.
+                            // Backend `AD` logic: total_points = green + len(cycle).
+                            // Cycle = vertices (Blue circles).
+                            // So yes, Blue circles count.
+
+                            // Simple Check: Check distance to all Polygon points? Expensive.
+                            // Better: Backend sends `coords`.
+                            // Let's just check if (lat, lon) is close to any point in `coords`.
+                            // This runs once on load. Acceptable.
+                            const isVertex = poly.coords.some(c => Math.abs(c[0] - lat) < 0.00001 && Math.abs(c[1] - lon) < 0.00001);
+                            if (isVertex) isRelevant = true;
+                        }
+
+                        if (isRelevant) {
+                            if (!list.includes(poly.id)) list.push(poly.id);
+                        }
+                    });
                 };
 
+                // 1. Groups
                 if (data.groups) {
-                    console.log(`DEBUG: Rendering ${data.groups.length} Groups into LayerGroup`);
                     data.groups.forEach(group => {
                         L.polygon(group.coords, {
-                            color: '#333',       // Visual Rule
-                            stroke: false,
-                            fillColor: '#222',
-                            fillOpacity: 0.3,
-                            weight: 0
+                            color: '#333', stroke: false, fillColor: '#222', fillOpacity: 0.3, weight: 0
                         }).addTo(groupsLayer);
                     });
                 }
 
-                // 1. Polygons (Details)
-                if (data.polygons) {
-                    data.polygons.forEach(poly => {
-                        L.polygon(poly.coords, {
-                            color: 'purple',    // Visual Rule
-                            fillColor: 'purple',
-                            fillOpacity: 0.1,
-                            weight: 0
-                        }).addTo(detailsLayer);
+                // 2. Polygons (Init State)
+                const localPolys = data.polygons || [];
+                localPolys.forEach(poly => {
+                    // Create Visual
+                    const pLayer = L.polygon(poly.coords, {
+                        color: 'purple', fillColor: 'purple', fillOpacity: 0.1, weight: 0
+                    }).addTo(detailsLayer);
 
-                        if (poly.center) {
-                            L.marker([poly.center[0], poly.center[1]], {
-                                icon: L.divIcon({
-                                    className: 'poly-label',
-                                    html: `<div style="background:white; border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; color:black; font-size:10px; opacity: 0.8;">${poly.percentage}%</div>`,
-                                    iconSize: [20, 20],
-                                    iconAnchor: [10, 10]
-                                })
-                            }).addTo(detailsLayer);
+                    const pLabel = L.marker([poly.center[0], poly.center[1]], {
+                        icon: L.divIcon({
+                            className: 'poly-label',
+                            html: `<div style="background:white; border-radius:50%; width:fit-content; min-width:20px; padding:0 4px; height:20px; text-align:center; line-height:20px; color:black; font-size:10px; opacity: 0.8; font-weight:bold;">0%</div>`,
+                            iconSize: [30, 20],
+                            iconAnchor: [15, 10]
+                        })
+                    }).addTo(detailsLayer);
+
+                    polygonState.set(poly.id, {
+                        current: 0,
+                        total: poly.total_points,
+                        layer: pLayer,
+                        label: pLabel,
+                        lines: poly.boundary_white_lines // Strings
+                    });
+                });
+
+                // 3. White Lines (Index)
+                if (data.white_lines) {
+                    controls.setSnapLines(data.white_lines);
+                    data.white_lines.forEach(line => {
+                        const layer = L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(detailsLayer);
+                        if (line.id !== undefined) {
+                            lineLayerMap.set(String(line.id), layer);
                         }
+                    });
+                    const currentPos = userMarker.getLatLng();
+                    controls.updateUserPosition(userMarker, currentPos.lat, currentPos.lng, isGpsActive);
+                }
+
+                // 4. Circles (Rendering + Mapping)
+                // Track Layers for Hiding Logic
+                const circleLayerMap = new Map();
+                const addToMap = (lat, lon, layer, type, lineId = -1) => {
+                    const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+                    circleLayerMap.set(key, layer);
+
+                    // Map to Polygons
+                    mapCircleToPolys(lat, lon, localPolys, lineId);
+                };
+
+                if (data.blue_circles) {
+                    data.blue_circles.forEach(circle => {
+                        const marker = L.circleMarker([circle.lat, circle.lon], {
+                            radius: 8, color: 'blue', fillColor: '#00ccff', fillOpacity: 0.8
+                        }).addTo(detailsLayer);
+                        marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
+                        addToMap(circle.lat, circle.lon, marker, 'blue');
                     });
                 }
 
-                // 2. Red Lines (Base or Details? Assuming Details as it is clutter)
-                // Actually assuming details.
-                if (data.red_lines && data.red_lines.length > 0) {
+                if (data.green_circles) {
+                    data.green_circles.forEach(circle => {
+                        const marker = L.circleMarker([circle.lat, circle.lon], {
+                            radius: 4, color: 'green', fillColor: '#00ff00', fillOpacity: 1
+                        }).addTo(detailsLayer);
+                        addToMap(circle.lat, circle.lon, marker, 'green', circle.line_id);
+                    });
+                }
+
+                // Red Lines (Visual only)
+                if (data.red_lines) {
                     data.red_lines.forEach(line => {
                         L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(detailsLayer);
                     });
                 }
 
-                // 3. White Lines (Details)
-                if (data.white_lines) {
-                    controls.setSnapLines(data.white_lines); // Enable Snapping
-                    data.white_lines.forEach(line => {
-                        L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(detailsLayer);
-                    });
-
-                    // FORCE RESNAP: Now that lines are known, update marker to closest point
-                    const currentPos = userMarker.getLatLng();
-                    console.log("DEBUG: Re-snapping after line load...");
-                    controls.updateUserPosition(userMarker, currentPos.lat, currentPos.lng, isGpsActive);
-                }
-
-                // 4. Blue Circles (Details)
-                if (data.blue_circles) {
-                    data.blue_circles.forEach(circle => {
-                        const marker = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 8,
-                            color: 'blue',
-                            fillColor: '#00ccff',
-                            fillOpacity: 0.8
-                        }).addTo(detailsLayer);
-
-                        marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
-                        addToMap(circle.lat, circle.lon, marker);
-                    });
-                }
-
-                // 5. Green Circles (Details)
-                if (data.green_circles) {
-                    data.green_circles.forEach(circle => {
-                        const marker = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 4,
-                            color: 'green',
-                            fillColor: '#00ff00',
-                            fillOpacity: 1
-                        }).addTo(detailsLayer);
-                        addToMap(circle.lat, circle.lon, marker);
-                    });
-                }
-
-                // Triggers visibility check immediately
+                // Setup Hiding Logic with Progress Tracking
                 controls.checkVisibility();
-
-                // 6. Update Navigation Graph (Strict Topology)
                 controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
-
-                // 7. Setup Auto-Hiding Logic (Closure retains circleLayerMap)
-                setupNodeHiding(circleLayerMap);
+                setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
             };
 
-            let currentHiddenLayer = null;
-            const setupNodeHiding = (layerMap) => {
+            const setupProgressHiding = (layerMap, circleMap, polyState, lineMap) => {
                 const checkAndHide = () => {
                     const pos = userMarker.getLatLng();
                     const key = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
 
-                    // Logic Change: Do NOT restore previous layers.
-                    // Circles should stay hidden once visited (Pac-Man style).
-
                     const target = layerMap.get(key);
                     if (target) {
-                        // Check if already hidden to avoid redundant style calcs
+                        // Check if already hidden
                         if (target.options.opacity !== 0) {
+                            // HIDE IT
                             target.setStyle({ opacity: 0, fillOpacity: 0 });
-                            if (target.getTooltip && target.getTooltip()) {
-                                target.closeTooltip();
+                            if (target.getTooltip && target.getTooltip()) target.closeTooltip();
+
+                            // UPDATE PROGRESS
+                            const relevantPolys = circleMap.get(key);
+                            if (relevantPolys) {
+                                relevantPolys.forEach(pid => {
+                                    const state = polyState.get(pid);
+                                    if (state && state.current < state.total) {
+                                        state.current++;
+                                        updatePolygonVisuals(state, lineMap);
+                                    }
+                                });
                             }
                         }
                     }
                 };
 
-                // Run immediately
-                checkAndHide();
-
+                // Remove old handler if exists (not strictly needed since we rebuild, but good practice)
                 if (userMarker._hideHandler) {
                     userMarker.off('move', userMarker._hideHandler);
                 }
+
+                // Initial check
+                checkAndHide();
+
+                // Bind
                 userMarker._hideHandler = checkAndHide;
                 userMarker.on('move', checkAndHide);
+            };
+
+            const updatePolygonVisuals = (state, lineMap) => {
+                const pct = Math.floor((state.current / state.total) * 100);
+
+                // Update Label
+                if (state.label) {
+                    const icon = state.label.options.icon;
+                    // Safe update of HTML
+                    icon.options.html = icon.options.html.replace(/>\d+%</, `>${pct}%<`);
+                    state.label.setIcon(icon);
+                }
+
+                // Check Completion
+                if (state.current >= state.total) {
+                    console.log("DEBUG: Polygon Completed!");
+
+                    // 1. Turn Green
+                    state.layer.setStyle({
+                        color: '#00ff00',
+                        fillColor: '#00ff00',
+                        fillOpacity: 0.4
+                    });
+
+                    // 2. Remove Label
+                    if (state.label) {
+                        state.label.remove();
+                        state.label = null;
+                    }
+
+                    // 3. Hide White Lines
+                    if (state.lines) {
+                        state.lines.forEach(lid => {
+                            const lineLayer = lineMap.get(String(lid));
+                            if (lineLayer) {
+                                lineLayer.setStyle({ opacity: 0, fillOpacity: 0 });
+                                // Note: This might hide a line shared with an INCOMPLETE polygon. 
+                                // User requested: "when in perimeter of polygon no visible circles left... disappear white lines in this perimeter"
+                                // This implies strict removal.
+                            }
+                        });
+                    }
+                }
             };
 
             // Listen for keyboard navigation requests
