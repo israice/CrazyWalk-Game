@@ -267,6 +267,8 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             params = urllib.parse.parse_qs(parsed_path.query)
             lat = float(params.get('lat', [0])[0])
             lon = float(params.get('lon', [0])[0])
+            rebuild_param = params.get('rebuild', ['false'])[0].lower()
+            force_rebuild = rebuild_param == 'true'
             
             if not lat or not lon:
                 self.send_error(400, "Missing lat/lon")
@@ -285,7 +287,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             importlib.reload(A_create_polygons)
             
             # Generate Data
-            data = A_create_polygons.run_list(lat, lon)
+            data = A_create_polygons.run_list(lat, lon, force_rebuild=force_rebuild)
             
             # Send Response
             self.send_response(200)

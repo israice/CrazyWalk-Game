@@ -257,16 +257,32 @@
                 // Use Controls to update position (Enforces map follow rules)
                 controls.updateUserPosition(userMarker, lat, lon, isGpsActive);
 
+                // Quality State: 'NONE', 'LOW', 'HIGH'
+                // Allows upgrading to High Accuracy if Low was loaded first.
+                if (!window.loadedQuality) window.loadedQuality = 'NONE';
+
                 if (isGpsActive) {
                     if (label === 'HIGH_ACCURACY' && accuracy > 200) {
                         console.warn(`Warning: GPS signal weak (${Math.round(accuracy)}m).`);
                     }
 
-                    // Trigger Data Load if this is a fresh session
-                    if (!window.hasLoadedGpsData) {
-                        window.hasLoadedGpsData = true;
-                        console.log("DEBUG: Triggering GPS Game Data Load (Accuracy: " + label + ")");
-                        loadGameData(lat, lon);
+                    // Trigger Data Load Logic
+                    // 1. If nothing loaded yet -> Load
+                    // 2. If 'LOW' loaded and we now have 'HIGH' -> Load (Upgrade)
+                    // 3. If 'HIGH' loaded -> Do nothing (Stable)
+
+                    const shouldLoad =
+                        (window.loadedQuality === 'NONE') ||
+                        (window.loadedQuality === 'LOW' && label === 'HIGH_ACCURACY');
+
+                    if (shouldLoad) {
+                        console.log(`DEBUG: Triggering GPS Game Data Load (Accuracy: ${label}, Previous: ${window.loadedQuality})`);
+
+                        // Update State
+                        window.loadedQuality = label === 'HIGH_ACCURACY' ? 'HIGH' : 'LOW';
+
+                        // Force Rebuild
+                        loadGameData(lat, lon, true);
                     }
                 }
 
@@ -277,7 +293,7 @@
                     .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
             };
 
-            const loadGameData = (lat, lon) => {
+            const loadGameData = (lat, lon, forceRebuild = false) => {
                 console.log("DEBUG: Fetching Game Data...");
 
                 // Show Loading GIF and dim map (Visual Transition)
@@ -286,9 +302,9 @@
                 mapElement.style.opacity = '0.3';
                 hasRevealed = false;
 
-                console.log(`DEBUG: Fetching Game Data from /api/game_data?lat=${lat}&lon=${lon}`);
+                console.log(`DEBUG: Fetching Game Data from /api/game_data?lat=${lat}&lon=${lon}&rebuild=${forceRebuild}`);
 
-                fetch(`/api/game_data?lat=${lat}&lon=${lon}`)
+                fetch(`/api/game_data?lat=${lat}&lon=${lon}&rebuild=${forceRebuild}`)
                     .then(res => {
                         console.log("DEBUG: Response Status:", res.status);
                         return res.json();
@@ -521,18 +537,21 @@
                         if (isGpsActive) {
                             console.log("DEBUG: GPS Toggled ON");
                             gpsBtn.classList.add('active');
+                            // Reset State on fresh activation
+                            window.loadedQuality = 'NONE';
                             startLocationWatch();
                         } else {
                             console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
                             gpsBtn.classList.remove('active');
                             hasPreciseFix = false;
+                            window.loadedQuality = 'NONE';
 
                             // Use Controls to reset view
                             controls.resetView(DEFAULT_LAT, DEFAULT_LON);
                             userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
 
                             // Trigger load to show animation and refresh data
-                            loadGameData(DEFAULT_LAT, DEFAULT_LON);
+                            loadGameData(DEFAULT_LAT, DEFAULT_LON, false);
                         }
                     });
                 }

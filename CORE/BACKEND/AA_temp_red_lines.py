@@ -6,13 +6,49 @@ import os
 
 logger = logging.getLogger(__name__)
 
-def create_red_lines(lat, lon, region_size=0.005):
+def create_red_lines(lat, lon, region_size=0.005, reuse_existing=False):
     """
     Fetches roads from Overpass API and returns them as 'Red Lines'.
     region_size: rough degrees for bounding box (0.005 ~ 500m)
     """
     logger.info(f"AA: Fetching Red Lines for {lat}, {lon}")
     
+    # META: Check for existing data
+    meta_path = os.path.join(os.path.dirname(__file__), 'generation_meta.json')
+    csv_path = os.path.join(os.path.dirname(__file__), 'AA_temp_red_lines.csv')
+    
+    if reuse_existing and os.path.exists(meta_path) and os.path.exists(csv_path):
+        try:
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+                
+            # Tolerance Check (e.g. 0.0001 is roughly 10 meters)
+            # If we are close to the last generation point, we can reuse.
+            # However, user request implies "Initial Load" -> Reuse, "GPS" -> Rebuild.
+            # So if reuse_existing is True, we generally want to reuse if the data is valid.
+            # Let's enforce a small tolerance to be safe, so we don't show wrong city data.
+            last_lat = meta.get('lat', 0)
+            last_lon = meta.get('lon', 0)
+            
+            if abs(last_lat - lat) < 0.0005 and abs(last_lon - lon) < 0.0005:
+                logger.info("AA: Reusing existing red lines data (Location match).")
+                
+                # We need to read the CSV to return the visual lines, 
+                # as the caller expects them (though A_create currently ignores the return for logic, 
+                # it uses the side-effect CSV. But let's return correctly to be robust).
+                visual_lines = []
+                with open(csv_path, 'r', newline='') as f:
+                    reader = csv.reader(f)
+                    header = next(reader, None) # Skip header
+                    for row in reader:
+                        if row:
+                            visual_lines.append(json.loads(row[0]))
+                
+                return [], visual_lines
+                
+        except Exception as e:
+            logger.warning(f"AA: Failed to read metadata for reuse: {e}. Proceeding to fetch.")
+            
     # Define bounding box
     min_lat = lat - region_size
     max_lat = lat + region_size
@@ -113,6 +149,13 @@ def create_red_lines(lat, lon, region_size=0.005):
 
         logger.info(f"AA: Found {len(red_lines_visual)} visual ways. Saved to AA_temp_red_lines.csv.")
         
+        # Save Metadata
+        try:
+            with open(meta_path, 'w') as f:
+                json.dump({'lat': lat, 'lon': lon}, f)
+        except Exception as e:
+            logger.warning(f"AA: Failed to save metadata: {e}")
+
         # Return visual lines for orchestrator (it uses 'red_visual' for valid output)
         # We can return empty segments for the first arg since AB will now read the file/visuals itself.
         return [], red_lines_visual

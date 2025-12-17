@@ -8,7 +8,7 @@ from .AE_create_group_of_polygons import create_groups_of_polygons
 
 logger = logging.getLogger(__name__)
 
-def run_list(lat, lon, region_size=0.0015):
+def run_list(lat, lon, region_size=0.0015, force_rebuild=False):
     """
     Orchestrates the creation of all game elements.
     """
@@ -18,7 +18,7 @@ def run_list(lat, lon, region_size=0.0015):
     # segments: for logic (building graph)
     # visual: for display (rendering separate ways)
     # Writes to AA_temp_red_lines.csv
-    red_segments, red_visual = create_red_lines(lat, lon, region_size)
+    red_segments, red_visual = create_red_lines(lat, lon, region_size, reuse_existing=not force_rebuild)
     if not red_visual:
         return {}
 
