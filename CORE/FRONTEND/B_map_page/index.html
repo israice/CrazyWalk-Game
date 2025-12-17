@@ -138,7 +138,7 @@
     <div class="black-square">
         <div id="map"></div>
 
-        <div id="top-bar-container"></div>
+        <div id="top-bar-container" style="opacity: 0; transition: opacity 0.8s ease-in-out;"></div>
         <img id="loading-gif" src="/B_map_page/components/earth.gif" alt="Loading...">
 
     </div>
@@ -221,6 +221,7 @@
             }).addTo(map);
 
             // Reveal Map Logic (Visual Transition)
+            const topBarContainer = document.getElementById('top-bar-container');
             const revealMap = () => {
                 if (hasRevealed) return;
                 hasRevealed = true;
@@ -228,6 +229,7 @@
                 map.invalidateSize();
                 loadingGif.style.opacity = '0';
                 mapElement.style.opacity = '1';
+                topBarContainer.style.opacity = '1';
                 setTimeout(() => {
                     loadingGif.style.display = 'none';
                 }, 600);
@@ -578,33 +580,34 @@
             });
 
             const startLocationWatch = () => {
-                console.log("DEBUG: [Map Page] Starting Parallel Geolocation Strategy...");
+                console.log("DEBUG: [Map Page] Requesting browser geolocation (permission should be granted)...");
+
                 if (!("geolocation" in navigator)) {
                     alert("Geolocation not supported by this browser.");
+                    revealMap();
                     return;
                 }
 
                 hasPreciseFix = false;
 
-                // 1. FAST LANE
+                // Используем разрешение, выданное на home page
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'LOW_ACCURACY'),
-                    (err) => console.warn("DEBUG: Fast Lane (Low Acc) failed:", err),
-                    { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
-                );
-
-                // 2. PRECISION LANE
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'HIGH_ACCURACY'),
-                    (err) => {
-                        console.warn("DEBUG: Precision Lane (High Acc) failed:", err);
-                        if (err.code === err.TIMEOUT && !hasPreciseFix) {
-                            console.log("DEBUG: High Accuracy timed out.");
-                        } else if (err.code === err.PERMISSION_DENIED) {
-                            alert("Please allow Location Access to use GPS.");
-                        }
+                    (pos) => {
+                        console.log("DEBUG: GPS Position received:", pos.coords);
+                        processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'HIGH_ACCURACY');
                     },
-                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                    (err) => {
+                        console.error("DEBUG: Geolocation failed:", err);
+                        if (err.code === 1) {
+                            alert("Location access denied. Please grant permission.");
+                        } else if (err.code === 3) {
+                            alert("Location timeout. Please try again.");
+                        } else {
+                            alert("Unable to get location: " + err.message);
+                        }
+                        revealMap();
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                 );
             };
 
@@ -639,6 +642,14 @@
                         if (isGpsActive) {
                             console.log("DEBUG: GPS Toggled ON");
                             gpsBtn.classList.add('active');
+
+                            // Show loading GIF immediately
+                            loadingGif.style.display = 'block';
+                            loadingGif.style.opacity = '1';
+                            mapElement.style.opacity = '0.3';
+                            topBarContainer.style.opacity = '0';
+                            hasRevealed = false;
+
                             // Reset State on fresh activation
                             window.loadedQuality = 'NONE';
                             startLocationWatch();

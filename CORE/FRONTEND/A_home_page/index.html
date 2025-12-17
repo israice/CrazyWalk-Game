@@ -546,14 +546,19 @@
             const errorScreen = document.getElementById('error-screen');
             const errorMessage = document.getElementById('error-message');
 
+            // Начальное состояние: GIF виден, UI скрыт
+            loadingGif.style.display = 'block';
+            loadingGif.style.opacity = '1';
+            mapElement.style.opacity = '0';
+            cityLabel.style.opacity = '0';
+            uiOverlay.style.opacity = '0';
+
             const revealContent = () => {
                 loadingGif.style.opacity = '0';
-                mapElement.style.opacity = '1'; /* Map full opacity, filters do the darkening */
+                mapElement.style.opacity = '1';
                 cityLabel.style.opacity = '1';
                 uiOverlay.style.opacity = '1';
-                setTimeout(() => {
-                    loadingGif.style.display = 'none';
-                }, 600);
+                setTimeout(() => { loadingGif.style.display = 'none'; }, 600);
             };
 
             const showError = (msg) => {
@@ -592,95 +597,60 @@
                 subdomains: 'abcd'
             }).addTo(map);
 
-            const startGeolocation = (retryCount = 0) => {
+            const startGeolocation = () => {
                 loadingGif.style.display = 'block';
                 errorScreen.style.display = 'none';
-                console.log(`DEBUG: [Step 1] Initializing Geolocation Sequence (Attempt ${retryCount + 1})...`);
-
-                // Safety Timeout - 25 seconds (must be longer than geoOptions.timeout check of 20s)
-                const safetyTimeout = setTimeout(() => {
-                    console.warn(`DEBUG: [Timeout] Safety Timeout Triggered (25s elapsed on attempt ${retryCount + 1})`);
-                    showError("Request timed out.<br>Please check your GPS or connection.");
-                }, 25000);
+                console.log("DEBUG: [Step 1] Requesting Browser Geolocation (triggers permission popup)...");
 
                 if (!("geolocation" in navigator)) {
-                    clearTimeout(safetyTimeout);
-                    console.error("DEBUG: [Error] Geolocation not supported");
+                    console.error("DEBUG: Geolocation not supported");
                     showError("Geolocation is not supported<br>by your browser.");
                     return;
                 }
 
-                console.log("DEBUG: [Step 2] Requesting browser coordinates...");
-                const geoOptions = {
-                    enableHighAccuracy: false, // Low accuracy is enough for City Name and much faster/reliable
-                    timeout: 10000,
-                    maximumAge: 0
-                };
-                console.log("DEBUG: [Step 2a] Geolocation Options:", JSON.stringify(geoOptions));
-
+                // Запрос геолокации - браузер покажет popup с разрешением
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        clearTimeout(safetyTimeout); // Got location, cancel safety timer
-                        console.log("DEBUG: [Step 3] Browser Location Found!", position);
+                        console.log("DEBUG: [Step 2] Permission GRANTED! Location received.");
                         const userLat = position.coords.latitude;
                         const userLon = position.coords.longitude;
-                        console.log(`DEBUG: [Info] Raw Coordinates: Lat=${userLat}, Lon=${userLon}`);
+                        console.log(`DEBUG: Coordinates: [${userLat}, ${userLon}]`);
 
-                        // Use server-side logic to determine location
-                        // Use client-side Geocoding (BigDataCloud) for speed and non-blocking
-                        console.log("DEBUG: [Step 4] Requesting City Name from BigDataCloud...");
-                        const bdcApiUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${userLat}&longitude=${userLon}&localityLanguage=en`;
+                        // Получаем название города
+                        const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${userLat}&longitude=${userLon}&localityLanguage=en`;
 
-                        fetch(bdcApiUrl)
-                            .then(response => {
-                                console.log(`DEBUG: [Step 5] BDC responded with status: ${response.status}`);
-                                if (!response.ok) throw new Error("BDC Network Error");
-                                return response.json();
-                            })
+                        fetch(bdcUrl)
+                            .then(r => r.json())
                             .then(data => {
-                                console.log("DEBUG: [Step 6] BDC Data Parsed:", data);
-                                // Update UI with BDC data
-                                // BDC fields: city, locality, principalSubdivision
-                                const cityName = data.city || data.locality || data.principalSubdivision || "Unknown Location";
+                                console.log("DEBUG: [Step 3] City data:", data);
+                                const cityName = data.city || data.locality || data.principalSubdivision || "Unknown";
                                 cityLabel.textContent = cityName;
-
-                                // Map view logic:
-                                // Center on the USER'S actual location (UserLat/UserLon)
-                                // This is better for the game than jumping to a generic city center.
-
-                                console.log(`DEBUG: [Step 7] Updating Map View to User Location: [${userLat}, ${userLon}]`);
                                 map.setView([userLat, userLon], 17, { animate: false });
                                 revealContent();
-                                console.log("DEBUG: [Success] Geolocation sequence complete.");
+                                console.log("DEBUG: [SUCCESS] Complete!");
                             })
                             .catch(err => {
-                                console.error("DEBUG: [Error] Location API Error:", err);
-                                // Even if city name fails, we should arguably still show the map?
-                                // Let's show error for now as requested.
-                                showError(`Unable to retrieve city name.<br><small>${err.message}</small>`);
+                                console.error("DEBUG: City lookup failed:", err);
+                                cityLabel.textContent = "Location Found";
+                                map.setView([userLat, userLon], 17, { animate: false });
+                                revealContent();
                             });
                     },
                     (error) => {
-                        clearTimeout(safetyTimeout); // Got error, cancel safety timer
-                        console.error("DEBUG: [Error] Geolocation Error Callback:", error);
-                        console.error(`DEBUG: [Error Details] Code: ${error.code}, Message: ${error.message}`);
-
-                        // Retry Logic for Timeout
-                        if (error.code === error.TIMEOUT && retryCount < 1) {
-                            console.warn("DEBUG: [Retry] Timeout occurred. Retrying geolocation request...");
-                            startGeolocation(retryCount + 1);
-                            return;
-                        }
-
-                        if (error.code === error.PERMISSION_DENIED) {
-                            showError("Location Access Denied.<br>Please enable GPS permissions.");
-                        } else if (error.code === error.TIMEOUT) {
-                            showError("Location Request Timed Out.<br>Check your GPS signal.");
+                        console.error("DEBUG: Geolocation Error:", error);
+                        let msg = "";
+                        if (error.code === 1) {
+                            msg = "Location Access Denied.<br>Please enable GPS permissions.";
+                        } else if (error.code === 2) {
+                            msg = "Location Unavailable.<br>Check your GPS settings.";
+                        } else if (error.code === 3) {
+                            msg = "Location Request Timeout.<br>Please try again.";
                         } else {
-                            showError(`Unable to retrieve location.<br><small>${error.message}</small>`);
+                            msg = `Location Error: ${error.message}`;
                         }
+                        showError(msg);
                     },
-                    geoOptions // Pass options here
+                    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
                 );
             };
 
@@ -691,9 +661,9 @@
             // User requested delay after GIF starts.
             setTimeout(startGeolocation, 2000);
 
-            // GUEST Button Logic - Standard Navigation
+            // GUEST Button Logic - просто переходим на карту
             document.querySelector('.btn-guest').addEventListener('click', () => {
-                console.log("DEBUG: Guest button clicked. Navigating to B_map_page...");
+                console.log("DEBUG: Guest button clicked. Navigating to map page...");
                 window.location.href = '/B_map_page/index.html';
             });
 
