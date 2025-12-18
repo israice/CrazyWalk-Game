@@ -195,10 +195,11 @@
   git log --oneline -n 10
   ```
   ```Powershell
-  Move-Item .env $env:TEMP\.env.backup
-  git reset --hard 247478e
-  Move-Item $env:TEMP\.env.backup .env
-  git push --force
+  Copy-Item .env $env:TEMP\.env.backup
+  git reset --hard ab3cf36
+  git clean -fd
+  Copy-Item $env:TEMP\.env.backup .env -Force
+  git push origin master --force  
   ```
 
   </details>
@@ -275,6 +276,7 @@
     - added polygons recreation on GPS activation 
     - added green polygons state as completed 
     - fixed GPS issues 
+    - fixed code to github restore 
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -288,7 +290,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.25 - fixed GPS issues"
+  git commit -m "v0.0.25 - fixed code to github restore"
   git push
   ```
 
