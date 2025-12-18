@@ -146,6 +146,92 @@
             pointer-events: none;
             /* Make tooltip transparent to clicks */
         }
+
+
+        /* Debug Mode Styles */
+        body.debug-mode .black-square,
+        body.debug-mode #map,
+        body.debug-mode .leaflet-container {
+            background-color: #001a4d !important;
+        }
+
+        /* Tint Tiles Blue in Debug Mode (Invert Light Map to Dark Blue) */
+        body.debug-mode .leaflet-tile-pane {
+            opacity: 1 !important;
+            filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%) !important;
+        }
+
+        .street-label-tooltip {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            color: #fff;
+            /* White text for Dark Map (Default) */
+            font-size: 11px;
+            font-weight: bold;
+            text-shadow: 0px 0px 2px #000;
+            /* Halo */
+        }
+
+        /* Invert Label Color in Debug Mode */
+        /* Invert Label Color in Debug Mode */
+        /* Invert Label Color in Debug Mode */
+        body.debug-mode .street-label-tooltip {
+            color: #000;
+            text-shadow: 0px 0px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        /* ERROR SCREEN */
+        #error-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ff0033;
+            /* Bright Red */
+            z-index: 1000;
+            display: none;
+            /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 5vh;
+        }
+
+        #error-screen h1 {
+            font-size: 4vh;
+            color: white;
+            background: none;
+            -webkit-text-fill-color: white;
+            margin-bottom: 2vh;
+        }
+
+        #error-screen p {
+            font-size: 2vh;
+            color: white;
+            opacity: 0.9;
+            max-width: 80%;
+            margin-bottom: 4vh;
+        }
+
+        .btn-retry {
+            background: white;
+            color: #ff0033;
+            border: none;
+            padding: 1.5vh 4vh;
+            font-size: 2vh;
+            font-weight: 700;
+            border-radius: 1vh;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s;
+        }
+
+        .btn-retry:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 
@@ -156,6 +242,16 @@
         <div id="top-bar-container" style="opacity: 0; transition: opacity 0.8s ease-in-out;"></div>
         <img id="loading-gif" src="/B_map_page/components/earth.gif" alt="Loading...">
 
+        <!-- Red Error Screen -->
+        <div id="error-screen">
+            <!-- Icon will be inserted dynamically or can use unicode if FontAwesome not loaded, but user has it cached? -->
+            <!-- Using SVG or simple text to be safe if FA not present on map page (it wasn't in head) -->
+            <div style="font-size: 8vh; color: white; margin-bottom: 2vh;">&#9888;</div>
+            <h1>CRITICAL ERROR</h1>
+            <p id="error-message">No map data found.</p>
+            <button class="btn-retry" id="retry-btn">RETRY</button>
+        </div>
+
     </div>
     <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
 
@@ -164,7 +260,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- Map Controls Logic -->
-    <script src="/B_map_page/components/map_controls.js"></script>
+    <script src="/B_map_page/components/map_controls.js?v=3"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -177,6 +273,7 @@
             const DEFAULT_LON = 34.76878;
             let isGpsActive = false;
             let hasPreciseFix = false;
+            let isDebugActive = false; // New Debug State
 
             // Initialize Map via MapControls (Centralized Logic)
             const controls = new MapControls('map', [DEFAULT_LAT, DEFAULT_LON], {
@@ -189,6 +286,18 @@
             // --- QUADRANT NAVIGATION HELPER ---
             let lastInputTime = 0; // Debounce tracker
             let blockMouseEvents = false; // Touch Lockout flag
+
+            // --- DEBUG SELECTION HELPERS (Global to DOMContentLoaded) ---
+            let selectedLayer = null;
+            let originalStyle = null;
+
+            const resetSelection = () => {
+                if (selectedLayer && originalStyle) {
+                    selectedLayer.setStyle(originalStyle);
+                    selectedLayer = null;
+                    originalStyle = null;
+                }
+            };
 
 
 
@@ -251,12 +360,31 @@
             };
 
             // Safety Reveal
+            /* REMOVED: Safety reveal is dangerous if data is missing. We want STRICT validation.
             setTimeout(() => {
                 if (!hasRevealed) {
                     console.warn("DEBUG: Safety Reveal Triggered (Data took too long)");
                     revealMap();
                 }
             }, 30000);
+            */
+
+            const showError = (msg) => {
+                loadingGif.style.display = 'none';
+                mapElement.style.display = 'none';
+                if (topBarContainer) topBarContainer.style.display = 'none';
+
+                const errorScreen = document.getElementById('error-screen');
+                const errorMessage = document.getElementById('error-message');
+                const retryBtn = document.getElementById('retry-btn');
+
+                errorScreen.style.display = 'flex';
+                errorMessage.innerHTML = msg;
+
+                retryBtn.onclick = () => {
+                    window.location.reload();
+                };
+            };
 
             // Reusable function to process coordinates (Logic)
             const processCoordinates = (lat, lon, accuracy, label) => {
@@ -333,7 +461,7 @@
                     })
                     .catch(err => {
                         console.error("DEBUG: Game Data Failed", err);
-                        revealMap();
+                        showError("CONNECTION ERROR:<br>Server failed to respond.<br>Please try again.");
                     });
             };
 
@@ -343,6 +471,13 @@
 
                 groupsLayer.clearLayers();
                 detailsLayer.clearLayers();
+
+                // STRICT VALIDATION
+                if (!data || !data.polygons || data.polygons.length === 0) {
+                    console.error("CRITICAL: No polygons found in game data.");
+                    showError("CRITICAL ERROR:<br>No polygons found.<br>Map cannot be generated.");
+                    return;
+                }
 
                 // STATE STORAGE (Closure Scope)
                 const polygonState = new Map(); // ID -> { current: 0, total: N, polyLayer, labelLayer, lineIds }
@@ -415,6 +550,81 @@
                     });
                 }
 
+                // SHARED DEBUG LOGIC
+                // resetSelection is now defined in parent scope
+
+                const attachDebugClick = (layer, data, type) => {
+                    layer.on('click', (e) => {
+                        if (!isDebugActive) return;
+                        L.DomEvent.stopPropagation(e);
+
+                        // Highlight Logic
+                        resetSelection();
+                        selectedLayer = layer;
+
+                        // Capture original style
+                        if (type.includes('Circle')) {
+                            originalStyle = {
+                                color: layer.options.color,
+                                weight: layer.options.weight,
+                                fillColor: layer.options.fillColor,
+                                fillOpacity: layer.options.fillOpacity
+                            };
+                            layer.setStyle({ color: 'red', weight: 4 });
+                        } else if (type.includes('Line')) {
+                            originalStyle = {
+                                color: layer.options.color,
+                                dashArray: layer.options.dashArray,
+                                weight: layer.options.weight
+                            };
+                            layer.setStyle({ color: 'red', dashArray: null, weight: 4 });
+                        } else if (type.includes('Polygon')) {
+                            originalStyle = {
+                                color: layer.options.color,
+                                weight: layer.options.weight,
+                                fillOpacity: layer.options.fillOpacity
+                            };
+                            layer.setStyle({ color: 'red', weight: 3 });
+                        }
+
+                        const contentObj = { ...data };
+                        // Remove large arrays for display if needed, but user wants info.
+                        const prettyJSON = JSON.stringify(contentObj, null, 2);
+                        const idDisplay = contentObj.id ? `<b>ID:</b> ${contentObj.id}<br>` : '';
+
+                        const container = document.createElement('div');
+                        container.innerHTML = `
+                            <div style="font-size: 11px; line-height: 1.2; color: #333;">
+                                ${idDisplay}
+                                <b>Type:</b> ${type}<br>
+                                <pre style="background:#f0f0f0; padding:4px; border-radius:4px; max-height:150px; overflow:auto; margin:4px 0;">${prettyJSON}</pre>
+                                <button style="width:100%; cursor:pointer; padding:4px;">Copy Data</button>
+                            </div>
+                        `;
+
+                        const btn = container.querySelector('button');
+                        btn.onclick = () => {
+                            navigator.clipboard.writeText(prettyJSON).then(() => {
+                                btn.innerText = "Copied!";
+                                setTimeout(() => btn.innerText = "Copy Data", 2000);
+                            });
+                        };
+
+                        L.popup({ minWidth: 200 })
+                            .setLatLng(e.latlng)
+                            .setContent(container)
+                            .openOn(map);
+                    });
+                };
+
+                // Map click to clear selection
+                map.on('click', () => {
+                    if (isDebugActive) {
+                        resetSelection();
+                        map.closePopup();
+                    }
+                });
+
                 // 2. Polygons (Init State)
                 const localPolys = data.polygons || [];
                 localPolys.forEach(poly => {
@@ -423,14 +633,20 @@
                         color: 'purple', fillColor: 'purple', fillOpacity: 0.1, weight: 0
                     }).addTo(detailsLayer);
 
+                    attachDebugClick(pLayer, poly, 'Polygon');
+
                     const pLabel = L.marker([poly.center[0], poly.center[1]], {
                         icon: L.divIcon({
                             className: 'poly-label',
-                            html: `<div style="background:white; border-radius:50%; width:fit-content; min-width:20px; padding:0 4px; height:20px; text-align:center; line-height:20px; color:black; font-size:10px; opacity: 0.8; font-weight:bold;">0%</div>`,
+                            html: `<div style="background:white; border-radius:50%; width:fit-content; min-width:20px; padding:0 4px; height:20px; text-align:center; line-height:20px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
                             iconSize: [30, 20],
                             iconAnchor: [15, 10]
-                        })
+                        }),
+                        interactive: true // Ensure it captures clicks
                     }).addTo(detailsLayer);
+
+                    // Attach debug click to the Label as well (shows Polygon Data)
+                    attachDebugClick(pLabel, poly, 'Polygon Label');
 
                     polygonState.set(poly.id, {
                         current: 0,
@@ -446,6 +662,7 @@
                     controls.setSnapLines(data.white_lines);
                     data.white_lines.forEach(line => {
                         const layer = L.polyline(line.path, { color: 'white', weight: 2, dashArray: '5, 5' }).addTo(detailsLayer);
+                        attachDebugClick(layer, line, 'White Line');
                         if (line.id !== undefined) {
                             lineLayerMap.set(String(line.id), layer);
                         }
@@ -465,6 +682,9 @@
                     mapCircleToPolys(lat, lon, localPolys, lineId);
                 };
 
+                // Shared Debug Click Handler (Removed from here, moved to top)
+
+
                 if (data.blue_circles) {
                     data.blue_circles.forEach(circle => {
                         const marker = L.circleMarker([circle.lat, circle.lon], {
@@ -472,6 +692,7 @@
                         }).addTo(detailsLayer);
                         marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
                         addToMap(circle.lat, circle.lon, marker, 'blue');
+                        attachDebugClick(marker, circle, 'Blue Circle');
                     });
                 }
 
@@ -481,15 +702,12 @@
                             radius: 4, color: 'green', fillColor: '#00ff00', fillOpacity: 1
                         }).addTo(detailsLayer);
                         addToMap(circle.lat, circle.lon, marker, 'green', circle.line_id);
+                        attachDebugClick(marker, circle, 'Green Circle');
                     });
                 }
 
-                // Red Lines (Visual only)
-                if (data.red_lines) {
-                    data.red_lines.forEach(line => {
-                        L.polyline(line, { color: 'red', weight: 4, opacity: 0.6 }).addTo(detailsLayer);
-                    });
-                }
+                // Red Lines / Street Names removed. 
+                // We now use the Google Text Overlay in map_controls.js
 
                 // Setup Hiding Logic with Progress Tracking
                 controls.checkVisibility();
@@ -641,6 +859,7 @@
 
             const initTopBarEvents = () => {
                 const gpsBtn = document.getElementById('gps-btn');
+                const debugBtn = document.getElementById('debug-btn');
                 const menuBtn = document.getElementById('menu-btn');
                 const topBar = document.getElementById('top-bar');
 
@@ -649,6 +868,30 @@
                         topBar.classList.remove('expanded');
                     }
                 };
+
+                // Get .black-square for background change
+                const blackSquare = document.querySelector('.black-square');
+
+                if (debugBtn) {
+                    debugBtn.addEventListener('click', () => {
+                        isDebugActive = !isDebugActive;
+                        if (isDebugActive) {
+                            console.log("DEBUG: Debug Mode ENABLED");
+                            debugBtn.classList.add('active');
+                            // Add Class to Body for global styling
+                            document.body.classList.add('debug-mode');
+
+                        } else {
+                            console.log("DEBUG: Debug Mode DISABLED");
+                            debugBtn.classList.remove('active');
+                            // Remove Class
+                            document.body.classList.remove('debug-mode');
+
+                            map.closePopup();
+                            resetSelection();
+                        }
+                    });
+                }
 
                 if (gpsBtn) {
                     gpsBtn.addEventListener('click', () => {

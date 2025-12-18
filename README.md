@@ -177,17 +177,18 @@
   🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄 
   🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
 
+  ## stop server
+  ```Bash
+  docker compose -f docker-compose.dev.yml down
+  docker compose -f docker-compose.prod.yml down
+  ```
+
   ## start or update server
   ```Bash
   docker compose -f docker-compose.dev.yml up --build -d
   docker compose -f docker-compose.prod.yml up --build -d
   ```
 
-  ## stop server
-  ```Bash
-  docker compose -f docker-compose.dev.yml down
-  docker compose -f docker-compose.prod.yml down
-  ```
 
   ## hard reset and rollback to previous commit
 
@@ -280,6 +281,7 @@
     - Redis added as docker container
   - [x] v0.0.26 - Redis checked now starting small fixes over map ui
     - green circles fixed as polygon percent
+    - added street names to map
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -293,7 +295,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - green circles fixed as polygon percent"
+  git commit -m "v0.0.26 - added street names to map"
   git push
   ```
 

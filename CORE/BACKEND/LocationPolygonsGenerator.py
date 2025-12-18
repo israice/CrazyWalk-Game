@@ -109,7 +109,7 @@ class LocationPolygonsGenerator:
                     f"{len(polygons)} polygons.")
         
         return {
-            "red_lines": [], 
+            "red_lines": [], # HIDE FROM FRONTEND
             "blue_circles": blue_circles,
             "white_lines": white_lines,
             "green_circles": green_circles,
@@ -184,7 +184,11 @@ class LocationPolygonsGenerator:
                 coords = [nodes[nid] for nid in way_nodes if nid in nodes]
                 
                 if len(coords) > 1:
+                    # SIMPLIFIED: Store only path (list of coordinates)
+                    # No street names saved.
+                    
                     red_visual.append(coords)
+                    
                     for i in range(len(coords) - 1):
                         red_segments.append((coords[i], coords[i+1]))
 
@@ -204,9 +208,13 @@ class LocationPolygonsGenerator:
         cached = load_from_redis(KEY_RED_LINES)
         if cached:
             for visual in cached:
-                 for i in range(len(visual) - 1):
-                     p1 = (float(visual[i][0]), float(visual[i][1]))
-                     p2 = (float(visual[i+1][0]), float(visual[i+1][1]))
+                 # Handle both old (list) and new (dict) formats
+                 coords = visual['path'] if isinstance(visual, dict) and 'path' in visual else visual
+                 if not isinstance(coords, list): continue
+
+                 for i in range(len(coords) - 1):
+                     p1 = (float(coords[i][0]), float(coords[i][1]))
+                     p2 = (float(coords[i+1][0]), float(coords[i+1][1]))
                      red_lines.append((p1, p2))
         
         node_counts = {}
@@ -348,7 +356,9 @@ class LocationPolygonsGenerator:
                                 nlat = p1[0] + (p2[0] - p1[0]) * ratio
                                 nlon = p1[1] + (p2[1] - p1[1]) * ratio
                                 green_circles.append({
-                                    'lat': nlat, 'lon': nlon, 'line_id': wl['id']
+                                    'id': f"gc_{wl['id']}_{count}",
+                                    'lat': nlat, 'lon': nlon, 
+                                    'line_id': wl['id']
                                 })
                                 count += 1
                                 t_idx += 1
@@ -416,6 +426,9 @@ class LocationPolygonsGenerator:
                     'boundary_white_lines': list(b_ids)
                 })
         except Exception as e:
+            import traceback
+            logger.error(f"LocationPolygonsGenerator: Polygon error type: {type(e)}")
+            logger.error(f"LocationPolygonsGenerator: Polygon error trace: {traceback.format_exc()}")
             logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
             
         save_to_redis(KEY_POLYGONS, polygons_data)

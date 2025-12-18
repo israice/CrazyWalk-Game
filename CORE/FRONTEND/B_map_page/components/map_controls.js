@@ -49,13 +49,32 @@ class MapControls {
             maxZoom: this.config.maxZoom
         }).setView(this.startCoords, this.config.defaultZoom);
 
-        // 2. Add Dark Matter Tile Layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-            maxZoom: 18, // Tiles can go deeper regardless of map constraint
+
+
+        // 2c. CartoDB Dark Matter (No Labels) - Base Map
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20,
             subdomains: 'abcd',
-            updateWhenIdle: false,
-            keepBuffer: 10
+            opacity: 1,
+            zIndex: 10
         }).addTo(this.map);
+
+        // 2d. CartoDB Dark Matter Labels - Overlay
+        // Adds street names and city labels in the corresponding dark theme style.
+        // 2d. CartoDB Dark Matter Labels - Overlay
+        // Adds street names and city labels in the corresponding dark theme style.
+        // VISIBILITY RULE: User wants names HIDDEN when Polygons are visible (Zoom 18+).
+        // Names should appear when zooming OUT (Zoom < 18).
+        const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20,
+            subdomains: 'abcd',
+            opacity: 1,
+            zIndex: 11 // Above the base map
+        });
+
+        // Add Rule: Show ONLY when Zoom <= 17.99 (Immediately when < 18)
+        // This closes the gap between Polygon visibility (Min 18) and Label visibility.
+        this.addVisibilityRule(labelsLayer, null, 17.99);
 
         // 3. Apply Mobile Rotation Drag Patch
         this.applyMobileRotationPatch();
@@ -135,26 +154,42 @@ class MapControls {
     }
 
     /**
-     * rule: Show layer ONLY if zoom >= minZoomToShow
+     * rule: Show layer conditionally based on Zoom.
+     * @param {Object} layer - The layer to toggle.
+     * @param {Number|null} minZoomToShow - If set, show when currentZoom >= minZoomToShow.
+     * @param {Number|null} maxZoomToShow - If set, show when currentZoom <= maxZoomToShow.
      */
-    addVisibilityRule(layer, minZoomToShow) {
-        this.visibilityRules.push({ layer, minZoomToShow });
+    addVisibilityRule(layer, minZoomToShow = null, maxZoomToShow = null) {
+        this.visibilityRules.push({ layer, minZoomToShow, maxZoomToShow });
         this.checkVisibility(); // Check immediately
     }
 
     checkVisibility() {
         if (!this.map) return;
         const currentZoom = this.map.getZoom();
+
         this.visibilityRules.forEach(rule => {
-            if (currentZoom >= rule.minZoomToShow) {
+            let shouldShow = true;
+
+            // Check Min Zoom Constraint
+            if (rule.minZoomToShow !== null && currentZoom < rule.minZoomToShow) {
+                shouldShow = false;
+            }
+
+            // Check Max Zoom Constraint
+            if (rule.maxZoomToShow !== null && currentZoom > rule.maxZoomToShow) {
+                shouldShow = false;
+            }
+
+            if (shouldShow) {
                 if (!this.map.hasLayer(rule.layer)) {
                     this.map.addLayer(rule.layer);
-                    console.log(`Controls: Showing layer (Zoom ${currentZoom} >= ${rule.minZoomToShow})`);
+                    console.log(`Controls: Showing layer (Zoom ${currentZoom})`);
                 }
             } else {
                 if (this.map.hasLayer(rule.layer)) {
                     this.map.removeLayer(rule.layer);
-                    console.log(`Controls: Hiding layer (Zoom ${currentZoom} < ${rule.minZoomToShow})`);
+                    console.log(`Controls: Hiding layer (Zoom ${currentZoom})`);
                 }
             }
         });
