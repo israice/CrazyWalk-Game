@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Upgrade pip to avoid segfaults with binary wheels
-RUN pip install --upgrade pip setuptools wheel
+# Upgrade pip to avoid segfaults and ensure compatibility
+RUN python -m pip install --upgrade pip setuptools wheel
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

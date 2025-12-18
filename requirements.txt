@@ -1,3 +1,4 @@
 requests
 shapely
 networkx
+redis==4.6.0

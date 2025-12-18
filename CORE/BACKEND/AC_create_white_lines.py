@@ -3,6 +3,7 @@ import math
 import csv
 import os
 import json
+from .redis_tools import save_to_redis, load_from_redis, KEY_BLUE_CIRCLES, KEY_ADJACENCY, KEY_WHITE_LINES, KEY_GREEN_CIRCLES
 
 logger = logging.getLogger(__name__)
 
@@ -71,11 +72,8 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
     white_lines = []
     green_circles = []
     
-    # ... (Existing logic for traversal) ...
-    
     # Convert list to set for fast lookup
     relevant_set = set(relevant_nodes)
-    visited_paths = set()
     
     # Visited edges (u, v)
     visited_edges = set()
@@ -139,13 +137,6 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
                  # e.g. 140m / 15 = 2.8 -> 3 segments -> 46.6m each
                  num_segments = int(round(total_length / target_spacing))
                  if num_segments < 1: num_segments = 1
-                 
-                 # Assign a simple ID to the White Line
-                 # Using hash of start/end for stability or just index?
-                 # Since we loop, we can just use index if we tracked it, but start/end is safer.
-                 # Let's use a generated ID based on coordinates for now, or just append later.
-                 # We will assign IDs after the loop or use a counter.
-                 # Actually, let's just use the list index at the end.
                  
                  if num_segments > 1:
                      step = total_length / num_segments
@@ -215,5 +206,14 @@ def create_white_lines(blue_circles_list=None, adjacency=None, relevant_nodes=No
             writer.writerow([gc['lat'], gc['lon'], gc.get('line_id', -1)])
 
     logger.info(f"AC: Created {len(white_lines)} white lines and {len(green_circles)} green circles. Saved to CSV.")
+    
+    # Redis IO: Save Data
+    try:
+        logger.info("AC: Attempting to save to Redis...")
+        saved_wl = save_to_redis(KEY_WHITE_LINES, white_lines)
+        saved_gc = save_to_redis(KEY_GREEN_CIRCLES, green_circles)
+        logger.info(f"AC: Redis Save Status - White Lines: {saved_wl}, Green Circles: {saved_gc}")
+    except Exception as e:
+        logger.error(f"AC: CRITICAL REDIS SAVE ERROR: {e}")
+    
     return white_lines, green_circles
-

@@ -4,6 +4,8 @@ services:
     restart: always
     ports:
       - "80:8000"
+    environment:
+      - REDIS_HOST=redis
     networks:
       - pc2-net
 
@@ -22,6 +24,12 @@ services:
     environment:
       - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
       - FRONTEND_INDEX_PAGE=CORE/FRONTEND
+    networks:
+      - pc2-net
+
+  redis:
+    image: redis:alpine
+    restart: always
     networks:
       - pc2-net
 

@@ -335,8 +335,44 @@ class ThreadedHTTPServer(socketserver.ThreadingTCPServer):
         # Log real errors normally
         super().handle_error(request, client_address)
 
+def ensure_redis_running():
+    """Checks if Redis is accessible. If not, attempts to start it via Docker."""
+    from CORE.redis_client import get_redis_client
+    import subprocess
+    import time
+    
+    r = get_redis_client()
+    try:
+        # PING
+        r.ping()
+        logger.info("Redis is running and accessible.")
+    except Exception as e:
+        logger.warning(f"Redis is not running ({e}). Attempting to start via Docker Compose...")
+        try:
+            # Try to start redis service
+            # Assumes docker-compose is in path and file is in current directory
+            subprocess.run(["docker-compose", "-f", "docker-compose.dev.yml", "up", "-d", "redis"], check=True)
+            logger.info("Docker Compose command executed. Waiting for Redis to initialize...")
+            
+            # Wait loop
+            retries = 5
+            for i in range(retries):
+                time.sleep(2)
+                try:
+                    r.ping()
+                    logger.info("Redis started successfully.")
+                    return
+                except Exception:
+                    logger.info(f"Waiting for Redis... ({i+1}/{retries})")
+            
+            logger.error("Redis failed to come online after starting container.")
+        except Exception as docker_e:
+            logger.error(f"Failed to start Redis via Docker: {docker_e}")
+            logger.error("Please run 'docker-compose up -d redis' manually.")
+
 def run_server():
     Initializer.setup_working_directory()
+    ensure_redis_running()
     
     with ThreadedHTTPServer(("", PORT), QuietHandler) as httpd:
         logger.info(f"http://localhost:{PORT}")

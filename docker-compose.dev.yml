@@ -3,5 +3,12 @@ services:
     build: .
     ports:
       - "80:8000"
+    environment:
+      - REDIS_HOST=redis
     volumes:
       - .:/app
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"

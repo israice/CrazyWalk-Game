@@ -23,18 +23,15 @@ def run_list(lat, lon, region_size=0.0015, force_rebuild=False):
         return {}
 
     # 2. Blue Circles (Intersections)
-    # Reads from AA_temp_red_lines.csv
+    # Reads from Redis (AA saved visual lines there)
     blue_circles, adjacency, relevant_nodes = create_blue_circles()
     
     # 3. White Lines + Green Circles
-    # Reads from AB_add_blue_circles.csv
+    # Reads from Redis
     white_lines, green_circles = create_white_lines()
     
     # 4. Polygons
-    # Reads from AC_create_white_lines.csv
-    # 4. Polygons
-    # Reads from AC_create_white_lines.csv
-    # AD returns tuple: (polygons_data, used_white_line_ids)
+    # Reads from Redis
     polygons, used_white_line_ids = create_polygons()
     
     # --- FILTER ORPHANED LINES ---
@@ -54,24 +51,25 @@ def run_list(lat, lon, region_size=0.0015, force_rebuild=False):
     else:
         logger.warning("DEBUG: used_white_line_ids is EMPTY!")
         
+    # Define normalized set first
+    used_ids_str = set(str(uid) for uid in used_white_line_ids)
+
     # Check overlap
-    overlap_count = sum(1 for wl in white_lines if str(wl.get('id')) in used_white_line_ids)
+    overlap_count = sum(1 for wl in white_lines if str(wl.get('id')) in used_ids_str)
     logger.info(f"DEBUG: Overlap Count: {overlap_count}")
 
     # Keep white lines only if their ID is in the used set
-    # AD returns IDs as strings (from CSV). AC returns IDs as ints.
-    # We must cast to string for comparison.
-    white_lines = [wl for wl in white_lines if str(wl.get('id')) in used_white_line_ids]
+    white_lines = [wl for wl in white_lines if str(wl.get('id')) in used_ids_str]
     
     # Keep green circles only if their line_id is in the used set
-    green_circles = [gc for gc in green_circles if str(gc.get('line_id')) in used_white_line_ids]
+    green_circles = [gc for gc in green_circles if str(gc.get('line_id')) in used_ids_str]
     
     logger.info(f"A: Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
     logger.info(f"A: Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
     # -----------------------------
     
     # 5. Groups
-    # Reads from AD_create_polygons.csv
+    # Reads from Redis
     groups = create_groups_of_polygons()
 
     # --- RECALCULATE CONNECTIONS FOR VISUAL ACCURACY ---
