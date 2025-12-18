@@ -283,6 +283,7 @@
     - green circles fixed as polygon percent
     - added street names to map
     - removed group of polygons area block from zoom out event 
+    - fixed all blue lines showing all exising crossings 
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -296,7 +297,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - removed group of polygons area block from zoom out event"
+  git commit -m "v0.0.26 - fixed all blue lines showing all exising crossings"
   git push
   ```
 

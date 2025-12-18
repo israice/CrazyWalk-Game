@@ -93,14 +93,16 @@ class LocationPolygonsGenerator:
         for circle in blue_circles:
             node_key = (circle['lat'], circle['lon'])
             if node_key in wl_node_data:
-                circle['connections'] = wl_node_data[node_key]['count']
+                # Preserve original 'connections' (Total Red Lines/Roads)
+                # Store active white paths for internal logic
+                circle['active_connections'] = wl_node_data[node_key]['count']
                 circle['connected_white_lines'] = wl_node_data[node_key]['line_ids']
             else:
-                circle['connections'] = 0
+                circle['active_connections'] = 0
                 circle['connected_white_lines'] = []
                 
-        # Only keep connected blue circles
-        blue_circles = [bc for bc in blue_circles if bc['connections'] > 0]
+        # Only keep connected blue circles (reachable via white lines)
+        blue_circles = [bc for bc in blue_circles if bc['active_connections'] > 0]
         
         logger.info(f"LocationPolygonsGenerator: Generated "
                     f"{len(red_visual)} red visuals, "
