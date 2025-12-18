@@ -286,6 +286,7 @@
     - fixed all blue lines showing all exising crossings 
     - fixed green polygons state as completed when zoom out
     - fixed blue circles number as one item
+    - fixed white circle size
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -299,7 +300,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - fixed blue circles number as one item"
+  git commit -m "v0.0.26 - fixed white circle size"
   git push
   ```
 
