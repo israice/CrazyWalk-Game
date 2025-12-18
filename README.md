@@ -282,6 +282,7 @@
   - [x] v0.0.26 - Redis checked now starting small fixes over map ui
     - green circles fixed as polygon percent
     - added street names to map
+    - removed group of polygons area block from zoom out event 
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -295,7 +296,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - added street names to map"
+  git commit -m "v0.0.26 - removed group of polygons area block from zoom out event"
   git push
   ```
 

@@ -321,8 +321,8 @@
             // 1. Details (Polygons, Lines, Circles) -> Visible ONLY at Zoom 18
             controls.addVisibilityRule(detailsLayer, 18);
 
-            // 2. Groups (Monolith) -> Always visible 18+ (base layer)
-            // controls.addVisibilityRule(groupsLayer, 18);
+            // 2. Groups (Monolith) -> Visible ONLY at Zoom 18 (Same as details)
+            controls.addVisibilityRule(groupsLayer, 18);
 
             // Custom Marker Icon (Visual)
             // Goal: Purple Circle (Shadow) is centered on the LatLon (Anchor). GIF stands on top.
