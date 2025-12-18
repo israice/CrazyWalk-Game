@@ -5,14 +5,15 @@
     <script>
         // CLEANUP: Force clear all local domain data on entry
         try {
-            localStorage.clear();
-            sessionStorage.clear();
+            // localStorage.clear(); // MODIFIED: Logic removed to allow persistence of Green Polygons
+            // sessionStorage.clear(); // Optional: We can keep session clear if we want fresh session but persisted progress.
+            // Let's keep data for now as user wants "existing" green polygons.
             if ('caches' in window) {
                 caches.keys().then(names => {
                     for (let name of names) caches.delete(name);
                 });
             }
-            console.log("Domain storage cleared.");
+            console.log("Domain storage cleanup skipped (Persistence enabled).");
         } catch (e) {
             console.warn("Storage cleanup failed:", e);
         }
@@ -293,7 +294,9 @@
 
             const resetSelection = () => {
                 if (selectedLayer && originalStyle) {
-                    selectedLayer.setStyle(originalStyle);
+                    if (typeof selectedLayer.setStyle === 'function') {
+                        selectedLayer.setStyle(originalStyle);
+                    }
                     selectedLayer = null;
                     originalStyle = null;
                 }
@@ -316,6 +319,7 @@
             // Initialize Layer Groups
             const groupsLayer = L.layerGroup().addTo(map);
             const detailsLayer = L.layerGroup().addTo(map);
+            const completedPolygonsLayer = L.layerGroup().addTo(map); // Always visible layer for completed zones
 
             // Visibility Rules
             // 1. Details (Polygons, Lines, Circles) -> Visible ONLY at Zoom 18
@@ -558,33 +562,35 @@
                         if (!isDebugActive) return;
                         L.DomEvent.stopPropagation(e);
 
-                        // Highlight Logic
+                        // Highlight Logic (Safely)
                         resetSelection();
                         selectedLayer = layer;
 
-                        // Capture original style
-                        if (type.includes('Circle')) {
-                            originalStyle = {
-                                color: layer.options.color,
-                                weight: layer.options.weight,
-                                fillColor: layer.options.fillColor,
-                                fillOpacity: layer.options.fillOpacity
-                            };
-                            layer.setStyle({ color: 'red', weight: 4 });
-                        } else if (type.includes('Line')) {
-                            originalStyle = {
-                                color: layer.options.color,
-                                dashArray: layer.options.dashArray,
-                                weight: layer.options.weight
-                            };
-                            layer.setStyle({ color: 'red', dashArray: null, weight: 4 });
-                        } else if (type.includes('Polygon')) {
-                            originalStyle = {
-                                color: layer.options.color,
-                                weight: layer.options.weight,
-                                fillOpacity: layer.options.fillOpacity
-                            };
-                            layer.setStyle({ color: 'red', weight: 3 });
+                        // Capture style & Highlight ONLY if supported (Vector Layers)
+                        if (typeof layer.setStyle === 'function') {
+                            if (type.includes('Circle')) {
+                                originalStyle = {
+                                    color: layer.options.color,
+                                    weight: layer.options.weight,
+                                    fillColor: layer.options.fillColor,
+                                    fillOpacity: layer.options.fillOpacity
+                                };
+                                layer.setStyle({ color: 'red', weight: 4 });
+                            } else if (type.includes('Line')) {
+                                originalStyle = {
+                                    color: layer.options.color,
+                                    dashArray: layer.options.dashArray,
+                                    weight: layer.options.weight
+                                };
+                                layer.setStyle({ color: 'red', dashArray: null, weight: 4 });
+                            } else if (type.includes('Polygon')) {
+                                originalStyle = {
+                                    color: layer.options.color,
+                                    weight: layer.options.weight,
+                                    fillOpacity: layer.options.fillOpacity
+                                };
+                                layer.setStyle({ color: 'red', weight: 3 });
+                            }
                         }
 
                         const contentObj = { ...data };
@@ -633,7 +639,7 @@
                         color: 'purple', fillColor: 'purple', fillOpacity: 0.1, weight: 0
                     }).addTo(detailsLayer);
 
-                    attachDebugClick(pLayer, poly, 'Polygon');
+                    // attachDebugClick(pLayer, poly, 'Polygon'); // Removed per user request
 
                     const pLabel = L.marker([poly.center[0], poly.center[1]], {
                         icon: L.divIcon({
@@ -648,13 +654,47 @@
                     // Attach debug click to the Label as well (shows Polygon Data)
                     attachDebugClick(pLabel, poly, 'Polygon Label');
 
-                    polygonState.set(poly.id, {
-                        current: 0,
+                    const savedCount = parseInt(localStorage.getItem(`poly_${poly.id}`) || '0');
+
+                    const pState = {
+                        id: poly.id, // Added ID for persistence
+                        current: savedCount,
                         total: poly.total_points,
                         layer: pLayer,
                         label: pLabel,
                         lines: poly.boundary_white_lines // Strings
-                    });
+                    };
+
+                    polygonState.set(poly.id, pState);
+
+                    // Immediate Completion Check (Restoration)
+                    // Immediate Completion Check (Restoration)
+                    if (pState.current >= pState.total) {
+                        console.log(`DEBUG: Restoring Completed Polygon ${poly.id} to Persistent Layer`);
+                        // Move to Persistent Layer immediately
+                        if (detailsLayer.hasLayer(pLayer)) detailsLayer.removeLayer(pLayer);
+                        completedPolygonsLayer.addLayer(pLayer);
+
+                        pLayer.setStyle({
+                            color: '#00ff00',
+                            fillColor: '#00ff00',
+                            fillOpacity: 0.4
+                        });
+                        if (pLabel) pLabel.remove();
+                        pState.label = null;
+
+                        // Hide lines (Deferred until lines are created? No, lines created later. 
+                        // Wait, lines are created AFTER polygons in this loop order?
+                        // No, Polygons are step 2, White Lines are Step 3.
+                        // We need to handle line hiding in Step 3 or a post-init check.)
+                    }
+                    else {
+                        // Update Label Text if partially complete
+                        const pct = Math.floor((pState.current / pState.total) * 100);
+                        const icon = pLabel.options.icon;
+                        icon.options.html = icon.options.html.replace(/>\d+%</, `>${pct}%<`);
+                        pLabel.setIcon(icon);
+                    }
                 });
 
                 // 3. White Lines (Index)
@@ -669,6 +709,19 @@
                     });
                     const currentPos = userMarker.getLatLng();
                     controls.updateUserPosition(userMarker, currentPos.lat, currentPos.lng, isGpsActive);
+
+                    // POST-INIT: Hide lines for restored completed polygons
+                    // Now that lines are created and mapped, we can hiding them.
+                    polygonState.forEach(state => {
+                        if (state.current >= state.total && state.lines) {
+                            state.lines.forEach(lid => {
+                                const lineLayer = lineLayerMap.get(String(lid));
+                                if (lineLayer) {
+                                    lineLayer.setStyle({ opacity: 0, fillOpacity: 0 });
+                                }
+                            });
+                        }
+                    });
                 }
 
                 // 4. Circles (Rendering + Mapping)
@@ -767,11 +820,55 @@
                     state.label.setIcon(icon);
                 }
 
+                // SAVE PROGRESS
+                // We need the ID. We don't have ID in 'state' object directly? 
+                // polygonState is Map<ID, State>. 
+                // 'state' is the value. We need 'key' or we add ID to state.
+                // Looking at init: ID is poly.id. 
+                // We need to add ID to state object to save it easily here.
+                // OR find key by value (slow).
+                // Let's assume we can get it or just pass it.
+                // updatePolygonVisuals is called with (state, lineMap).
+                // Let's just find the ID in the loop calling this: `relevantPolys.forEach(pid => ...)`
+
+                // Wait, I can't modify the call signature easily without checking setupProgressHiding.
+                // Let's add ID to the state object in the init step first.
+                // BUT I already sent the init step replacement!
+                // FIX: I will depend on the NEXT tool call to add ID to state, then this one.
+                // Actually, I can use the `polyState` map iterator to find it? No.
+
+                // BETTER: Modify `setupProgressHiding` to pass the ID.
+                // Only `setupProgressHiding` calls this.
+                // Let's check `setupProgressHiding` implementation.
+                // It has `relevantPolys.forEach(pid => { const state = polyState.get(pid); ... })`
+                // So I have `pid` there!
+                // I should pass `pid` to `updatePolygonVisuals`.
+
+                // REFRESH: I will update `updatePolygonVisuals` signature to `(pid, state, lineMap)`.
+
+                // SAVE PROGRESS
+                if (state.id) {
+                    localStorage.setItem(`poly_${state.id}`, state.current);
+                }
+
                 // Check Completion
                 if (state.current >= state.total) {
-                    console.log("DEBUG: Polygon Completed!");
+                    console.log("DEBUG: Polygon Completed! Moving to Persistent Layer.");
 
-                    // 1. Turn Green
+                    // 1. Turn Green & Move to Persistent Layer
+                    // Remove from detailsLayer (which hides on zoom out)
+                    // Ensure it is explicitly removed from the hiding detailsLayer
+                    if (detailsLayer.hasLayer(state.layer)) {
+                        detailsLayer.removeLayer(state.layer);
+                    } else {
+                        state.layer.remove();
+                    }
+
+                    // Add to completedLayer (visible everywhere)
+                    if (!completedPolygonsLayer.hasLayer(state.layer)) {
+                        completedPolygonsLayer.addLayer(state.layer);
+                    }
+
                     state.layer.setStyle({
                         color: '#00ff00',
                         fillColor: '#00ff00',
