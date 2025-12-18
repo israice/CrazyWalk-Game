@@ -276,18 +276,14 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
             # Import and Reload to ensure fresh code
             import importlib
-            from CORE.BACKEND import A_create_polygons, AA_temp_red_lines, AB_add_blue_circles, AC_create_white_lines, AD_create_polygons, AE_create_group_of_polygons
+            from CORE.BACKEND import GameMapGenerator
             
             # Force reload of dependencies in order
-            importlib.reload(AA_temp_red_lines)
-            importlib.reload(AB_add_blue_circles)
-            importlib.reload(AC_create_white_lines)
-            importlib.reload(AD_create_polygons)
-            importlib.reload(AE_create_group_of_polygons)
-            importlib.reload(A_create_polygons)
+            importlib.reload(GameMapGenerator)
             
             # Generate Data
-            data = A_create_polygons.run_list(lat, lon, force_rebuild=force_rebuild)
+            generator = GameMapGenerator.GameMapGenerator()
+            data = generator.generate_map(lat, lon, force_rebuild=force_rebuild)
             
             # Send Response
             self.send_response(200)

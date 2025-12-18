@@ -278,6 +278,7 @@
     - fixed GPS issues 
     - fixed code to github restore 
     - Redis added as docker container
+  - [x] v0.0.26 - Redis checked now starting small fixes over map ui
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -291,7 +292,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.25 - Redis added as docker container"
+  git commit -m "v0.0.26 - Redis checked now starting small fixes over map ui"
   git push
   ```
 

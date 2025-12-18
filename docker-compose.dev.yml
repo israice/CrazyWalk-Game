@@ -1,14 +1,17 @@
 services:
   app:
     build: .
+    container_name: CrazyWalk-Frontend
     ports:
       - "80:8000"
     environment:
       - REDIS_HOST=redis
+      - PYTHONDONTWRITEBYTECODE=1
     volumes:
       - .:/app
 
   redis:
     image: redis:alpine
+    container_name: CrazyWalk-Redis
     ports:
       - "6379:6379"

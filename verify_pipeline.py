@@ -19,9 +19,9 @@ sys.path.append(os.getcwd())
 try:
     debug_print("VERIFY: Importing redis_client...")
     from CORE.redis_client import get_redis_client
-    debug_print("VERIFY: Importing A_create_polygons...")
-    # Import orchestrator directly to test pipeline logic
-    from CORE.BACKEND import A_create_polygons
+    debug_print("VERIFY: Importing GameMapGenerator...")
+    # Import unified generator
+    from CORE.BACKEND import GameMapGenerator
     from CORE.BACKEND.redis_tools import KEY_RED_LINES, KEY_BLUE_CIRCLES, KEY_WHITE_LINES, KEY_POLYGONS, KEY_GROUPS
     debug_print("VERIFY: Imports complete.")
 except ImportError as e:
@@ -42,15 +42,16 @@ def verify_pipeline():
     r.delete(*keys_to_delete)
     
     # 2. Run Generation (using a known location, e.g. London or existing lat/lon)
-    # Using approx coords from existing csvs if possible, or just default.
-    # checking generation_meta.json ?
-    lat = 55.7558 # Moscow example
+    lat = 55.7558 
     lon = 37.6173
     
     debug_print(f"VERIFY: Running generation for {lat}, {lon}...")
     logger.info(f"Running generation for {lat}, {lon}...")
     try:
-        data = A_create_polygons.run_list(lat, lon, force_rebuild=True)
+        # Instantiate and run
+        generator = GameMapGenerator.GameMapGenerator()
+        data = generator.generate_map(lat, lon, force_rebuild=True)
+        
         debug_print(f"VERIFY: Generation returned data type: {type(data)}")
         if not data:
             logger.error("Generation returned empty data!")
