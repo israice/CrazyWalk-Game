@@ -375,7 +375,7 @@
                     polyList.forEach(poly => {
                         let isRelevant = false;
                         // Check Green Stickiness (Line ID)
-                        if (whiteLineId !== -1 && poly.boundary_white_lines && poly.boundary_white_lines.includes(String(whiteLineId))) {
+                        if (whiteLineId !== -1 && poly.boundary_white_lines && poly.boundary_white_lines.some(id => Number(id) === Number(whiteLineId))) {
                             isRelevant = true;
                         }
                         // Check Blue Stickiness (Vertex Match)

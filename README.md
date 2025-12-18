@@ -133,7 +133,7 @@
   AUTOUPDATE_WEBHOOK_FROM_GITHUB="your_secret_here" 
   ```
   ```Bash
-  docker compose -f docker-compose.prod.yml up -d --build
+  docker compose -f docker-compose.dev.yml up -d --build
   ```
   </details>
 
@@ -279,6 +279,7 @@
     - fixed code to github restore 
     - Redis added as docker container
   - [x] v0.0.26 - Redis checked now starting small fixes over map ui
+    - green circles fixed as polygon percent
 
     - fixed layers view of polygon items
     - deleted all lines that not have red line
@@ -292,7 +293,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - Redis checked now starting small fixes over map ui"
+  git commit -m "v0.0.26 - green circles fixed as polygon percent"
   git push
   ```
 

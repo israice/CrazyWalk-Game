@@ -3,14 +3,20 @@ import logging
 import os
 import sys
 
-# Ensure we can import from CORE
-# If running as script from backend, path might need adjustment
-try:
-    from CORE.redis_client import get_redis_client
-except ImportError:
-    # Fallback if running standalone from subfolder
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-    from CORE.redis_client import get_redis_client
+import redis
+
+def get_redis_client():
+    """
+    Returns a configured Redis client instance.
+    Uses environment variables REDIS_HOST and REDIS_PORT.
+    Defaults to 'redis' and 6379.
+    """
+    return redis.Redis(
+        host=os.getenv('REDIS_HOST', 'localhost'),
+        port=int(os.getenv('REDIS_PORT', 6379)),
+        db=0,
+        decode_responses=True
+    )
 
 logger = logging.getLogger(__name__)
 

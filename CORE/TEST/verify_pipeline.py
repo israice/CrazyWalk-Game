@@ -18,10 +18,10 @@ sys.path.append(os.getcwd())
 
 try:
     debug_print("VERIFY: Importing redis_client...")
-    from CORE.redis_client import get_redis_client
-    debug_print("VERIFY: Importing GameMapGenerator...")
+    from CORE.BACKEND.redis_tools import get_redis_client
+    debug_print("VERIFY: Importing LocationPolygonsGenerator...")
     # Import unified generator
-    from CORE.BACKEND import GameMapGenerator
+    from CORE.BACKEND import LocationPolygonsGenerator
     from CORE.BACKEND.redis_tools import KEY_RED_LINES, KEY_BLUE_CIRCLES, KEY_WHITE_LINES, KEY_POLYGONS, KEY_GROUPS
     debug_print("VERIFY: Imports complete.")
 except ImportError as e:
@@ -49,7 +49,7 @@ def verify_pipeline():
     logger.info(f"Running generation for {lat}, {lon}...")
     try:
         # Instantiate and run
-        generator = GameMapGenerator.GameMapGenerator()
+        generator = LocationPolygonsGenerator.LocationPolygonsGenerator()
         data = generator.generate_map(lat, lon, force_rebuild=True)
         
         debug_print(f"VERIFY: Generation returned data type: {type(data)}")

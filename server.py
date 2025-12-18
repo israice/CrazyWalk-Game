@@ -1,3 +1,4 @@
+import redis
 import http.server
 import socketserver
 import os
@@ -276,13 +277,13 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
             # Import and Reload to ensure fresh code
             import importlib
-            from CORE.BACKEND import GameMapGenerator
+            from CORE.BACKEND import LocationPolygonsGenerator
             
             # Force reload of dependencies in order
-            importlib.reload(GameMapGenerator)
+            importlib.reload(LocationPolygonsGenerator)
             
             # Generate Data
-            generator = GameMapGenerator.GameMapGenerator()
+            generator = LocationPolygonsGenerator.LocationPolygonsGenerator()
             data = generator.generate_map(lat, lon, force_rebuild=force_rebuild)
             
             # Send Response
@@ -333,7 +334,7 @@ class ThreadedHTTPServer(socketserver.ThreadingTCPServer):
 
 def ensure_redis_running():
     """Checks if Redis is accessible. If not, attempts to start it via Docker."""
-    from CORE.redis_client import get_redis_client
+    from CORE.BACKEND.redis_tools import get_redis_client
     import subprocess
     import time
     

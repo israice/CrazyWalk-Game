@@ -1,6 +1,6 @@
 import logging
 import json
-import csv
+
 import os
 import math
 import time
@@ -16,7 +16,7 @@ from .redis_tools import (
 
 logger = logging.getLogger(__name__)
 
-class GameMapGenerator:
+class LocationPolygonsGenerator:
     """
     Unified generator for CrazyWalk game map data.
     Consolidates previous AA-AE steps into one cohesive flow.
@@ -41,12 +41,12 @@ class GameMapGenerator:
         """
         Orchestrates the creation of all game elements.
         """
-        logger.info("GameMapGenerator: Starting generation sequence...")
+        logger.info("LocationPolygonsGenerator: Starting generation sequence...")
         
         # 1. Red Lines (Roads)
         red_segments, red_visual = self._fetch_red_lines(lat, lon, region_size, reuse_existing=not force_rebuild)
         if not red_visual and not red_segments:
-            logger.warning("GameMapGenerator: No red lines found.")
+            logger.warning("LocationPolygonsGenerator: No red lines found.")
             return {}
 
         # 2. Blue Circles (Intersections)
@@ -69,8 +69,8 @@ class GameMapGenerator:
         white_lines = [wl for wl in white_lines if str(wl.get('id')) in used_ids_str]
         green_circles = [gc for gc in green_circles if str(gc.get('line_id')) in used_ids_str]
         
-        logger.info(f"GameMapGenerator: Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
-        logger.info(f"GameMapGenerator: Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
+        logger.info(f"LocationPolygonsGenerator: Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
+        logger.info(f"LocationPolygonsGenerator: Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
         
         # 5. Groups
         groups = self._create_groups()
@@ -102,7 +102,7 @@ class GameMapGenerator:
         # Only keep connected blue circles
         blue_circles = [bc for bc in blue_circles if bc['connections'] > 0]
         
-        logger.info(f"GameMapGenerator: Generated "
+        logger.info(f"LocationPolygonsGenerator: Generated "
                     f"{len(red_visual)} red visuals, "
                     f"{len(blue_circles)} blue circles, "
                     f"{len(white_lines)} white lines, "
@@ -119,9 +119,9 @@ class GameMapGenerator:
 
     def _fetch_red_lines(self, lat, lon, region_size, reuse_existing):
         """Step 1: Fetch from Overpass or Redis"""
-        logger.info(f"GameMapGenerator: Step 1 - Fetching Red Lines for {lat}, {lon}")
+        logger.info(f"LocationPolygonsGenerator: Step 1 - Fetching Red Lines for {lat}, {lon}")
         
-        csv_path = os.path.join(self.data_dir, 'AA_temp_red_lines.csv')
+
         
         # Reuse Logic
         if reuse_existing:
@@ -129,7 +129,7 @@ class GameMapGenerator:
             if meta and abs(meta.get('lat', 0) - lat) < 0.0005 and abs(meta.get('lon', 0) - lon) < 0.0005:
                 cached_lines = load_from_redis(KEY_RED_LINES)
                 if cached_lines:
-                     logger.info("GameMapGenerator: Reusing red lines (Redis match).")
+                     logger.info("LocationPolygonsGenerator: Reusing red lines (Redis match).")
                      return [], cached_lines
             
             # Fallback CSV check
@@ -170,7 +170,7 @@ class GameMapGenerator:
                 time.sleep(1)
         
         if not data:
-            logger.error("GameMapGenerator: Overpass failed.")
+            logger.error("LocationPolygonsGenerator: Overpass failed.")
             return [], []
 
         # Process
@@ -188,14 +188,7 @@ class GameMapGenerator:
                     for i in range(len(coords) - 1):
                         red_segments.append((coords[i], coords[i+1]))
 
-        # Save
-        try:
-             with open(csv_path, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(['coordinates_json'])
-                for v in red_visual:
-                    writer.writerow([json.dumps(v)])
-        except Exception: pass
+
 
         save_to_redis(KEY_META, {'lat': lat, 'lon': lon})
         save_to_redis(KEY_RED_LINES, red_visual)
@@ -204,7 +197,7 @@ class GameMapGenerator:
 
     def _identify_intersections(self):
         """Step 2: Blue Circles"""
-        logger.info("GameMapGenerator: Step 2 - Identifing Intersections")
+        logger.info("LocationPolygonsGenerator: Step 2 - Identifing Intersections")
         
         red_lines = []
         # Load from Redis (we utilize the side-effect of Step 1 saving to Redis)
@@ -258,7 +251,7 @@ class GameMapGenerator:
 
     def _create_graph_elements(self):
         """Step 3: White Lines & Green Circles"""
-        logger.info("GameMapGenerator: Step 3 - Creating Graph Elements")
+        logger.info("LocationPolygonsGenerator: Step 3 - Creating Graph Elements")
         
         # Need to reconstruct inputs if not passed? 
         # Actually logic says "Reads from Redis" usually. 
@@ -371,7 +364,7 @@ class GameMapGenerator:
 
     def _find_polygons(self):
         """Step 4: Find Polygons"""
-        logger.info("GameMapGenerator: Step 4 - Finding Polygons")
+        logger.info("LocationPolygonsGenerator: Step 4 - Finding Polygons")
         
         white_lines = load_from_redis(KEY_WHITE_LINES)
         G = nx.Graph()
@@ -423,7 +416,7 @@ class GameMapGenerator:
                     'boundary_white_lines': list(b_ids)
                 })
         except Exception as e:
-            logger.error(f"GameMapGenerator: Polygon error: {e}")
+            logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
             
         save_to_redis(KEY_POLYGONS, polygons_data)
         
@@ -435,7 +428,7 @@ class GameMapGenerator:
 
     def _create_groups(self):
         """Step 5: Groups"""
-        logger.info("GameMapGenerator: Step 5 - Grouping")
+        logger.info("LocationPolygonsGenerator: Step 5 - Grouping")
         
         polygons = load_from_redis(KEY_POLYGONS)
         shapely_sources = []
@@ -472,7 +465,7 @@ class GameMapGenerator:
                         'polygon_ids': m_ids
                     })
             except Exception as e:
-                logger.error(f"GameMapGenerator: Grouping error: {e}")
+                logger.error(f"LocationPolygonsGenerator: Grouping error: {e}")
                 
         save_to_redis(KEY_GROUPS, groups)
         return groups
