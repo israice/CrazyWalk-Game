@@ -287,20 +287,25 @@
     - fixed green polygons state as completed when zoom out
     - fixed blue circles number as one item
     - fixed white circle size
+    - next tasks plan created in README.md
 
+  - ### Next Tasks
+    - prod docker must to be fixed
+    - when teleporting back to last location i do see good greens saved but all circles unhiden!!!
+    - fix space between icons
+    - must fix micro polygons on map
     - fixed layers view of polygon items
     - deleted all lines that not have red line
     - show white lines instead red lines
     - need more green circles
     - fixed space between icons
-  - ### Next Tasks
 
 
   ## update repository
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - fixed white circle size"
+  git commit -m "v0.0.26 - next tasks plan created in README.md"
   git push
   ```
 
