@@ -779,7 +779,9 @@
                         if (target.options.opacity !== 0) {
                             // HIDE IT
                             target.setStyle({ opacity: 0, fillOpacity: 0 });
-                            if (target.getTooltip && target.getTooltip()) target.closeTooltip();
+                            if (target.getTooltip()) {
+                                target.unbindTooltip(); // Permanently remove label so it doesn't reappear on Zoom In
+                            }
 
                             // UPDATE PROGRESS
                             const relevantPolys = circleMap.get(key);
