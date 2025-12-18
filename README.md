@@ -299,7 +299,8 @@
     - show white lines instead red lines
     - need more green circles
     - fixed space between icons
-
+    - fix when left marker is gif left when right marker is gif right
+    - move default location to .env
 
   ## update repository
 
