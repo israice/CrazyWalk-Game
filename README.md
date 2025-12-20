@@ -289,6 +289,7 @@
     - fixed white circle size
     - next tasks plan created in README.md
     - added MCPs and skills to antigravity
+    - version checked
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -307,7 +308,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - added MCPs and skills to antigravity"
+  git commit -m "v0.0.26 - version checked"
   git push
   ```
 

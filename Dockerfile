@@ -13,10 +13,10 @@ RUN python -m pip install --upgrade pip setuptools wheel
 
 COPY requirements.txt .
 
-# Install dependencies separately to isolate potential crashes
-RUN pip install --no-cache-dir requests networkx "redis==4.6.0"
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install shapely from source with explicit no-binary
+# Re-install shapely from source with explicit no-binary if needed (keeping original intent)
 RUN pip install --no-cache-dir --no-binary shapely shapely
 
 COPY . .
