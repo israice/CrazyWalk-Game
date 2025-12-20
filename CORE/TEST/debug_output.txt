@@ -1,0 +1,39 @@
+2025-12-20 07:22:57,884 - INFO - LocationPolygonsGenerator: Starting generation sequence...
+2025-12-20 07:22:57,884 - INFO - LocationPolygonsGenerator: === Attempt 1/3 with region_size=0.0015 (~166m) ===
+2025-12-20 07:22:57,884 - INFO - LocationPolygonsGenerator: Step 1 - Fetching Red Lines for 32.0372736, 34.7963392
+2025-12-20 07:22:57,886 - DEBUG - Starting new HTTPS connection (1): overpass-api.de:443
+2025-12-20 07:22:58,291 - DEBUG - https://overpass-api.de:443 "POST /api/interpreter HTTP/1.1" 200 234
+2025-12-20 07:22:58,292 - WARNING - LocationPolygonsGenerator: No roads to save to Redis
+2025-12-20 07:22:58,292 - WARNING - LocationPolygonsGenerator: No roads found with region_size=0.0015
+2025-12-20 07:22:58,292 - INFO - LocationPolygonsGenerator: === Attempt 2/3 with region_size=0.005 (~555m) ===
+2025-12-20 07:22:58,292 - INFO - LocationPolygonsGenerator: Step 1 - Fetching Red Lines for 32.0372736, 34.7963392
+2025-12-20 07:22:58,293 - DEBUG - Starting new HTTPS connection (1): overpass-api.de:443
+2025-12-20 07:22:58,703 - DEBUG - https://overpass-api.de:443 "POST /api/interpreter HTTP/1.1" 200 5088
+2025-12-20 07:22:58,710 - INFO - REDIS: Saved data items to game:meta
+2025-12-20 07:22:58,761 - INFO - REDIS: Saved 27 items to game:red_lines
+2025-12-20 07:22:58,762 - INFO - LocationPolygonsGenerator: Saved 27 roads to Redis
+2025-12-20 07:22:58,762 - INFO - LocationPolygonsGenerator: Found 27 roads
+2025-12-20 07:22:58,762 - INFO - LocationPolygonsGenerator: Step 2 - Identifing Intersections
+2025-12-20 07:22:58,774 - INFO - REDIS: Saved 41 items to game:blue_circles
+2025-12-20 07:22:58,832 - INFO - REDIS: Saved 228 items to game:adjacency
+2025-12-20 07:22:58,832 - INFO - LocationPolygonsGenerator: Step 3 - Creating Graph Elements
+2025-12-20 07:22:58,891 - INFO - REDIS: Saved 39 items to game:white_lines
+2025-12-20 07:22:58,943 - INFO - REDIS: Saved 369 items to game:green_circles
+2025-12-20 07:22:58,943 - INFO - LocationPolygonsGenerator: Step 4 - Finding Polygons
+2025-12-20 07:22:58,947 - INFO - LocationPolygonsGenerator: Graph built - Nodes: 41, Edges: 39
+2025-12-20 07:22:58,953 - INFO - LocationPolygonsGenerator: Found 4 cycles in graph
+2025-12-20 07:22:58,958 - INFO - REDIS: Saved 4 items to game:polygons
+2025-12-20 07:22:58,958 - INFO - LocationPolygonsGenerator: SUCCESS - Found 4 polygons on attempt 2
+2025-12-20 07:22:58,959 - INFO - LocationPolygonsGenerator: Filtered White Lines: 39 -> 9
+2025-12-20 07:22:58,959 - INFO - LocationPolygonsGenerator: Filtered Green Circles: 369 -> 14
+2025-12-20 07:22:58,959 - INFO - LocationPolygonsGenerator: Step 5 - Grouping
+2025-12-20 07:22:58,967 - INFO - REDIS: Saved 2 items to game:groups
+2025-12-20 07:22:58,967 - INFO - LocationPolygonsGenerator: Generated 27 red visuals, 7 blue circles, 9 white lines, 4 polygons.
+Testing coordinates: 32.0372736, 34.7963392
+--------------------------------------------------
+--------------------------------------------------
+Result keys: ['red_lines', 'blue_circles', 'white_lines', 'green_circles', 'polygons', 'groups']
+White Lines: 9
+Blue Circles: 7
+Green Circles: 14
+Polygons: 4

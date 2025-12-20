@@ -631,14 +631,15 @@
                         const userLon = position.coords.longitude;
                         console.log(`DEBUG: Coordinates: [${userLat}, ${userLon}]`);
 
-                        // Получаем название города
-                        const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${userLat}&longitude=${userLon}&localityLanguage=en`;
+                        // Получаем название города через серверный API (использует Nominatim)
+                        const locateUrl = `/api/locate?lat=${userLat}&lon=${userLon}`;
 
-                        fetch(bdcUrl)
+                        fetch(locateUrl)
                             .then(r => r.json())
                             .then(data => {
                                 console.log("DEBUG: [Step 3] City data:", data);
-                                const cityName = data.city || data.locality || data.principalSubdivision || "Unknown";
+                                // Server returns { city: "CITY NAME", lat, lon, user_lat, user_lon }
+                                const cityName = data.city || "Unknown";
                                 cityLabel.textContent = cityName;
                                 map.setView([userLat, userLon], 17, { animate: false });
                                 revealContent();

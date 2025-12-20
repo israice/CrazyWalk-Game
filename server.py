@@ -1,4 +1,3 @@
-import redis
 import http.server
 import socketserver
 import os
@@ -73,7 +72,7 @@ if "A_home_page" in DIRECTORY:
     logger.warning(f"Detected incorrect DIRECTORY configuration: {DIRECTORY}. Forcing to 'CORE/FRONTEND'")
     DIRECTORY = "CORE/FRONTEND"
 
-logger.info(f"Server starting.")
+logger.info("Server starting.")
 logger.info(f"Current Working Directory: {os.getcwd()}")
 logger.info(f"Serving Directory: {DIRECTORY}")
 full_path = os.path.abspath(DIRECTORY)
@@ -122,7 +121,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             self.proxy_nominatim()
             return
         if self.path.startswith('/api/game_data'):
-            logger.info(f"Route Matched: /api/game_data")
+            logger.info("Route Matched: /api/game_data")
             self.handle_game_data()
             return
         super().do_GET()
@@ -158,15 +157,19 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
             # 1. Reverse Geocode to get City Name
             try:
-                reverse_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&accept-language=en"
+                # zoom=18 provides city-level detail in reverse geocoding
+                reverse_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&accept-language=en"
                 req = urllib.request.Request(reverse_url, headers=headers)
                 
                 with urllib.request.urlopen(req, timeout=api_timeout) as response:
                     if response.status == 200:
                         data = json.loads(response.read().decode())
                         address = data.get('address', {})
-                        city = address.get('city') or address.get('town') or address.get('village') or \
-                               address.get('hamlet') or address.get('state') or "Unknown City"
+                        # Priority: city > municipality > town > suburb > village > hamlet > county > state
+                        # This ensures we get the actual city name, not the region/district
+                        city = address.get('city') or address.get('municipality') or address.get('town') or \
+                               address.get('suburb') or address.get('village') or address.get('hamlet') or \
+                               address.get('county') or address.get('state') or "Unknown City"
             except Exception as e:
                 logger.warning(f"Reverse geocoding failed: {e}")
                 # Continue with defaults

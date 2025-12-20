@@ -1,7 +1,6 @@
 
 import sys
 import os
-import json
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -24,7 +23,6 @@ def test_street_names():
     print(f"Received {len(red_lines)} red lines.")
     
     names_found = 0
-    english_names = 0
     
     for line in red_lines:
         if isinstance(line, dict):

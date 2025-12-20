@@ -4,11 +4,10 @@ import os
 import hmac
 import hashlib
 import subprocess
-import urllib.parse
+import threading
 
 PORT = 9000
 SECRET = os.environ.get("AUTOUPDATE_WEBHOOK_FROM_GITHUB", "").encode("utf-8")
-import threading
 UpdateLock = threading.Lock()
 
 class WebhookHandler(http.server.BaseHTTPRequestHandler):
@@ -48,8 +47,6 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Update triggered successfully")
         
-        # Run update in a separate thread
-        import threading
         if not UpdateLock.locked():
              threading.Thread(target=self.run_update).start()
         else:

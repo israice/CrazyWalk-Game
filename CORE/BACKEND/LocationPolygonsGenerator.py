@@ -1,5 +1,4 @@
 import logging
-import json
 
 import os
 import math
@@ -40,84 +39,115 @@ class LocationPolygonsGenerator:
     def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False):
         """
         Orchestrates the creation of all game elements.
+        Includes automatic retry with increasing region sizes.
         """
-        logger.info("LocationPolygonsGenerator: Starting generation sequence...")
+        # Region sizes: ~166m, ~555m, ~1110m
+        REGION_SIZES = [0.0015, 0.005, 0.01]
         
-        # 1. Red Lines (Roads)
-        red_segments, red_visual = self._fetch_red_lines(lat, lon, region_size, reuse_existing=not force_rebuild)
-        if not red_visual and not red_segments:
-            logger.warning("LocationPolygonsGenerator: No red lines found.")
-            return {}
-
-        # 2. Blue Circles (Intersections)
-        blue_circles, adjacency, relevant_nodes = self._identify_intersections()
-        
-        # 3. White Lines + Green Circles
-        white_lines, green_circles = self._create_graph_elements()
-        
-        # 4. Polygons
-        polygons, used_white_line_ids = self._find_polygons()
-        
-        # --- FILTER ORPHANED ELEMENTS ---
-        original_wl_count = len(white_lines)
-        original_gc_count = len(green_circles)
-        
-        # Define normalized set
-        used_ids_str = set(str(uid) for uid in used_white_line_ids)
-
-        # Filter
-        white_lines = [wl for wl in white_lines if str(wl.get('id')) in used_ids_str]
-        green_circles = [gc for gc in green_circles if str(gc.get('line_id')) in used_ids_str]
-        
-        logger.info(f"LocationPolygonsGenerator: Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
-        logger.info(f"LocationPolygonsGenerator: Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
-        
-        # 5. Groups
-        groups = self._create_groups()
-
-        # --- RECALCULATE CONNECTIONS FOR VISUAL ACCURACY ---
-        wl_node_data = {} 
-        for wl in white_lines:
-            s = wl['start'] 
-            e = wl['end']
-            lid = wl.get('id', -1)
+        for attempt, size in enumerate(REGION_SIZES, 1):
+            meters = int(size * 111000)
+            logger.info("========================================")
+            logger.info(f"GPS POLYGON ATTEMPT {attempt}/3: region_size={size} (~{meters}m)")
+            logger.info("========================================")
             
-            if s not in wl_node_data: wl_node_data[s] = {'count': 0, 'line_ids': []}
-            if e not in wl_node_data: wl_node_data[e] = {'count': 0, 'line_ids': []}
+            # 1. Red Lines (Roads)
+            red_segments, red_visual = self._fetch_red_lines(lat, lon, size, reuse_existing=False)
             
-            wl_node_data[s]['count'] += 1
-            wl_node_data[s]['line_ids'].append(lid)
-            wl_node_data[e]['count'] += 1
-            wl_node_data[e]['line_ids'].append(lid)
+            if not red_visual and not red_segments:
+                logger.warning(f"ATTEMPT {attempt}/3: No roads found for region_size={size}")
+                if attempt < len(REGION_SIZES):
+                    logger.info("Retrying with larger region...")
+                    continue
+                else:
+                    logger.error("FAILED: No roads found after 3 attempts")
+                    return {"error": "NO_ROADS", "message": f"No roads found at ({lat}, {lon}) after 3 attempts with max region ~{meters}m"}
             
-        for circle in blue_circles:
-            node_key = (circle['lat'], circle['lon'])
-            if node_key in wl_node_data:
-                # Preserve original 'connections' (Total Red Lines/Roads)
-                # Store active white paths for internal logic
-                circle['active_connections'] = wl_node_data[node_key]['count']
-                circle['connected_white_lines'] = wl_node_data[node_key]['line_ids']
-            else:
-                circle['active_connections'] = 0
-                circle['connected_white_lines'] = []
+            logger.info(f"ATTEMPT {attempt}/3: Found {len(red_visual)} road segments")
+            
+            # 2. Blue Circles (Intersections)
+            blue_circles, adjacency, relevant_nodes = self._identify_intersections()
+            logger.info(f"ATTEMPT {attempt}/3: Identified {len(blue_circles)} intersections")
+            
+            # 3. White Lines + Green Circles
+            white_lines, green_circles = self._create_graph_elements()
+            logger.info(f"ATTEMPT {attempt}/3: Created {len(white_lines)} white lines, {len(green_circles)} green circles")
+            
+            # 4. Polygons
+            polygons, used_white_line_ids = self._find_polygons()
+            
+            if not polygons:
+                logger.warning(f"ATTEMPT {attempt}/3: No polygons created from roads")
+                if attempt < len(REGION_SIZES):
+                    logger.info("Retrying with larger region...")
+                    continue
+                else:
+                    logger.error("FAILED: No polygons created after 3 attempts")
+                    return {"error": "NO_POLYGONS", "message": f"No polygons created at ({lat}, {lon}) after 3 attempts"}
+            
+            logger.info(f"ATTEMPT {attempt}/3: Created {len(polygons)} polygons - SUCCESS!")
+            
+            # --- FILTER ORPHANED ELEMENTS ---
+            original_wl_count = len(white_lines)
+            original_gc_count = len(green_circles)
+            
+            # Define normalized set
+            used_ids_str = set(str(uid) for uid in used_white_line_ids)
+
+            # Filter
+            white_lines = [wl for wl in white_lines if str(wl.get('id')) in used_ids_str]
+            green_circles = [gc for gc in green_circles if str(gc.get('line_id')) in used_ids_str]
+            
+            logger.info(f"Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
+            logger.info(f"Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
+            
+            # 5. Groups
+            groups = self._create_groups()
+
+            # --- RECALCULATE CONNECTIONS FOR VISUAL ACCURACY ---
+            wl_node_data = {} 
+            for wl in white_lines:
+                s = wl['start'] 
+                e = wl['end']
+                lid = wl.get('id', -1)
                 
-        # Only keep connected blue circles (reachable via white lines)
-        blue_circles = [bc for bc in blue_circles if bc['active_connections'] > 0]
+                if s not in wl_node_data:
+                    wl_node_data[s] = {'count': 0, 'line_ids': []}
+                if e not in wl_node_data:
+                    wl_node_data[e] = {'count': 0, 'line_ids': []}
+                
+                wl_node_data[s]['count'] += 1
+                wl_node_data[s]['line_ids'].append(lid)
+                wl_node_data[e]['count'] += 1
+                wl_node_data[e]['line_ids'].append(lid)
+                
+            for circle in blue_circles:
+                node_key = (circle['lat'], circle['lon'])
+                if node_key in wl_node_data:
+                    circle['active_connections'] = wl_node_data[node_key]['count']
+                    circle['connected_white_lines'] = wl_node_data[node_key]['line_ids']
+                else:
+                    circle['active_connections'] = 0
+                    circle['connected_white_lines'] = []
+                    
+            # Only keep connected blue circles
+            blue_circles = [bc for bc in blue_circles if bc['active_connections'] > 0]
+            
+            logger.info("========================================")
+            logger.info(f"SUCCESS on attempt {attempt}: {len(polygons)} polygons, {len(blue_circles)} circles, {len(white_lines)} lines")
+            logger.info("========================================")
+            
+            return {
+                "red_lines": [],
+                "blue_circles": blue_circles,
+                "white_lines": white_lines,
+                "green_circles": green_circles,
+                "polygons": polygons,
+                "groups": groups
+            }
         
-        logger.info(f"LocationPolygonsGenerator: Generated "
-                    f"{len(red_visual)} red visuals, "
-                    f"{len(blue_circles)} blue circles, "
-                    f"{len(white_lines)} white lines, "
-                    f"{len(polygons)} polygons.")
-        
-        return {
-            "red_lines": [], # HIDE FROM FRONTEND
-            "blue_circles": blue_circles,
-            "white_lines": white_lines,
-            "green_circles": green_circles,
-            "polygons": polygons,
-            "groups": groups
-        }
+        # Should not reach here, but safety fallback
+        return {"error": "UNKNOWN", "message": "Generation failed unexpectedly"}
+
 
     def _fetch_red_lines(self, lat, lon, region_size, reuse_existing):
         """Step 1: Fetch from Overpass or Redis"""
@@ -210,14 +240,15 @@ class LocationPolygonsGenerator:
         cached = load_from_redis(KEY_RED_LINES)
         if cached:
             for visual in cached:
-                 # Handle both old (list) and new (dict) formats
-                 coords = visual['path'] if isinstance(visual, dict) and 'path' in visual else visual
-                 if not isinstance(coords, list): continue
+                # Handle both old (list) and new (dict) formats
+                coords = visual['path'] if isinstance(visual, dict) and 'path' in visual else visual
+                if not isinstance(coords, list):
+                    continue
 
-                 for i in range(len(coords) - 1):
-                     p1 = (float(coords[i][0]), float(coords[i][1]))
-                     p2 = (float(coords[i+1][0]), float(coords[i+1][1]))
-                     red_lines.append((p1, p2))
+                for i in range(len(coords) - 1):
+                    p1 = (float(coords[i][0]), float(coords[i][1]))
+                    p2 = (float(coords[i+1][0]), float(coords[i+1][1]))
+                    red_lines.append((p1, p2))
         
         node_counts = {}
         adjacency = {}
@@ -226,8 +257,10 @@ class LocationPolygonsGenerator:
             node_counts[start] = node_counts.get(start, 0) + 1
             node_counts[end] = node_counts.get(end, 0) + 1
             
-            if start not in adjacency: adjacency[start] = set()
-            if end not in adjacency: adjacency[end] = set()
+            if start not in adjacency:
+                adjacency[start] = set()
+            if end not in adjacency:
+                adjacency[end] = set()
             adjacency[start].add(end)
             adjacency[end].add(start)
             
@@ -290,13 +323,15 @@ class LocationPolygonsGenerator:
         
         adjacency = {}
         if adj_raw:
-             for pair in adj_raw:
-                 u = tuple(pair[0])
-                 v = tuple(pair[1])
-                 if u not in adjacency: adjacency[u] = set()
-                 if v not in adjacency: adjacency[v] = set()
-                 adjacency[u].add(v)
-                 adjacency[v].add(u)
+            for pair in adj_raw:
+                u = tuple(pair[0])
+                v = tuple(pair[1])
+                if u not in adjacency:
+                    adjacency[u] = set()
+                if v not in adjacency:
+                    adjacency[v] = set()
+                adjacency[u].add(v)
+                adjacency[v].add(u)
 
         white_lines = []
         green_circles = []
@@ -305,10 +340,12 @@ class LocationPolygonsGenerator:
         relevant_set = set(relevant_nodes)
         
         for start_node in relevant_nodes:
-            if start_node not in adjacency: continue
+            if start_node not in adjacency:
+                continue
             for neighbor in adjacency[start_node]:
                 edge_key = tuple(sorted((start_node, neighbor)))
-                if edge_key in visited: continue
+                if edge_key in visited:
+                    continue
                 
                 path = [start_node, neighbor]
                 curr = neighbor
@@ -393,7 +430,8 @@ class LocationPolygonsGenerator:
         try:
             cycles = nx.minimum_cycle_basis(G)
             for cycle in cycles:
-                if len(cycle) < 3: continue
+                if len(cycle) < 3:
+                    continue
                 coords = []
                 b_ids = set()
                 total_pts = len(cycle) # + green circles
@@ -407,17 +445,23 @@ class LocationPolygonsGenerator:
                     else:
                         path = ed['path']
                         total_pts += ed.get('green_count', 0)
-                        if ed.get('line_id') != -1: b_ids.add(ed['line_id'])
+                        if ed.get('line_id') != -1:
+                            b_ids.add(ed['line_id'])
                         
-                        if path[0] == u: current = path[:-1]
-                        elif path[-1] == u: current = path[::-1][:-1]
-                        else: current = path[:-1]
+                        if path[0] == u:
+                            current = path[:-1]
+                        elif path[-1] == u:
+                            current = path[::-1][:-1]
+                        else:
+                            current = path[:-1]
                     coords.extend(current)
                 
-                if coords: coords.append(coords[0])
+                if coords:
+                    coords.append(coords[0])
                 
                 poly = Polygon(coords)
-                if not poly.is_valid: poly = poly.buffer(0)
+                if not poly.is_valid:
+                    poly = poly.buffer(0)
                 center = poly.centroid
                 
                 polygons_data.append({
@@ -449,11 +493,12 @@ class LocationPolygonsGenerator:
         shapely_sources = []
         if polygons:
              for p in polygons:
-                 cs = [tuple(c) for c in p['coords']]
-                 if len(cs) >= 3:
-                     shp = Polygon(cs)
-                     if not shp.is_valid: shp = shp.buffer(0)
-                     shapely_sources.append({'id': p['id'], 'geom': shp})
+                cs = [tuple(c) for c in p['coords']]
+                if len(cs) >= 3:
+                    shp = Polygon(cs)
+                    if not shp.is_valid:
+                        shp = shp.buffer(0)
+                    shapely_sources.append({'id': p['id'], 'geom': shp})
         
         groups = []
         if shapely_sources:
@@ -461,8 +506,10 @@ class LocationPolygonsGenerator:
                 union_geom = unary_union([s['geom'] for s in shapely_sources])
                 
                 geoms = []
-                if union_geom.geom_type == 'Polygon': geoms = [union_geom]
-                elif union_geom.geom_type == 'MultiPolygon': geoms = list(union_geom.geoms)
+                if union_geom.geom_type == 'Polygon':
+                    geoms = [union_geom]
+                elif union_geom.geom_type == 'MultiPolygon':
+                    geoms = list(union_geom.geoms)
                 
                 for idx, g in enumerate(geoms):
                     boundary = list(g.exterior.coords)
@@ -472,7 +519,8 @@ class LocationPolygonsGenerator:
                              try:
                                  if g.intersection(s['geom']).area > 1e-9:
                                      m_ids.append(s['id'])
-                             except: pass
+                             except Exception:
+                                 pass
                     groups.append({
                         'id': f"area_{idx}",
                         'coords': boundary,

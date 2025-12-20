@@ -1,5 +1,4 @@
 import requests
-import json
 
 try:
     url = "http://localhost:8000/api/game_data?lat=32.08055&lon=34.78018"
