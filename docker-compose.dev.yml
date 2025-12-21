@@ -14,4 +14,4 @@ services:
     image: redis:alpine
     container_name: CrazyWalk-Redis
     ports:
-      - "6379:6379"
+      - "6500:6379"

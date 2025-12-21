@@ -2,3 +2,4 @@ requests
 shapely
 networkx
 redis==5.0.1
+numpy<2.0

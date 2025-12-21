@@ -290,6 +290,7 @@
     - next tasks plan created in README.md
     - added MCPs and skills to antigravity
     - version checked
+    - added Liquid Glass Web Effects to home page
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -308,7 +309,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - version checked"
+  git commit -m "v0.0.26 - added Liquid Glass Web Effects to home page"
   git push
   ```
 
