@@ -557,7 +557,7 @@ class MapControls {
 
             // Dispatch Event so index.html can update the marker visual
             const event = new CustomEvent('map-move-request', {
-                detail: { lat: newPos[0], lon: newPos[1] }
+                detail: { lat: newPos[0], lon: newPos[1], direction: direction }
             });
             document.dispatchEvent(event);
         }
