@@ -293,6 +293,7 @@
     - added Liquid Glass Web Effects to home page
     - added more information to debug
     - small polygons fixed 
+    - added arrows combination up + left  
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -311,7 +312,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - small polygons fixed"
+  git commit -m "v0.0.26 - added arrows combination up + left"
   git push
   ```
 

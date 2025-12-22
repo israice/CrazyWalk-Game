@@ -283,59 +283,57 @@ class MapControls {
 
         // 4. Process White Lines to build chains
         if (whiteLines && greenCircles) {
-            // Pre-process Green Circles into a spatial structure or simple list?
-            // Simple list is fine.
+            // Build a map of green circle UIDs to their data for fast lookup
+            const greenCircleMap = new Map();
+            greenCircles.forEach(g => {
+                greenCircleMap.set(g.uid, g);
+            });
 
             whiteLines.forEach(line => {
                 const startNode = getNode(line.start[0], line.start[1]);
                 const endNode = getNode(line.end[0], line.end[1]);
 
-                // Find Green Circles on this line
-                // Logic: A green circle is 'on' this line if it's very close to any segment of the line path.
-                // AND it's not the start/end node.
-
+                // Find Green Circles on this line using explicit backend data
                 const circlesOnLine = [];
 
-                greenCircles.forEach(g => {
-                    // Check distance to polyline
-                    // Optimization: quick bounding box check?
-                    // Skip for now.
-
-                    let minDSq = Infinity;
-                    for (let i = 0; i < line.path.length - 1; i++) {
-                        const p1 = line.path[i];
-                        const p2 = line.path[i + 1];
-                        const d = distToSegmentSq({ lat: g.lat, lon: g.lon }, p1, p2);
-                        if (d < minDSq) minDSq = d;
-                    }
-
-                    // Threshold: ~1 meter (approx 1e-10 deg squared)
-                    if (minDSq < 0.000000002) {
-                        circlesOnLine.push(getNode(g.lat, g.lon));
-                    }
-                });
+                // Use green_circles_uids from backend if available
+                if (line.green_circles_uids && line.green_circles_uids.length > 0) {
+                    line.green_circles_uids.forEach(uid => {
+                        const g = greenCircleMap.get(uid);
+                        if (g) {
+                            circlesOnLine.push(getNode(g.lat, g.lon));
+                        }
+                    });
+                } else {
+                    // Fallback to geometry-based detection for old data format
+                    greenCircles.forEach(g => {
+                        let minDSq = Infinity;
+                        for (let i = 0; i < line.path.length - 1; i++) {
+                            const p1 = line.path[i];
+                            const p2 = line.path[i + 1];
+                            const d = distToSegmentSq({ lat: g.lat, lon: g.lon }, p1, p2);
+                            if (d < minDSq) minDSq = d;
+                        }
+                        // Increased threshold: ~5 meters 
+                        if (minDSq < 0.00000001) {
+                            circlesOnLine.push(getNode(g.lat, g.lon));
+                        }
+                    });
+                }
 
                 // Sort circles by distance from Start Node
-                // Use simple Euclidean from Start Node (valid for non-looping simple roads)
-                // For U-shapes, this might fail, but our segments are short.
                 circlesOnLine.sort((a, b) => {
                     const dA = (a.lat - startNode.lat) ** 2 + (a.lon - startNode.lon) ** 2;
                     const dB = (b.lat - startNode.lat) ** 2 + (b.lon - startNode.lon) ** 2;
                     return dA - dB;
                 });
 
-                // Link Chain
-                // Start -> C1 -> C2 ... -> End
-
+                // Link Chain: Start -> C1 -> C2 ... -> End
                 let prev = startNode;
                 circlesOnLine.forEach(curr => {
-                    // Avoid self-loops if green circle is exactly on start
                     if (curr === prev) return;
-
-                    // Link
                     if (!prev.neighbors.includes(curr)) prev.neighbors.push(curr);
                     if (!curr.neighbors.includes(prev)) curr.neighbors.push(prev);
-
                     prev = curr;
                 });
 
@@ -358,25 +356,93 @@ class MapControls {
     }
 
     bindKeys() {
+        // Track currently pressed keys for combination detection
+        const pressedKeys = new Set();
+        let moveTimeout = null;
+        let isFirstPress = true; // Track if this is first press after all keys released
+        const DEBOUNCE_MS = 100; // Wait for simultaneous key presses on first press only
+
+        const getDirection = () => {
+            const up = pressedKeys.has('ArrowUp') || pressedKeys.has('w');
+            const down = pressedKeys.has('ArrowDown') || pressedKeys.has('s');
+            const left = pressedKeys.has('ArrowLeft') || pressedKeys.has('a');
+            const right = pressedKeys.has('ArrowRight') || pressedKeys.has('d');
+
+            // Diagonals first (combinations)
+            if (up && left) return 'UP_LEFT';
+            if (up && right) return 'UP_RIGHT';
+            if (down && left) return 'DOWN_LEFT';
+            if (down && right) return 'DOWN_RIGHT';
+
+            // Single directions
+            if (up) return 'UP';
+            if (down) return 'DOWN';
+            if (left) return 'LEFT';
+            if (right) return 'RIGHT';
+
+            // Q/E/Z/C fallback for diagonal hotkeys
+            if (pressedKeys.has('q')) return 'UP_LEFT';
+            if (pressedKeys.has('e')) return 'UP_RIGHT';
+            if (pressedKeys.has('z')) return 'DOWN_LEFT';
+            if (pressedKeys.has('c')) return 'DOWN_RIGHT';
+
+            return null;
+        };
+
         document.addEventListener('keydown', (e) => {
-            switch (e.key) {
-                case 'ArrowUp':
-                case 'w':
-                    this.moveSelection('UP');
-                    break;
-                case 'ArrowDown':
-                case 's':
-                    this.moveSelection('DOWN');
-                    break;
-                case 'ArrowLeft':
-                case 'a':
-                    this.moveSelection('LEFT');
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                    this.moveSelection('RIGHT');
-                    break;
+            const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'c'];
+            if (!navKeys.includes(e.key)) return;
+
+            // Prevent default arrow key scrolling
+            e.preventDefault();
+
+            const isRepeat = pressedKeys.has(e.key);
+
+            // Add to pressed keys
+            pressedKeys.add(e.key);
+
+            if (isRepeat) {
+                // Key is being held - move continuously in current direction
+                const direction = getDirection();
+                if (direction) {
+                    this.moveSelection(direction);
+                }
+            } else if (isFirstPress) {
+                // First key of new sequence - wait for possible combination
+                isFirstPress = false;
+                if (moveTimeout) clearTimeout(moveTimeout);
+                moveTimeout = setTimeout(() => {
+                    const direction = getDirection();
+                    if (direction) {
+                        this.moveSelection(direction);
+                    }
+                }, DEBOUNCE_MS);
+            } else {
+                // Additional key added to combination - restart debounce
+                if (moveTimeout) clearTimeout(moveTimeout);
+                moveTimeout = setTimeout(() => {
+                    const direction = getDirection();
+                    if (direction) {
+                        this.moveSelection(direction);
+                    }
+                }, DEBOUNCE_MS);
             }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            pressedKeys.delete(e.key);
+            // When all keys released, reset for next first press
+            if (pressedKeys.size === 0) {
+                isFirstPress = true;
+                if (moveTimeout) clearTimeout(moveTimeout);
+            }
+        });
+
+        // Clear pressed keys on window blur (user switches tabs)
+        window.addEventListener('blur', () => {
+            pressedKeys.clear();
+            isFirstPress = true;
+            if (moveTimeout) clearTimeout(moveTimeout);
         });
     }
 
@@ -406,11 +472,17 @@ class MapControls {
 
         // 2. Filter neighbors by direction relative to currentNode
         // Direction Vectors (Normalized)
+        const DIAG = 0.7071; // 1/sqrt(2) for 45-degree angles
         const dirVectors = {
             'UP': { x: 0, y: 1 },
             'DOWN': { x: 0, y: -1 },
             'RIGHT': { x: 1, y: 0 },
-            'LEFT': { x: -1, y: 0 }
+            'LEFT': { x: -1, y: 0 },
+            // Diagonals
+            'UP_LEFT': { x: -DIAG, y: DIAG },
+            'UP_RIGHT': { x: DIAG, y: DIAG },
+            'DOWN_LEFT': { x: -DIAG, y: -DIAG },
+            'DOWN_RIGHT': { x: DIAG, y: -DIAG }
         };
 
         const targetDir = dirVectors[direction];
