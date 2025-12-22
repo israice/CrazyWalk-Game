@@ -341,34 +341,54 @@ def ensure_redis_running():
     import subprocess
     import time
     
-    r = get_redis_client()
+    # Try connecting with current settings (likely default 6379)
     try:
-        # PING
+        r = get_redis_client()
         r.ping()
-        logger.info("Redis is running and accessible.")
-    except Exception as e:
-        logger.warning(f"Redis is not running ({e}). Attempting to start via Docker Compose...")
+        r.flushdb()
+        logger.info(f"Redis is running and accessible (Port {os.getenv('REDIS_PORT', 6379)}). Database flushed.")
+        return
+    except Exception:
+        # If default failed, try port 6500 (common dev port)
         try:
-            # Try to start redis service
-            # Assumes docker-compose is in path and file is in current directory
-            subprocess.run(["docker-compose", "-f", "docker-compose.dev.yml", "up", "-d", "redis"], check=True)
-            logger.info("Docker Compose command executed. Waiting for Redis to initialize...")
-            
-            # Wait loop
-            retries = 5
-            for i in range(retries):
+            os.environ['REDIS_PORT'] = '6500'
+            r = get_redis_client()
+            r.ping()
+            r.flushdb()
+            logger.info("Redis is running and accessible (Port 6500). Database flushed.")
+            return
+        except Exception:
+            # If 6500 also failed, proceed to start Docker
+            pass
+
+    logger.warning("Redis is not running. Attempting to start via Docker Compose...")
+    try:
+        # Build/Start redis service
+        subprocess.run(["docker-compose", "-f", "docker-compose.dev.yml", "up", "-d", "redis"], check=True)
+        logger.info("Docker Compose command executed. Waiting for Redis to initialize...")
+        
+        # When started via dev compose, it is definitely on port 6500
+        os.environ['REDIS_PORT'] = '6500'
+        
+        # Re-get client with new port
+        r = get_redis_client()
+
+        # Wait loop
+        retries = 10
+        for i in range(retries):
+            try:
+                r.ping()
+                r.flushdb() # <--- Flush after successful start
+                logger.info("Redis started successfully (Port 6500). Database flushed.")
+                return
+            except Exception:
                 time.sleep(2)
-                try:
-                    r.ping()
-                    logger.info("Redis started successfully.")
-                    return
-                except Exception:
-                    logger.info(f"Waiting for Redis... ({i+1}/{retries})")
-            
-            logger.error("Redis failed to come online after starting container.")
-        except Exception as docker_e:
-            logger.error(f"Failed to start Redis via Docker: {docker_e}")
-            logger.error("Please run 'docker-compose up -d redis' manually.")
+                logger.info(f"Waiting for Redis... ({i+1}/{retries})")
+        
+        logger.error("Redis failed to come online after starting container.")
+    except Exception as docker_e:
+        logger.error(f"Failed to start Redis via Docker: {docker_e}")
+        logger.error("Please run 'docker-compose up -d redis' manually.")
 
 def run_server():
     Initializer.setup_working_directory()

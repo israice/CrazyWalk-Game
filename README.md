@@ -291,6 +291,7 @@
     - added MCPs and skills to antigravity
     - version checked
     - added Liquid Glass Web Effects to home page
+    - added more information to debug
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -309,7 +310,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - added Liquid Glass Web Effects to home page"
+  git commit -m "v0.0.26 - added more information to debug"
   git push
   ```
 
