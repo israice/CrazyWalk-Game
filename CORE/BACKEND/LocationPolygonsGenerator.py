@@ -5,7 +5,7 @@ import math
 import time
 import requests
 import networkx as nx
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
 from shapely.ops import unary_union
 from .redis_tools import (
     save_to_redis, load_from_redis, 
@@ -95,7 +95,7 @@ class LocationPolygonsGenerator:
         
         return None, None
     
-    def _merge_two_polygons(self, poly_a, poly_b, shared_line_id):
+    def _merge_two_polygons(self, poly_a, poly_b, shared_line_id, white_lines_map):
         """
         Merge two polygons by combining their geometries.
         Returns a new polygon dict with merged data.
@@ -135,7 +135,11 @@ class LocationPolygonsGenerator:
                 logger.info(f"  -> Using center from poly_b (area {area_b:.2e} > {area_a:.2e})")
             
             # Merge using unary_union
-            merged_geom = unary_union([geom_a, geom_b])
+            # Use specific precision or small buffer to ensure shared edges dissolve.
+            # Floating point issues sometimes prevent edges from merging, leaving "slits".
+            # "Morphological Close": Buffer out then buffer in.
+            eps = 1e-7
+            merged_geom = unary_union([geom_a.buffer(eps), geom_b.buffer(eps)]).buffer(-eps)
             
             if merged_geom.is_empty:
                 logger.warning(f"_merge_two_polygons: result is empty")
@@ -154,7 +158,48 @@ class LocationPolygonsGenerator:
             # Combine boundary lines, excluding the shared one
             lines_a = set(poly_a.get('boundary_white_lines', []))
             lines_b = set(poly_b.get('boundary_white_lines', []))
-            combined_lines = (lines_a | lines_b) - {shared_line_id}
+            # Combine boundary lines: symmetric difference removes ALL shared (internal) lines
+            combined_lines = lines_a ^ lines_b
+
+            # --- GEOMETRIC VALIDATION FOR GHOST LINES ---
+            # Verify that these lines are actually on the new boundary.
+            validated_lines = []
+            
+            # Create a "tube" around the exterior boundary.
+            # Relaxed buffer: 2.5e-5 degrees is approx 2.5 meters radius (5m width tube).
+            # This ensures we capture lines even if there's slight drift.
+            boundary_tube = merged_geom.exterior.buffer(2.5e-5)
+            
+            for line_id in combined_lines:
+                wl = white_lines_map.get(line_id)
+                if not wl:
+                    continue
+                
+                # Create the line geometry using the FULL PATH
+                # wl['path'] is [[lat, lon], [lat, lon], ...]
+                # Shapely needs (lon, lat)
+                if 'path' in wl and wl['path']:
+                    line_coords = [(p[1], p[0]) for p in wl['path']]
+                    ls = LineString(line_coords)
+                else:
+                    # Fallback to straight line if path missing
+                    ls = LineString([(wl['start'][1], wl['start'][0]), (wl['end'][1], wl['end'][0])])
+                
+                # Calculate Intersection Ratio
+                if ls.length == 0:
+                    continue
+                    
+                intersection = boundary_tube.intersection(ls)
+                coverage = intersection.length / ls.length
+                
+                # Relaxed threshold: 0.75 (75%)
+                # Spur lines are typically < 10% coverage, so 75% is safe for true boundaries.
+                if coverage > 0.75:
+                    validated_lines.append(line_id)
+                else:
+                    logger.info(f"    -> Removed ghost line {line_id} (coverage={coverage:.2f})")
+
+            combined_lines = validated_lines
             
             # Sum total points
             total_pts = poly_a.get('total_points', 0) + poly_b.get('total_points', 0)
@@ -312,18 +357,20 @@ class LocationPolygonsGenerator:
             blue_circles = [bc for bc in blue_circles if bc['active_connections'] > 0]
             
             # --- FILTER INTERNAL BLUE CIRCLES (from merged polygons) ---
-            # Collect all unique vertex coordinates from final polygon boundaries
-            polygon_boundary_vertices = set()
-            for poly in polygons:
-                for coord in poly['coords']:
-                    # Round to 7 decimal places for comparison
-                    vertex_key = (round(coord[0], 7), round(coord[1], 7))
-                    polygon_boundary_vertices.add(vertex_key)
-            
+            # Use valid white_lines to determine which blue circles should be kept.
+            # (Shapely simplification might remove vertices from coords, but if the white line exists, its nodes must exist)
+            valid_blue_circle_coords = set()
+            for wl in white_lines:
+                s = wl['start']
+                e = wl['end']
+                # Round to match the blue circle precision
+                valid_blue_circle_coords.add((round(s[0], 7), round(s[1], 7)))
+                valid_blue_circle_coords.add((round(e[0], 7), round(e[1], 7)))
+
             original_bc_count = len(blue_circles)
             blue_circles = [
                 bc for bc in blue_circles 
-                if (round(bc['lat'], 7), round(bc['lon'], 7)) in polygon_boundary_vertices
+                if (round(bc['lat'], 7), round(bc['lon'], 7)) in valid_blue_circle_coords
             ]
             
             if len(blue_circles) != original_bc_count:
@@ -677,8 +724,9 @@ class LocationPolygonsGenerator:
         
         # --- MERGE SMALL POLYGONS ---
         if polygons_data:
+            white_lines_map = {wl['id']: wl for wl in white_lines}
             original_count = len(polygons_data)
-            polygons_data = self._merge_small_polygons(polygons_data)
+            polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
             if len(polygons_data) != original_count:
                 logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
             
@@ -690,7 +738,7 @@ class LocationPolygonsGenerator:
             
         return polygons_data, used_ids
     
-    def _merge_small_polygons(self, polygons, max_iterations=10):
+    def _merge_small_polygons(self, polygons, white_lines_map, max_iterations=10):
         """
         Iteratively merge polygons that are too small to fit the white circle label.
         Returns the updated list of polygons with small ones merged into neighbors.
@@ -725,7 +773,7 @@ class LocationPolygonsGenerator:
                     neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys)
                     
                     if neighbor and neighbor['id'] not in merged_ids:
-                        merged = self._merge_two_polygons(poly, neighbor, shared_line)
+                        merged = self._merge_two_polygons(poly, neighbor, shared_line, white_lines_map)
                         if merged:
                             merged_ids.add(poly['id'])
                             merged_ids.add(neighbor['id'])

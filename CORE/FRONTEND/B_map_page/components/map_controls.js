@@ -40,13 +40,19 @@ class MapControls {
 
         console.log("MapControls: Initializing Map...");
 
+        // Create a shared Canvas renderer for performance optimization
+        // Canvas renders all elements on a single canvas instead of creating DOM nodes for each
+        this.canvasRenderer = L.canvas({ padding: 0.5 });
+
         this.map = L.map(this.elementId, {
             zoomControl: false,
             attributionControl: false,
             keyboard: false, // Disable default Leaflet panning
             zoomSnap: this.config.zoomSnap,
             minZoom: this.config.minZoom,
-            maxZoom: this.config.maxZoom
+            maxZoom: this.config.maxZoom,
+            preferCanvas: true,  // Use Canvas instead of SVG for vector layers
+            renderer: this.canvasRenderer // Default renderer for all layers
         }).setView(this.startCoords, this.config.defaultZoom);
 
 
@@ -226,14 +232,21 @@ class MapControls {
 
         // 1. Initialize Node Map
         // Key: "lat,lon" -> Node Object
-        const nodeMap = new Map();
+        // 1. Initialize Node Map
+        // Key: "lat,lon" -> Node Object
+        const nodeList = []; // Using Array for iteration
 
         const getNode = (lat, lon) => {
-            const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
-            if (!nodeMap.has(key)) {
-                nodeMap.set(key, { lat, lon, neighbors: [] });
-            }
-            return nodeMap.get(key);
+            // Fuzzy Search: Find existing node within ~1 meter (1e-5 degrees)
+            // This fixes disconnects where Line Endpoint != Blue Circle exactly due to float precision
+            const EPSILON = 0.00001;
+            const existing = nodeList.find(n => Math.abs(n.lat - lat) < EPSILON && Math.abs(n.lon - lon) < EPSILON);
+
+            if (existing) return existing;
+
+            const newNode = { lat, lon, neighbors: [] };
+            nodeList.push(newNode);
+            return newNode;
         };
 
         // 2. Register Blue Circles (Intersections)
@@ -294,7 +307,7 @@ class MapControls {
                 const endNode = getNode(line.end[0], line.end[1]);
 
                 // Find Green Circles on this line using explicit backend data
-                const circlesOnLine = [];
+                let circlesOnLine = [];
 
                 // Use green_circles_uids from backend if available
                 if (line.green_circles_uids && line.green_circles_uids.length > 0) {
@@ -321,12 +334,55 @@ class MapControls {
                     });
                 }
 
-                // Sort circles by distance from Start Node
-                circlesOnLine.sort((a, b) => {
-                    const dA = (a.lat - startNode.lat) ** 2 + (a.lon - startNode.lon) ** 2;
-                    const dB = (b.lat - startNode.lat) ** 2 + (b.lon - startNode.lon) ** 2;
-                    return dA - dB;
-                });
+                // Helper: Get distance along path
+                const getProjectedDist = (node, path) => {
+                    if (!path || path.length < 2) return 0;
+                    let totalDist = 0;
+                    let bestDist = 0;
+                    let minSegDistSq = Infinity;
+
+                    const p = [node.lat, node.lon];
+
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const a = path[i];
+                        const b = path[i + 1];
+
+                        // Segment length
+                        const segLen = Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2);
+
+                        // Project p onto ab
+                        const ap = [p[0] - a[0], p[1] - a[1]];
+                        const ab = [b[0] - a[0], b[1] - a[1]];
+                        const abSq = ab[0] ** 2 + ab[1] ** 2;
+
+                        let t = (abSq === 0) ? 0 : (ap[0] * ab[0] + ap[1] * ab[1]) / abSq;
+                        t = Math.max(0, Math.min(1, t));
+
+                        // Distance from p to projection
+                        const proj = [a[0] + t * ab[0], a[1] + t * ab[1]];
+                        const dSq = (p[0] - proj[0]) ** 2 + (p[1] - proj[1]) ** 2;
+
+                        if (dSq < minSegDistSq) {
+                            minSegDistSq = dSq;
+                            bestDist = totalDist + segLen * t;
+                        }
+
+                        totalDist += segLen;
+                    }
+                    return bestDist;
+                };
+
+                // Calculate distances once for sorting
+                const circlesWithDist = circlesOnLine.map(node => ({
+                    node,
+                    dist: getProjectedDist(node, line.path)
+                }));
+
+                // Sort by distance along path (Topological sort)
+                circlesWithDist.sort((a, b) => a.dist - b.dist);
+
+                // Extract sorted nodes
+                circlesOnLine = circlesWithDist.map(o => o.node);
 
                 // Link Chain: Start -> C1 -> C2 ... -> End
                 let prev = startNode;
@@ -345,8 +401,8 @@ class MapControls {
             });
         }
 
-        this.navNodes = Array.from(nodeMap.values());
-        console.log(`Controls: Built Strict Graph with ${this.navNodes.length} nodes.`);
+        this.navNodes = nodeList;
+        console.log(`Controls: Built Strict Graph with ${this.navNodes.length} nodes (Fuzzy Match Active).`);
 
         // Start listening to keys if not already
         if (!this.keysBound) {

@@ -295,6 +295,7 @@
     - small polygons fixed 
     - added arrows combination up + left  
     - added revercing using arrow keys to marker.gif
+    - fixed combined polygons perimeter
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -313,7 +314,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - added revercing using arrow keys to marker.gif"
+  git commit -m "v0.0.26 - fixed combined polygons perimeter"
   git push
   ```
 
