@@ -470,7 +470,7 @@
                 mapElement.style.opacity = '0.3';
                 hasRevealed = false;
 
-                const url = `/api/game_data?lat=${lat}&lon=${lon}&rebuild=${forceRebuild}`;
+                const url = `/api/game_data?lat=${lat}&lon=${lon}&rebuild=${forceRebuild}&_t=${Date.now()}`;
                 console.log(`GPS: Fetching from ${url}`);
 
                 fetch(url)
@@ -701,11 +701,11 @@
                     });
                 };
 
-                // 1. Groups
+                // 1. Groups (internal use only - not visible to user)
                 if (data.groups) {
                     data.groups.forEach(group => {
                         L.polygon(group.coords, {
-                            color: '#333', stroke: false, fillColor: '#222', fillOpacity: 0.3, weight: 0
+                            color: 'transparent', stroke: false, fillColor: 'transparent', fillOpacity: 0, weight: 0
                         }).addTo(groupsLayer);
                     });
                 }
@@ -917,10 +917,13 @@
                             const whiteLinesCount = data.boundary_white_lines ? data.boundary_white_lines.length : 0;
                             const totalPoints = data.total_points || 0;
                             const greenCount = Math.max(0, totalPoints - blueCount); // Green = Total - Blue
+                            const mergeCount = data.merge_count || 1;
+                            const mergeInfo = mergeCount > 1 ? `🔗 Merged From: <b>${mergeCount}</b> polygons<br>` : '';
 
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
                                     <b>Polygon Stats:</b><br>
+                                    ${mergeInfo}
                                     🔵 Blue Circles: <b>${blueCount}</b><br>
                                     ⚪ White Lines: <b>${whiteLinesCount}</b><br>
                                     🟢 Green Circles: <b>${greenCount}</b><br>
@@ -1021,7 +1024,8 @@
                         center: poly.center,
                         coords: poly.coords,
                         total_points: poly.total_points,
-                        blue_circles_count: poly.blue_circles_count || 0
+                        blue_circles_count: poly.blue_circles_count || 0,
+                        merge_count: poly.merge_count || 1
                     };
                     window.allItems.set(labelDebugData.uid, labelDebugData);
 
@@ -1085,7 +1089,10 @@
                             fillColor: '#00ff00',
                             fillOpacity: 0.4
                         });
-                        if (pLabel) pLabel.remove();
+                        // Remove label from detailsLayer explicitly
+                        if (pLabel && detailsLayer.hasLayer(pLabel)) {
+                            detailsLayer.removeLayer(pLabel);
+                        }
                         pState.label = null;
 
                         // Hide lines (Deferred until lines are created? No, lines created later. 
@@ -1361,9 +1368,9 @@
                         fillOpacity: 0.4
                     });
 
-                    // 2. Remove Label
-                    if (state.label) {
-                        state.label.remove();
+                    // 2. Remove Label from detailsLayer explicitly
+                    if (state.label && detailsLayer.hasLayer(state.label)) {
+                        detailsLayer.removeLayer(state.label);
                         state.label = null;
                     }
 

@@ -87,13 +87,18 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
     def end_headers(self):
-        """Add caching headers to static files."""
-        # Default: Cache assets (images, css) for 1 hour
-        cache_ctrl = "public, max-age=3600"
+        """Add caching headers. Controlled by DISABLE_CACHE env variable."""
+        # Check if caching is disabled (default: True for development)
+        disable_cache = os.environ.get('DISABLE_CACHE', 'true').lower() == 'true'
         
-        # Don't cache HTML files so users always get the latest code/fixes
-        if hasattr(self, 'path') and (self.path.endswith('.html') or self.path == '/' or self.path == ''):
-             cache_ctrl = "no-cache, no-store, must-revalidate"
+        if disable_cache:
+            cache_ctrl = "no-cache, no-store, must-revalidate"
+        else:
+            # Production: Cache assets for 1 hour, but not HTML/API
+            cache_ctrl = "public, max-age=3600"
+            if hasattr(self, 'path'):
+                if self.path.endswith('.html') or self.path == '/' or self.path.startswith('/api/'):
+                    cache_ctrl = "no-cache, no-store, must-revalidate"
 
         self.send_header("Cache-Control", cache_ctrl)
         super().end_headers()
@@ -272,7 +277,8 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             lat = float(params.get('lat', [0])[0])
             lon = float(params.get('lon', [0])[0])
             rebuild_param = params.get('rebuild', ['false'])[0].lower()
-            force_rebuild = rebuild_param == 'true'
+            # TEMP: Force rebuild to always be True for debugging polygon merging
+            force_rebuild = True  # rebuild_param == 'true'
             
             if not lat or not lon:
                 self.send_error(400, "Missing lat/lon")

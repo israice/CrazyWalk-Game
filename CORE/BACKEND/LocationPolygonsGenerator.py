@@ -36,11 +36,154 @@ class LocationPolygonsGenerator:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         return R * c
 
+    def _can_fit_circle(self, coords, radius_meters=15):
+        """
+        Check if a circle with given radius can fit entirely inside the polygon.
+        The white circle label is approximately 30x30 pixels, which at typical zoom
+        translates to roughly 15 meters radius.
+        
+        Coords are in [lat, lon] format, but Shapely needs (x, y) = (lon, lat).
+        """
+        try:
+            # Swap from [lat, lon] to (lon, lat) for Shapely
+            shapely_coords = [(c[1], c[0]) for c in coords]
+            
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            if poly.is_empty or poly.area == 0:
+                logger.info(f"_can_fit_circle: empty/zero area polygon")
+                return False
+            
+            centroid = poly.centroid
+            
+            # Check if centroid is inside polygon
+            if not poly.contains(centroid):
+                logger.info(f"_can_fit_circle: centroid outside polygon")
+                return False
+            
+            # Calculate minimum distance from centroid to polygon boundary
+            boundary = poly.exterior
+            min_distance_deg = centroid.distance(boundary)
+            
+            # Convert to meters (approximate: 1 degree ≈ 111km at equator)
+            min_distance_meters = min_distance_deg * 111000
+            
+            fits = min_distance_meters >= radius_meters
+            
+            # Always log for debugging
+            logger.info(f"_can_fit_circle: min_dist={min_distance_meters:.2f}m, radius={radius_meters}m, fits={fits}")
+            
+            return fits
+        except Exception as e:
+            logger.warning(f"_can_fit_circle error: {e}")
+            return True  # Assume fits if check fails
+    
+    def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map):
+        """
+        Find a neighboring polygon that shares a boundary white line with small_poly.
+        Returns (neighbor_poly, shared_line_id) or (None, None).
+        """
+        small_lines = set(small_poly.get('boundary_white_lines', []))
+        
+        for line_id in small_lines:
+            # Find all polygons that share this line
+            sharing_polys = line_to_polys_map.get(line_id, [])
+            for candidate in sharing_polys:
+                if candidate['id'] != small_poly['id']:
+                    return candidate, line_id
+        
+        return None, None
+    
+    def _merge_two_polygons(self, poly_a, poly_b, shared_line_id):
+        """
+        Merge two polygons by combining their geometries.
+        Returns a new polygon dict with merged data.
+        
+        Coords are in [lat, lon] format, but Shapely needs (x, y) = (lon, lat).
+        
+        We track the largest ORIGINAL polygon's center through merge chains.
+        """
+        try:
+            # Swap from [lat, lon] to (lon, lat) for Shapely
+            coords_a = [(c[1], c[0]) for c in poly_a['coords']]
+            coords_b = [(c[1], c[0]) for c in poly_b['coords']]
+            
+            geom_a = Polygon(coords_a)
+            geom_b = Polygon(coords_b)
+            
+            if not geom_a.is_valid:
+                geom_a = geom_a.buffer(0)
+            if not geom_b.is_valid:
+                geom_b = geom_b.buffer(0)
+            
+            # Track largest ORIGINAL polygon area through merge chains
+            # For unmerged polygons, use current geometry area
+            area_a = poly_a.get('_largest_original_area', geom_a.area)
+            area_b = poly_b.get('_largest_original_area', geom_b.area)
+            center_a = poly_a.get('_largest_original_center', poly_a.get('center', (0, 0)))
+            center_b = poly_b.get('_largest_original_center', poly_b.get('center', (0, 0)))
+            
+            # Select the larger original polygon's center
+            if area_a >= area_b:
+                largest_original_area = area_a
+                largest_original_center = center_a
+                logger.info(f"  -> Using center from poly_a (area {area_a:.2e} >= {area_b:.2e})")
+            else:
+                largest_original_area = area_b
+                largest_original_center = center_b
+                logger.info(f"  -> Using center from poly_b (area {area_b:.2e} > {area_a:.2e})")
+            
+            # Merge using unary_union
+            merged_geom = unary_union([geom_a, geom_b])
+            
+            if merged_geom.is_empty:
+                logger.warning(f"_merge_two_polygons: result is empty")
+                return None
+            
+            # Handle MultiPolygon case (shouldn't happen for adjacent polys, but safety)
+            if merged_geom.geom_type == 'MultiPolygon':
+                # Take the largest polygon
+                merged_geom = max(merged_geom.geoms, key=lambda g: g.area)
+                logger.warning(f"_merge_two_polygons: MultiPolygon result, took largest")
+            
+            # Get new coords and swap back to [lat, lon]
+            shapely_coords = list(merged_geom.exterior.coords)
+            new_coords = [[c[1], c[0]] for c in shapely_coords]  # Swap back to [lat, lon]
+            
+            # Combine boundary lines, excluding the shared one
+            lines_a = set(poly_a.get('boundary_white_lines', []))
+            lines_b = set(poly_b.get('boundary_white_lines', []))
+            combined_lines = (lines_a | lines_b) - {shared_line_id}
+            
+            # Sum total points
+            total_pts = poly_a.get('total_points', 0) + poly_b.get('total_points', 0)
+            
+            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {len(new_coords)} coords")
+            
+            return {
+                'id': poly_a['id'],  # Keep first polygon's ID
+                'coords': new_coords,
+                'center': largest_original_center,  # Center of largest original polygon
+                'total_points': total_pts,
+                'boundary_white_lines': list(combined_lines),
+                'merge_count': poly_a.get('merge_count', 1) + poly_b.get('merge_count', 1),
+                '_largest_original_area': largest_original_area,  # Track for future merges
+                '_largest_original_center': largest_original_center
+            }
+        except Exception as e:
+            logger.error(f"_merge_two_polygons error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+
     def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False):
         """
         Orchestrates the creation of all game elements.
         Includes automatic retry with increasing region sizes.
         """
+        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}")
+        
         # Region sizes: ~166m, ~555m, ~1110m
         REGION_SIZES = [0.0015, 0.005, 0.01]
         
@@ -100,6 +243,42 @@ class LocationPolygonsGenerator:
             logger.info(f"Filtered White Lines: {original_wl_count} -> {len(white_lines)}")
             logger.info(f"Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
             
+            # --- RECALCULATE total_points FOR MERGED POLYGONS ---
+            # Build map: line_id -> green_count
+            line_green_counts = {}
+            for wl in white_lines:
+                line_id = wl.get('id')
+                line_green_counts[line_id] = wl.get('green_count', 0)
+            
+            # Build set of all blue circle coordinates (filtered list)
+            blue_circle_coords = set()
+            for bc in blue_circles:
+                bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                blue_circle_coords.add(bc_key)
+            
+            for poly in polygons:
+                # Count green circles on boundary white lines
+                green_total = 0
+                for line_id in poly.get('boundary_white_lines', []):
+                    green_total += line_green_counts.get(line_id, 0)
+                
+                # Count blue circles that are on this polygon's boundary
+                # Match polygon vertices with actual blue circle coordinates
+                polygon_vertices = set()
+                for coord in poly.get('coords', []):
+                    vertex_key = (round(coord[0], 7), round(coord[1], 7))
+                    polygon_vertices.add(vertex_key)
+                
+                # Only count vertices that are actual blue circles
+                blue_count = len(polygon_vertices & blue_circle_coords)
+                
+                old_total = poly.get('total_points', 0)
+                new_total = green_total + blue_count
+                
+                if old_total != new_total:
+                    logger.info(f"Recalculated total_points for {poly['id']}: {old_total} -> {new_total} (greens={green_total}, blues={blue_count})")
+                    poly['total_points'] = new_total
+            
             # 5. Groups
             groups = self._create_groups()
 
@@ -131,6 +310,24 @@ class LocationPolygonsGenerator:
                     
             # Only keep connected blue circles
             blue_circles = [bc for bc in blue_circles if bc['active_connections'] > 0]
+            
+            # --- FILTER INTERNAL BLUE CIRCLES (from merged polygons) ---
+            # Collect all unique vertex coordinates from final polygon boundaries
+            polygon_boundary_vertices = set()
+            for poly in polygons:
+                for coord in poly['coords']:
+                    # Round to 7 decimal places for comparison
+                    vertex_key = (round(coord[0], 7), round(coord[1], 7))
+                    polygon_boundary_vertices.add(vertex_key)
+            
+            original_bc_count = len(blue_circles)
+            blue_circles = [
+                bc for bc in blue_circles 
+                if (round(bc['lat'], 7), round(bc['lon'], 7)) in polygon_boundary_vertices
+            ]
+            
+            if len(blue_circles) != original_bc_count:
+                logger.info(f"Filtered internal blue circles: {original_bc_count} -> {len(blue_circles)}")
             
             logger.info("========================================")
             logger.info(f"SUCCESS on attempt {attempt}: {len(polygons)} polygons, {len(blue_circles)} circles, {len(white_lines)} lines")
@@ -469,13 +666,21 @@ class LocationPolygonsGenerator:
                     'coords': coords,
                     'center': (center.x, center.y),
                     'total_points': total_pts,
-                    'boundary_white_lines': list(b_ids)
+                    'boundary_white_lines': list(b_ids),
+                    'merge_count': 1
                 })
         except Exception as e:
             import traceback
             logger.error(f"LocationPolygonsGenerator: Polygon error type: {type(e)}")
             logger.error(f"LocationPolygonsGenerator: Polygon error trace: {traceback.format_exc()}")
             logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
+        
+        # --- MERGE SMALL POLYGONS ---
+        if polygons_data:
+            original_count = len(polygons_data)
+            polygons_data = self._merge_small_polygons(polygons_data)
+            if len(polygons_data) != original_count:
+                logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
             
         save_to_redis(KEY_POLYGONS, polygons_data)
         
@@ -484,6 +689,61 @@ class LocationPolygonsGenerator:
             used_ids.update(p['boundary_white_lines'])
             
         return polygons_data, used_ids
+    
+    def _merge_small_polygons(self, polygons, max_iterations=10):
+        """
+        Iteratively merge polygons that are too small to fit the white circle label.
+        Returns the updated list of polygons with small ones merged into neighbors.
+        """
+        for iteration in range(max_iterations):
+            # Build line -> polygons map
+            line_to_polys = {}
+            for poly in polygons:
+                for line_id in poly.get('boundary_white_lines', []):
+                    if line_id not in line_to_polys:
+                        line_to_polys[line_id] = []
+                    line_to_polys[line_id].append(poly)
+            
+            # Find small polygons
+            small_polys = [p for p in polygons if not self._can_fit_circle(p['coords'])]
+            
+            if not small_polys:
+                logger.info(f"Polygon merging: no small polygons found (iteration {iteration})")
+                break
+            
+            logger.info(f"Polygon merging iteration {iteration}: found {len(small_polys)} small polygons")
+            
+            merged_ids = set()
+            new_polygons = []
+            
+            for poly in polygons:
+                if poly['id'] in merged_ids:
+                    continue
+                
+                if not self._can_fit_circle(poly['coords']):
+                    # This is a small polygon, try to merge
+                    neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys)
+                    
+                    if neighbor and neighbor['id'] not in merged_ids:
+                        merged = self._merge_two_polygons(poly, neighbor, shared_line)
+                        if merged:
+                            merged_ids.add(poly['id'])
+                            merged_ids.add(neighbor['id'])
+                            new_polygons.append(merged)
+                            logger.info(f"Merged {poly['id']} + {neighbor['id']} (removed line {shared_line})")
+                            continue
+                
+                # Keep polygon as is
+                if poly['id'] not in merged_ids:
+                    new_polygons.append(poly)
+            
+            if not merged_ids:
+                # No merges happened, stop
+                break
+            
+            polygons = new_polygons
+        
+        return polygons
 
     def _create_groups(self):
         """Step 5: Groups"""

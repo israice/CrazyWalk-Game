@@ -292,6 +292,7 @@
     - version checked
     - added Liquid Glass Web Effects to home page
     - added more information to debug
+    - small polygons fixed 
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -310,7 +311,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - added more information to debug"
+  git commit -m "v0.0.26 - small polygons fixed"
   git push
   ```
 
