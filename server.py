@@ -115,27 +115,42 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                      self.log_date_time_string(),
                      format % args))
 
+    def do_HEAD(self):
+        """Handle HEAD requests."""
+        self.handle_routing()
+
     def do_GET(self):
         """Handle GET requests, including API proxies."""
+        self.handle_routing()
+
+    def handle_routing(self):
+        """Shared routing for GET and HEAD."""
+        logger.info(f"INCOMING {self.command} REQUEST: {self.path}")
+        
         if self.path.startswith('/api/ip_locate'):
             self.handle_ip_locate()
             return
         if self.path.startswith('/api/locate'):
             self.handle_locate()
             return
-        # Debugging request path
-        # logger.info(f"Checking Path: {self.path}") 
         if self.path.startswith('/api/reverse') or self.path.startswith('/api/search'):
             self.proxy_nominatim()
             return
         if self.path.startswith('/api/game_data'):
-            logger.info("Route Matched: /api/game_data")
             self.handle_game_data()
             return
         if self.path.startswith('/api/location_state'):
             self.handle_get_location_state()
             return
-        super().do_GET()
+        if self.path.startswith('/GAME_POSTERS/'):
+            logger.info(f"MATCHED Poster Route: {self.path}")
+            self.handle_serve_poster()
+            return
+
+        if self.command == 'GET':
+            super().do_GET()
+        else:
+            super().do_HEAD()
 
     def do_POST(self):
         """Handle POST requests."""
@@ -372,6 +387,37 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             logger.error(f"Get Location State Error: {e}")
             self.send_error(500, str(e))
 
+
+    def handle_serve_poster(self):
+        """Serve images from CORE/DATA/GAME_POSTERS."""
+        try:
+            # Extract filename and ensure it's safe
+            filename = os.path.basename(self.path)
+            poster_path = os.path.join(os.getcwd(), 'CORE', 'DATA', 'GAME_POSTERS', filename)
+            
+            logger.info(f"Attempting to serve poster: {poster_path}")
+
+            if not os.path.exists(poster_path):
+                logger.error(f"POSTER NOT FOUND on disk: {poster_path}")
+                self.send_error(404, "Poster Not Found")
+                return
+                
+            if not filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                logger.error(f"INVALID POSTER EXTENSION: {filename}")
+                self.send_error(404, "Invalid Extension")
+                return
+                
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'public, max-age=86400') # Cache for 1 day
+            self.end_headers()
+            
+            with open(poster_path, 'rb') as f:
+                self.wfile.write(f.read())
+        except Exception as e:
+            logger.error(f"Error serving poster: {e}")
+            self.send_error(500, str(e))
 
     def proxy_nominatim(self):
         """Proxy requests to Nominatim to avoid CORS."""

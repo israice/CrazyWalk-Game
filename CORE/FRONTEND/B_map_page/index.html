@@ -19,6 +19,9 @@
         }
     </script>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Map Location</title>
@@ -241,6 +244,39 @@
             user-select: text !important;
             cursor: auto;
         }
+
+        /* Poster Styling */
+        .poster-overlay {
+            pointer-events: none;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 5;
+            /* Above base map, below game elements */
+        }
+
+        /* Debug Button for Posters */
+        #btn-debug-posters {
+            position: absolute;
+            bottom: 2vh;
+            right: 2vh;
+            width: 6vh;
+            height: 6vh;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid white;
+            border-radius: 50%;
+            color: white;
+            font-size: 3vh;
+            display: none;
+            /* Only in debug */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 200;
+        }
+
+        #btn-debug-posters.active {
+            border-color: red;
+            box-shadow: 0 0 15px red;
+        }
     </style>
 </head>
 
@@ -261,6 +297,9 @@
             <button class="btn-retry" id="retry-btn">RETRY</button>
         </div>
 
+        <!-- Posters Debug Button -->
+        <div id="btn-debug-posters" title="Toggle Posters Visibility">🖼️</div>
+
     </div>
     <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
 
@@ -269,7 +308,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- Map Controls Logic -->
-    <script src="/B_map_page/components/map_controls.js?v=8"></script>
+    <script src="/B_map_page/components/map_controls.js?v=9"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -283,6 +322,7 @@
             let isGpsActive = false;
             let hasPreciseFix = false;
             let isDebugActive = false; // New Debug State
+            let isPostersDebugActive = false;
 
             // Location State Persistence
             let collectedCircles = new Set(); // Tracks hidden circle keys: "lat,lon"
@@ -374,6 +414,7 @@
             const groupsLayer = L.layerGroup().addTo(map);
             const detailsLayer = L.layerGroup().addTo(map);
             const completedPolygonsLayer = L.layerGroup().addTo(map); // Always visible layer for completed zones
+            const postersLayer = L.layerGroup().addTo(map); // Background posters
 
             // Visibility Rules
             // 1. Details (Polygons, Lines, Circles) -> Visible ONLY at Zoom 18
@@ -414,8 +455,179 @@
                 topBarContainer.style.opacity = '1';
                 setTimeout(() => {
                     loadingGif.style.display = 'none';
+                    initPosterGrid(); // Init posters once map is ready
                 }, 600);
             };
+
+            // --- POSTER GRID LOGIC ---
+            const posters = [];
+            const REVEAL_MASK_SVG_ID = 'poster-reveal-mask';
+            let revealMask = null;
+            let revealMaskPath = null;
+            let posterSvgOverlay = null; // SVG overlay for posters
+
+            const initPosterGrid = () => {
+                console.log("DEBUG: Initializing Poster Grid...");
+                postersLayer.clearLayers();
+
+                // Define poster dimensions in degrees (approximate)
+                const LAT_SIZE = 0.003; // ~333m
+                const LON_SIZE = 0.004; // ~444m
+
+                const startLat = DEFAULT_LAT - (LAT_SIZE * 1);
+                const startLon = DEFAULT_LON - (LON_SIZE * 2.5);
+
+                // Create SVG overlay for posters with mask
+                const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                svgElement.style.position = "absolute";
+                svgElement.style.top = "0";
+                svgElement.style.left = "0";
+                svgElement.style.width = "100%";
+                svgElement.style.height = "100%";
+                svgElement.style.pointerEvents = "none";
+                svgElement.innerHTML = `
+                    <defs>
+                        <mask id="poster-reveal-mask">
+                            <rect width="100%" height="100%" fill="black"/>
+                            <g id="mask-paths-container" fill="white"></g>
+                        </mask>
+                    </defs>
+                    <g id="poster-images-container" mask="url(#poster-reveal-mask)"></g>
+                `;
+
+                // Add to map pane
+                posterSvgOverlay = L.svgOverlay(svgElement, map.getBounds(), {
+                    interactive: false,
+                    pane: 'tilePane'
+                }).addTo(map);
+
+                revealMask = svgElement.querySelector('#mask-paths-container');
+                const imagesContainer = svgElement.querySelector('#poster-images-container');
+
+                // Create poster image elements as SVG images
+                for (let i = 0; i < 10; i++) {
+                    const row = Math.floor(i / 5);
+                    const col = i % 5;
+                    const bounds = [
+                        [startLat + row * LAT_SIZE, startLon + col * LON_SIZE],
+                        [startLat + (row + 1) * LAT_SIZE, startLon + (col + 1) * LON_SIZE]
+                    ];
+
+                    const imageUrl = `/GAME_POSTERS/${i + 1}.jpg`;
+
+                    // Store for debug toggle
+                    posters.push({ bounds, id: i + 1, imageUrl });
+                }
+
+                console.log(`DEBUG: Created ${posters.length} poster overlays`);
+                updatePosterSVG();
+            };
+
+            const updatePosterSVG = () => {
+                if (!posterSvgOverlay) return;
+
+                const svg = posterSvgOverlay.getElement();
+                if (!svg) return;
+
+                const imagesContainer = svg.querySelector('#poster-images-container');
+                if (!imagesContainer) return;
+
+                imagesContainer.innerHTML = '';
+
+                posters.forEach(p => {
+                    // Get screen coordinates for bounds
+                    const point1 = map.latLngToLayerPoint([p.bounds[0][0], p.bounds[0][1]]);
+                    const point2 = map.latLngToLayerPoint([p.bounds[1][0], p.bounds[1][1]]);
+
+                    // Calculate actual top-left and dimensions (handle coordinate system)
+                    const x = Math.min(point1.x, point2.x);
+                    const y = Math.min(point1.y, point2.y);
+                    const width = Math.abs(point2.x - point1.x);
+                    const height = Math.abs(point2.y - point1.y);
+
+                    if (width <= 0 || height <= 0) {
+                        console.warn(`Skipping poster ${p.id} - invalid dimensions:`, { width, height });
+                        return;
+                    }
+
+                    const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
+                    image.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
+                    image.setAttribute("x", x);
+                    image.setAttribute("y", y);
+                    image.setAttribute("width", width);
+                    image.setAttribute("height", height);
+                    image.setAttribute("opacity", isPostersDebugActive ? "0.6" : "1.0");
+                    image.setAttribute("preserveAspectRatio", "none");
+
+                    imagesContainer.appendChild(image);
+
+                    // Debug mode: show borders and numbers
+                    if (isPostersDebugActive) {
+                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        rect.setAttribute("x", x);
+                        rect.setAttribute("y", y);
+                        rect.setAttribute("width", width);
+                        rect.setAttribute("height", height);
+                        rect.setAttribute("fill", "none");
+                        rect.setAttribute("stroke", "red");
+                        rect.setAttribute("stroke-width", "3");
+                        imagesContainer.appendChild(rect);
+
+                        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        text.setAttribute("x", x + width / 2);
+                        text.setAttribute("y", y + height / 2);
+                        text.setAttribute("fill", "yellow");
+                        text.setAttribute("font-size", "40");
+                        text.setAttribute("font-weight", "bold");
+                        text.setAttribute("text-anchor", "middle");
+                        text.setAttribute("dominant-baseline", "middle");
+                        text.textContent = `#${p.id}`;
+                        imagesContainer.appendChild(text);
+                    }
+                });
+
+                console.log(`DEBUG: Updated ${posters.length} SVG poster images`);
+            };
+
+            const updatePostersVisibility = () => {
+                if (isPostersDebugActive && posterSvgOverlay) {
+                    const svg = posterSvgOverlay.getElement();
+                    if (svg) {
+                        const imagesContainer = svg.querySelector('#poster-images-container');
+                        if (imagesContainer) {
+                            imagesContainer.setAttribute('mask', 'none');
+                        }
+                    }
+                } else if (posterSvgOverlay) {
+                    const svg = posterSvgOverlay.getElement();
+                    if (svg) {
+                        const imagesContainer = svg.querySelector('#poster-images-container');
+                        if (imagesContainer) {
+                            imagesContainer.setAttribute('mask', 'url(#poster-reveal-mask)');
+                        }
+                    }
+                }
+                updatePosterSVG();
+            };
+
+            const addPolygonToMask = (coords) => {
+                if (!revealMask) return;
+
+                // We need to project lat/lon to pixel coordinates for the SVG mask
+                // BUT Leaflet's L.SVG works better for this.
+                // Simpler approach: Use a CSS mask-image with a dynamic SVG.
+                // Since Leaflet uses its own panes and transformation, a global SVG is hard to align.
+
+                // REVISED PLAN: Use an L.SVG overlay for the mask that covers the same bounds as the posters.
+                // OR even simpler: Just use the polygons themselves as containers for the image background.
+                // But user wants a SEAMLESS canvas.
+
+                // Let's use the simplest reliable method: Each completed polygon gets an 'image-reveal' style.
+                // We'll use a CSS background with background-attachment: fixed (or simulated via SVG patterns).
+            };
+
+            // --- END POSTER GRID LOGIC ---
 
             // Safety Reveal
             /* REMOVED: Safety reveal is dangerous if data is missing. We want STRICT validation.
@@ -904,21 +1116,31 @@
                             }
 
                             // 4. Highlight Blue Circles (vertices) on polygon coords
+                            // Use fuzzy matching since coords may differ in precision
                             if (_blueCircleLayerMap && data.coords) {
                                 data.coords.forEach(coord => {
-                                    const key = `${coord[0].toFixed(6)},${coord[1].toFixed(6)}`;
-                                    const blueCircle = _blueCircleLayerMap.get(key);
-                                    if (blueCircle && typeof blueCircle.setStyle === 'function') {
-                                        // Check if not already selected
-                                        if (!selectedLayers.includes(blueCircle)) {
-                                            originalStyles.push({
-                                                color: blueCircle.options.color,
-                                                weight: blueCircle.options.weight,
-                                                fillColor: blueCircle.options.fillColor,
-                                                fillOpacity: blueCircle.options.fillOpacity
-                                            });
-                                            selectedLayers.push(blueCircle);
-                                            blueCircle.setStyle({ color: 'red', weight: 4 });
+                                    const targetLat = coord[0];
+                                    const targetLon = coord[1];
+
+                                    // Fuzzy search: find blue circle within ~5m
+                                    for (const [key, blueCircle] of _blueCircleLayerMap) {
+                                        const [lat, lon] = key.split(',').map(Number);
+                                        const distance = Math.sqrt(
+                                            Math.pow(lat - targetLat, 2) + Math.pow(lon - targetLon, 2)
+                                        );
+                                        // ~0.00005 degrees ≈ 5 meters
+                                        if (distance < 0.00005 && !selectedLayers.includes(blueCircle)) {
+                                            if (typeof blueCircle.setStyle === 'function') {
+                                                originalStyles.push({
+                                                    color: blueCircle.options.color,
+                                                    weight: blueCircle.options.weight,
+                                                    fillColor: blueCircle.options.fillColor,
+                                                    fillOpacity: blueCircle.options.fillOpacity
+                                                });
+                                                selectedLayers.push(blueCircle);
+                                                blueCircle.setStyle({ color: 'red', weight: 4 });
+                                            }
+                                            break; // Found match, stop searching
                                         }
                                     }
                                 });
@@ -1189,6 +1411,7 @@
                     const pState = {
                         id: poly.id, // Now uses RANDOM UID
                         uid: poly.uid,
+                        coords: poly.coords, // Save coords for masking
                         current: savedCount, // Will usually be 0 unless random check luck
                         total: poly.total_points,
                         layer: pLayer,
@@ -1208,15 +1431,19 @@
                         completedPolygonsLayer.addLayer(pLayer);
 
                         pLayer.setStyle({
-                            color: '#00ff00',
-                            fillColor: '#00ff00',
-                            fillOpacity: 0.4
+                            color: 'transparent',
+                            fillColor: 'transparent',
+                            fillOpacity: 0,
+                            stroke: false
                         });
                         // Remove label from detailsLayer explicitly
                         if (pLabel && detailsLayer.hasLayer(pLabel)) {
                             detailsLayer.removeLayer(pLabel);
                         }
                         pState.label = null;
+
+                        // Reveal poster part
+                        revealPolygonPart(pState.coords);
 
                         // Hide lines (Deferred until lines are created? No, lines created later. 
                         // Wait, lines are created AFTER polygons in this loop order?
@@ -1381,6 +1608,43 @@
 
                 // RESTORE saved state for this location (async)
                 restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
+
+                // Hook into map movements to refresh the mask and SVG posters 
+                map.on('viewreset move zoom', () => {
+                    // NOTE: Don't call updatePosterSVG() here - it causes images to reload
+                    // SVG overlay coordinates are managed by Leaflet automatically
+                    // updatePosterSVG();
+
+                    if (!revealMask) return;
+                    // Rebuild all paths in the mask based on current zoom/pan
+                    revealMask.innerHTML = '';
+                    polygonState.forEach(state => {
+                        if (state.current >= state.total && state.coords) {
+                            try {
+                                // coords is a SINGLE ARRAY of points, not array of rings
+                                const points = state.coords.map(p => {
+                                    if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') return null;
+                                    try {
+                                        const pt = map.latLngToLayerPoint([p[0], p[1]]);
+                                        return `${pt.x},${pt.y}`;
+                                    } catch (e) {
+                                        return null;
+                                    }
+                                }).filter(Boolean).join(' ');
+
+                                const pathData = points ? `M ${points} Z` : '';
+
+                                if (pathData) {
+                                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                                    path.setAttribute("d", pathData);
+                                    revealMask.appendChild(path);
+                                }
+                            } catch (e) {
+                                console.warn(`Failed to update mask for polygon ${state.id}:`, e);
+                            }
+                        }
+                    });
+                });
             };
 
             // Restore previously collected circles from server
@@ -1538,16 +1802,24 @@
                     }
 
                     state.layer.setStyle({
-                        color: '#00ff00',
-                        fillColor: '#00ff00',
-                        fillOpacity: 0.4
+                        color: 'transparent',
+                        fillColor: 'transparent',
+                        fillOpacity: 0,
+                        stroke: false
                     });
+
+                    // Reveal poster part
+                    console.log(`DEBUG: Calling revealPolygonPart for polygon ${state.id}`);
+                    console.log(`DEBUG: Polygon coords:`, state.coords);
+                    revealPolygonPart(state.coords);
+                    console.log(`DEBUG: Current clipPath paths count:`, revealMask ? revealMask.children.length : 'no mask');
 
                     // 2. Remove Label from detailsLayer explicitly
                     if (state.label && detailsLayer.hasLayer(state.label)) {
                         detailsLayer.removeLayer(state.label);
                         state.label = null;
                     }
+                    console.log("DEBUG: Polygon Completed! Moving to Persistent Layer.");
 
                     // 3. Hide White Lines
                     if (state.lines) {
@@ -1588,11 +1860,80 @@
                 }
 
                 // Move marker
+                userMarker.setLatLng([lat, lon]);
                 controls.updateUserPosition(userMarker, lat, lon, isGpsActive);
 
                 // Ensure map centers on it
                 map.panTo([lat, lon]);
             });
+
+            // Handle Debug Mode Toggles (via map_controls.js or top bar)
+            document.addEventListener('debug-mode-change', (e) => {
+                isDebugActive = e.detail.active;
+                const postersBtn = document.getElementById('btn-debug-posters');
+                if (isDebugActive) {
+                    postersBtn.style.display = 'flex';
+                } else {
+                    postersBtn.style.display = 'none';
+                    isPostersDebugActive = false;
+                    postersBtn.classList.remove('active');
+                    updatePostersVisibility();
+                }
+            });
+
+            // Posters Debug Toggle
+            const btnDebugPosters = document.getElementById('btn-debug-posters');
+            btnDebugPosters.onclick = () => {
+                isPostersDebugActive = !isPostersDebugActive;
+                btnDebugPosters.classList.toggle('active', isPostersDebugActive);
+                updatePostersVisibility();
+            };
+
+            // --- THE REVEAL MAGIC (SVG CLIP PATHS) ---
+            const revealPolygonPart = (coords) => {
+                console.log("REVEAL: revealPolygonPart called", { coords, revealMask });
+                if (!revealMask || !coords) {
+                    console.warn("REVEAL: Skipping - no mask or coords", { revealMask, coords });
+                    return;
+                }
+
+                try {
+                    // coords is a SINGLE ARRAY of points: [[lat1,lon1], [lat2,lon2], ...]
+                    // NOT an array of rings!
+                    if (!Array.isArray(coords) || coords.length === 0) {
+                        console.warn("REVEAL: coords is not a valid array");
+                        return;
+                    }
+
+                    const points = coords.map(p => {
+                        if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') return null;
+                        try {
+                            const point = map.latLngToLayerPoint([p[0], p[1]]);
+                            return `${point.x},${point.y}`;
+                        } catch (e) {
+                            console.warn("REVEAL: Failed to convert point", p, e);
+                            return null;
+                        }
+                    }).filter(Boolean).join(' ');
+
+                    const pathData = points ? `M ${points} Z` : '';
+
+                    console.log("REVEAL: Generated pathData:", pathData);
+
+                    if (!pathData) {
+                        console.warn("REVEAL: No valid pathData generated");
+                        return;
+                    }
+
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path.setAttribute("d", pathData);
+                    revealMask.appendChild(path);
+                    console.log("REVEAL: Polygon added to mask. Total paths:", revealMask.children.length);
+                    console.log("REVEAL: Mask HTML:", revealMask.innerHTML);
+                } catch (e) {
+                    console.error("Failed to reveal polygon part:", e);
+                }
+            };
 
             const startLocationWatch = () => {
                 console.log("DEBUG: [Map Page] Requesting browser geolocation (permission should be granted)...");

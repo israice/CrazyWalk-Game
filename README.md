@@ -298,6 +298,8 @@
     - fixed combined polygons perimeter
     - added city title based ip and geo aproove to guest button
     - fixed hidden circles syayment when going back to fake location
+  - [x] v0.0.27 - added POSTERS instead green polygons 
+
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -316,7 +318,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - fixed hidden circles syayment when going back to fake location"
+  git commit -m "v0.0.27 - added POSTERS instead green polygons"
   git push
   ```
 
