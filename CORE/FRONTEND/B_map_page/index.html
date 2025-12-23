@@ -284,6 +284,51 @@
             let hasPreciseFix = false;
             let isDebugActive = false; // New Debug State
 
+            // Location State Persistence
+            let collectedCircles = new Set(); // Tracks hidden circle keys: "lat,lon"
+            let currentLocationKey = null;    // Current location rounded key: "lat_lon"
+            let savedGpsPosition = null;      // Saved GPS position before switching to fake location
+            const gameDataCache = new Map();  // Caches game data per location key
+            let savedLocationKey = null;      // Saved location key before switching to GPS
+
+            // Helper: Generate location key from coordinates (round to ~100m precision)
+            const getLocationKey = (lat, lon) => {
+                return `${lat.toFixed(3)}_${lon.toFixed(3)}`;
+            };
+
+            // Helper: Save current location state to server
+            const saveLocationState = async () => {
+                if (!currentLocationKey || collectedCircles.size === 0) return;
+
+                try {
+                    const response = await fetch('/api/location_state', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            location_key: currentLocationKey,
+                            collected_circles: Array.from(collectedCircles)
+                        })
+                    });
+                    const data = await response.json();
+                    console.log(`DEBUG: Saved ${data.saved} circles for location ${currentLocationKey}`);
+                } catch (err) {
+                    console.error('DEBUG: Failed to save location state:', err);
+                }
+            };
+
+            // Helper: Load saved state for a location from server
+            const loadLocationState = async (locationKey) => {
+                try {
+                    const response = await fetch(`/api/location_state?location_key=${encodeURIComponent(locationKey)}`);
+                    const data = await response.json();
+                    console.log(`DEBUG: Loaded ${data.collected_circles?.length || 0} saved circles for location ${locationKey}`);
+                    return new Set(data.collected_circles || []);
+                } catch (err) {
+                    console.error('DEBUG: Failed to load location state:', err);
+                    return new Set();
+                }
+            };
+
             // Initialize Map via MapControls (Centralized Logic)
             const controls = new MapControls('map', [DEFAULT_LAT, DEFAULT_LON], {
                 defaultZoom: 18,
@@ -458,17 +503,38 @@
                     .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
             };
 
-            const loadGameData = (lat, lon, forceRebuild = false) => {
+            const loadGameData = async (lat, lon, forceRebuild = false) => {
                 console.log("GPS: ========================================");
                 console.log(`GPS: Starting polygon generation for (${lat.toFixed(6)}, ${lon.toFixed(6)})`);
                 console.log(`GPS: Force rebuild: ${forceRebuild}`);
                 console.log("GPS: ========================================");
+
+                // SAVE current location state before switching
+                if (currentLocationKey && collectedCircles.size > 0) {
+                    console.log(`DEBUG: Saving state for ${currentLocationKey} before switching...`);
+                    await saveLocationState();
+                }
+
+                // Update to new location
+                const newLocationKey = getLocationKey(lat, lon);
+                console.log(`DEBUG: Switching location: ${currentLocationKey} -> ${newLocationKey}`);
+                currentLocationKey = newLocationKey;
+                collectedCircles = new Set(); // Reset for new location
 
                 // Show Loading GIF and dim map (Visual Transition)
                 loadingGif.style.display = 'block';
                 loadingGif.style.opacity = '1';
                 mapElement.style.opacity = '0.3';
                 hasRevealed = false;
+
+                // CHECK CACHE first (unless force rebuild)
+                if (!forceRebuild && gameDataCache.has(newLocationKey)) {
+                    console.log(`GPS: Using CACHED data for location ${newLocationKey}`);
+                    const cachedData = gameDataCache.get(newLocationKey);
+                    renderGameElements(cachedData);
+                    revealMap();
+                    return;
+                }
 
                 const url = `/api/game_data?lat=${lat}&lon=${lon}&rebuild=${forceRebuild}&_t=${Date.now()}`;
                 console.log(`GPS: Fetching from ${url}`);
@@ -506,6 +572,10 @@
                         console.log(`GPS: Green circles: ${data.green_circles?.length || 0}`);
                         console.log(`GPS: ========================================`);
 
+                        // CACHE the data for this location
+                        gameDataCache.set(newLocationKey, data);
+                        console.log(`DEBUG: Cached game data for location ${newLocationKey}`);
+
                         renderGameElements(data);
                         revealMap();
                     })
@@ -517,6 +587,59 @@
                     });
             };
 
+            // Special version that uses explicit location key for cache lookup (for returning to saved locations)
+            const loadGameDataWithKey = async (lat, lon, explicitLocationKey) => {
+                console.log("GPS: ========================================");
+                console.log(`GPS: Loading with explicit key: ${explicitLocationKey}`);
+                console.log("GPS: ========================================");
+
+                // SAVE current location state before switching
+                if (currentLocationKey && collectedCircles.size > 0) {
+                    console.log(`DEBUG: Saving state for ${currentLocationKey} before switching...`);
+                    await saveLocationState();
+                }
+
+                // Use explicit key if provided, otherwise calculate
+                const targetLocationKey = explicitLocationKey || getLocationKey(lat, lon);
+                console.log(`DEBUG: Switching to location key: ${targetLocationKey}`);
+                currentLocationKey = targetLocationKey;
+                collectedCircles = new Set();
+
+                // Show Loading GIF
+                loadingGif.style.display = 'block';
+                loadingGif.style.opacity = '1';
+                mapElement.style.opacity = '0.3';
+                hasRevealed = false;
+
+                // CHECK CACHE with explicit key
+                if (gameDataCache.has(targetLocationKey)) {
+                    console.log(`GPS: *** USING CACHED DATA for key ${targetLocationKey} ***`);
+                    const cachedData = gameDataCache.get(targetLocationKey);
+                    renderGameElements(cachedData);
+                    revealMap();
+                    return;
+                }
+
+                // No cache, fetch new data
+                console.log(`GPS: Cache miss for ${targetLocationKey}, fetching fresh data...`);
+                const url = `/api/game_data?lat=${lat}&lon=${lon}&rebuild=false&_t=${Date.now()}`;
+
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.error || !data.polygons?.length) {
+                            showError("Failed to load map data");
+                            return;
+                        }
+                        gameDataCache.set(targetLocationKey, data);
+                        renderGameElements(data);
+                        revealMap();
+                    })
+                    .catch(err => {
+                        console.error("GPS: NETWORK ERROR:", err);
+                        showError("CONNECTION ERROR");
+                    });
+            };
 
             const renderGameElements = (data) => {
 
@@ -1255,6 +1378,55 @@
 
                 controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
                 setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
+
+                // RESTORE saved state for this location (async)
+                restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
+            };
+
+            // Restore previously collected circles from server
+            const restoreSavedCircles = async (layerMap, circleMap, polyState, lineMap) => {
+                if (!currentLocationKey) return;
+
+                const savedCircles = await loadLocationState(currentLocationKey);
+                if (savedCircles.size === 0) {
+                    console.log("DEBUG: No saved circles to restore for this location");
+                    return;
+                }
+
+                console.log(`DEBUG: Restoring ${savedCircles.size} previously collected circles...`);
+
+                let restoredCount = 0;
+                savedCircles.forEach(key => {
+                    const target = layerMap.get(key);
+                    if (target && target.options.opacity !== 0) {
+                        // Hide the circle
+                        target.setStyle({ opacity: 0, fillOpacity: 0 });
+
+                        // Track as collected
+                        collectedCircles.add(key);
+
+                        // Remove tooltip if exists
+                        if (typeof target.getTooltip === 'function' && target.getTooltip()) {
+                            target.unbindTooltip();
+                        }
+
+                        // Update polygon progress
+                        const relevantPolys = circleMap.get(key);
+                        if (relevantPolys) {
+                            relevantPolys.forEach(pid => {
+                                const state = polyState.get(pid);
+                                if (state && state.current < state.total) {
+                                    state.current++;
+                                    updatePolygonVisuals(state, lineMap);
+                                }
+                            });
+                        }
+
+                        restoredCount++;
+                    }
+                });
+
+                console.log(`DEBUG: Restored ${restoredCount} circles to hidden state`);
             };
 
             const setupProgressHiding = (layerMap, circleMap, polyState, lineMap) => {
@@ -1268,6 +1440,9 @@
                         if (target.options.opacity !== 0) {
                             // HIDE IT
                             target.setStyle({ opacity: 0, fillOpacity: 0 });
+
+                            // TRACK collected circle for persistence
+                            collectedCircles.add(key);
 
                             // Safe Tooltip Check (Must be a function and truthy)
                             if (typeof target.getTooltip === 'function' && target.getTooltip()) {
@@ -1508,6 +1683,13 @@
                             console.log("DEBUG: GPS Toggled ON");
                             gpsBtn.classList.add('active');
 
+                            // SAVE current position and location key before switching to GPS/real location
+                            const currentPos = userMarker.getLatLng();
+                            savedGpsPosition = { lat: currentPos.lat, lon: currentPos.lng };
+                            savedLocationKey = currentLocationKey; // Save exact key for cache lookup
+                            console.log(`DEBUG: Saved position before GPS: ${savedGpsPosition.lat}, ${savedGpsPosition.lon}`);
+                            console.log(`DEBUG: Saved location key: ${savedLocationKey}`);
+
                             // Show loading GIF immediately
                             loadingGif.style.display = 'block';
                             loadingGif.style.opacity = '1';
@@ -1519,17 +1701,22 @@
                             window.loadedQuality = 'NONE';
                             startLocationWatch();
                         } else {
-                            console.log("DEBUG: GPS Toggled OFF. Reverting to default.");
+                            console.log("DEBUG: GPS Toggled OFF. Reverting to saved position.");
                             gpsBtn.classList.remove('active');
                             hasPreciseFix = false;
                             window.loadedQuality = 'NONE';
 
-                            // Use Controls to reset view
-                            controls.resetView(DEFAULT_LAT, DEFAULT_LON);
-                            userMarker.setLatLng([DEFAULT_LAT, DEFAULT_LON]);
+                            // Use saved position or default
+                            const returnLat = savedGpsPosition?.lat ?? DEFAULT_LAT;
+                            const returnLon = savedGpsPosition?.lon ?? DEFAULT_LON;
+                            console.log(`DEBUG: Returning to position: ${returnLat}, ${returnLon}`);
 
-                            // Trigger load to show animation and refresh data
-                            loadGameData(DEFAULT_LAT, DEFAULT_LON, false);
+                            // Use Controls to reset view to saved position
+                            controls.resetView(returnLat, returnLon);
+                            userMarker.setLatLng([returnLat, returnLon]);
+
+                            // Use SAVED location key for cache lookup (not recalculated)
+                            loadGameDataWithKey(returnLat, returnLon, savedLocationKey);
                         }
                     });
                 }

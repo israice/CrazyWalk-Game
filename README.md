@@ -297,6 +297,7 @@
     - added revercing using arrow keys to marker.gif
     - fixed combined polygons perimeter
     - added city title based ip and geo aproove to guest button
+    - fixed hidden circles syayment when going back to fake location
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -315,7 +316,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - added city title based ip and geo aproove to guest button"
+  git commit -m "v0.0.26 - fixed hidden circles syayment when going back to fake location"
   git push
   ```
 

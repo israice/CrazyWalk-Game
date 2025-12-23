@@ -132,7 +132,17 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             logger.info("Route Matched: /api/game_data")
             self.handle_game_data()
             return
+        if self.path.startswith('/api/location_state'):
+            self.handle_get_location_state()
+            return
         super().do_GET()
+
+    def do_POST(self):
+        """Handle POST requests."""
+        if self.path.startswith('/api/location_state'):
+            self.handle_save_location_state()
+            return
+        self.send_error(404, "Not Found")
 
     def handle_locate(self):
         """
@@ -277,6 +287,90 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(json.dumps({"city": "UNKNOWN CITY", "lat": 0, "lon": 0}).encode())
+
+    def handle_save_location_state(self):
+        """
+        Handle POST /api/location_state
+        Saves collected circles for a location to Redis.
+        Body: { "location_key": "lat_lon", "collected_circles": ["lat,lon", ...] }
+        """
+        try:
+            from CORE.BACKEND.redis_tools import get_redis_client
+            
+            # Read POST body
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode())
+            
+            location_key = data.get('location_key')
+            collected_circles = data.get('collected_circles', [])
+            
+            if not location_key:
+                self.send_error(400, "Missing location_key")
+                return
+            
+            # Save to Redis with 7-day TTL
+            redis_key = f"location:{location_key}:collected"
+            r = get_redis_client()
+            
+            if collected_circles:
+                r.set(redis_key, json.dumps(collected_circles))
+                r.expire(redis_key, 60 * 60 * 24 * 7)  # 7 days
+                logger.info(f"Saved {len(collected_circles)} collected circles for location {location_key}")
+            else:
+                # Clear if empty
+                r.delete(redis_key)
+                logger.info(f"Cleared collected circles for location {location_key}")
+            
+            # Send response
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok", "saved": len(collected_circles)}).encode())
+            
+        except Exception as e:
+            logger.error(f"Save Location State Error: {e}")
+            self.send_error(500, str(e))
+
+    def handle_get_location_state(self):
+        """
+        Handle GET /api/location_state?location_key=lat_lon
+        Returns saved collected circles for a location.
+        """
+        try:
+            from CORE.BACKEND.redis_tools import get_redis_client
+            
+            # Parse query params
+            parsed_path = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_path.query)
+            location_key = params.get('location_key', [None])[0]
+            
+            if not location_key:
+                self.send_error(400, "Missing location_key parameter")
+                return
+            
+            # Get from Redis
+            redis_key = f"location:{location_key}:collected"
+            r = get_redis_client()
+            data = r.get(redis_key)
+            
+            collected_circles = json.loads(data) if data else []
+            logger.info(f"Retrieved {len(collected_circles)} collected circles for location {location_key}")
+            
+            # Send response
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "location_key": location_key,
+                "collected_circles": collected_circles
+            }).encode())
+            
+        except Exception as e:
+            logger.error(f"Get Location State Error: {e}")
+            self.send_error(500, str(e))
 
 
     def proxy_nominatim(self):
