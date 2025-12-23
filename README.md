@@ -296,6 +296,7 @@
     - added arrows combination up + left  
     - added revercing using arrow keys to marker.gif
     - fixed combined polygons perimeter
+    - added city title based ip and geo aproove to guest button
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -314,7 +315,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.26 - fixed combined polygons perimeter"
+  git commit -m "v0.0.26 - added city title based ip and geo aproove to guest button"
   git push
   ```
 

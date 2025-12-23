@@ -764,7 +764,7 @@
             const errorScreen = document.getElementById('error-screen');
             const errorMessage = document.getElementById('error-message');
 
-            // Начальное состояние: GIF виден, UI скрыт
+            // Initial state: GIF visible, UI hidden
             loadingGif.style.display = 'block';
             loadingGif.style.opacity = '1';
             mapElement.style.opacity = '0';
@@ -780,11 +780,9 @@
             };
 
             const showError = (msg) => {
-                // On mobile, avoid the "Red Screen" and iPhone frame overlay issues
-                // Revert to simple alert and show UI so user isn't blocked on black screen
+                // On mobile, avoid the "Red Screen" overlay issues
                 if (window.innerWidth <= 1024) {
                     const plainMsg = msg.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '');
-                    // Small delay to ensure loading gif doesn't conflict
                     setTimeout(() => {
                         alert(plainMsg);
                     }, 100);
@@ -815,77 +813,94 @@
                 subdomains: 'abcd'
             }).addTo(map);
 
-            const startGeolocation = () => {
-                loadingGif.style.display = 'block';
-                errorScreen.style.display = 'none';
-                console.log("DEBUG: [Step 1] Requesting Browser Geolocation (triggers permission popup)...");
+            // IP-based location detection (no permission needed)
+            const loadIPLocation = () => {
+                console.log("DEBUG: Loading city from IP address...");
+
+                fetch('/api/ip_locate')
+                    .then(r => r.json())
+                    .then(data => {
+                        console.log("DEBUG: IP Location data:", data);
+                        const cityName = data.city || "UNKNOWN CITY";
+                        cityLabel.textContent = cityName;
+
+                        // If we have coordinates, show that location on map
+                        if (data.lat && data.lon && data.lat !== 0) {
+                            map.setView([data.lat, data.lon], 12, { animate: false });
+                        } else {
+                            // Default view (world center)
+                            map.setView([0, 0], 2, { animate: false });
+                        }
+
+                        revealContent();
+                        console.log("DEBUG: [SUCCESS] IP-based location loaded!");
+                    })
+                    .catch(err => {
+                        console.error("DEBUG: IP lookup failed:", err);
+                        cityLabel.textContent = "WELCOME";
+                        map.setView([0, 0], 2, { animate: false });
+                        revealContent();
+                    });
+            };
+
+            // GPS geolocation (requires user permission) - called on GUEST button
+            const requestGPSLocation = () => {
+                console.log("DEBUG: [Step 1] Requesting GPS permission...");
 
                 if (!("geolocation" in navigator)) {
                     console.error("DEBUG: Geolocation not supported");
-                    showError("Geolocation is not supported<br>by your browser.");
+                    // Still navigate to map, will use IP-based location there
+                    window.location.href = '/B_map_page/index.html';
                     return;
                 }
 
-                // Запрос геолокации - браузер покажет popup с разрешением
+                // Show loading indicator
+                loadingGif.style.display = 'block';
+                loadingGif.style.opacity = '1';
+
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        console.log("DEBUG: [Step 2] Permission GRANTED! Location received.");
+                        console.log("DEBUG: [Step 2] GPS Permission GRANTED!");
                         const userLat = position.coords.latitude;
                         const userLon = position.coords.longitude;
-                        console.log(`DEBUG: Coordinates: [${userLat}, ${userLon}]`);
+                        console.log(`DEBUG: GPS Coordinates: [${userLat}, ${userLon}]`);
 
-                        // Получаем название города через серверный API (использует Nominatim)
-                        const locateUrl = `/api/locate?lat=${userLat}&lon=${userLon}`;
+                        // Store GPS coords in sessionStorage for map page
+                        sessionStorage.setItem('gps_lat', userLat);
+                        sessionStorage.setItem('gps_lon', userLon);
+                        sessionStorage.setItem('gps_enabled', 'true');
 
-                        fetch(locateUrl)
-                            .then(r => r.json())
-                            .then(data => {
-                                console.log("DEBUG: [Step 3] City data:", data);
-                                // Server returns { city: "CITY NAME", lat, lon, user_lat, user_lon }
-                                const cityName = data.city || "Unknown";
-                                cityLabel.textContent = cityName;
-                                map.setView([userLat, userLon], 17, { animate: false });
-                                revealContent();
-                                console.log("DEBUG: [SUCCESS] Complete!");
-                            })
-                            .catch(err => {
-                                console.error("DEBUG: City lookup failed:", err);
-                                cityLabel.textContent = "Location Found";
-                                map.setView([userLat, userLon], 17, { animate: false });
-                                revealContent();
-                            });
+                        // Navigate to map page
+                        window.location.href = '/B_map_page/index.html';
                     },
                     (error) => {
-                        console.error("DEBUG: Geolocation Error:", error);
-                        let msg = "";
-                        if (error.code === 1) {
-                            msg = "Location Access Denied.<br>Please enable GPS permissions.";
-                        } else if (error.code === 2) {
-                            msg = "Location Unavailable.<br>Check your GPS settings.";
-                        } else if (error.code === 3) {
-                            msg = "Location Request Timeout.<br>Please try again.";
-                        } else {
-                            msg = `Location Error: ${error.message}`;
-                        }
-                        showError(msg);
+                        console.warn("DEBUG: GPS Error:", error.message);
+                        // GPS failed, but still allow navigation - map will use IP or default
+                        sessionStorage.setItem('gps_enabled', 'false');
+                        window.location.href = '/B_map_page/index.html';
                     },
-                    { enableHighAccuracy: false, timeout: 60000, maximumAge: 60000 }
+                    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
                 );
             };
 
-            // Retry button now triggers the function directly (User Gesture)
-            document.getElementById('retry-btn').addEventListener('click', startGeolocation);
+            // Retry button for error screen
+            document.getElementById('retry-btn').addEventListener('click', loadIPLocation);
 
-            // Initial auto-start (delayed to avoid immediate timeout/resource contention)
-            // User requested delay after GIF starts.
-            setTimeout(startGeolocation, 2000);
-
-            // GUEST Button Logic - просто переходим на карту
+            // GUEST Button - Request GPS then navigate to map
             document.querySelector('.btn-guest').addEventListener('click', () => {
-                console.log("DEBUG: Guest button clicked. Navigating to map page...");
-                window.location.href = '/B_map_page/index.html';
+                console.log("DEBUG: GUEST button clicked. Requesting GPS permission...");
+                requestGPSLocation();
             });
 
+            // LOGIN Button (placeholder)
+            document.querySelector('.btn-login').addEventListener('click', () => {
+                console.log("DEBUG: LOGIN button clicked.");
+                // TODO: Implement login flow
+                alert("Login feature coming soon!");
+            });
+
+            // Initial load - use IP-based location (no permission popup)
+            setTimeout(loadIPLocation, 1000);
         });
     </script>
 </body>

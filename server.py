@@ -117,6 +117,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests, including API proxies."""
+        if self.path.startswith('/api/ip_locate'):
+            self.handle_ip_locate()
+            return
         if self.path.startswith('/api/locate'):
             self.handle_locate()
             return
@@ -218,6 +221,62 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f"Locate Fatal Error: {e}")
             self.send_error(500, f"Server Error: {str(e)}")
+
+    def handle_ip_locate(self):
+        """
+        Handle /api/ip_locate request.
+        Uses ip-api.com to get approximate location from client IP.
+        Returns: { 'city': 'City Name', 'lat': 0.0, 'lon': 0.0 }
+        """
+        try:
+            # Get client IP from request
+            client_ip = self.client_address[0]
+            
+            # For localhost, we need to get external IP or use a fallback
+            if client_ip in ('127.0.0.1', '::1', 'localhost'):
+                # Use ip-api without IP param to detect server's external IP
+                api_url = "http://ip-api.com/json/?fields=status,message,city,lat,lon"
+            else:
+                api_url = f"http://ip-api.com/json/{client_ip}?fields=status,message,city,lat,lon"
+            
+            headers = {'User-Agent': 'CrazyWalk/1.0'}
+            req = urllib.request.Request(api_url, headers=headers)
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    
+                    if data.get('status') == 'success':
+                        result = {
+                            "city": (data.get('city') or 'Unknown City').upper(),
+                            "lat": data.get('lat', 0),
+                            "lon": data.get('lon', 0)
+                        }
+                    else:
+                        # Fallback if IP lookup fails
+                        result = {
+                            "city": "UNKNOWN CITY",
+                            "lat": 0,
+                            "lon": 0
+                        }
+                else:
+                    result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
+            
+            # Send Response
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            
+        except Exception as e:
+            logger.error(f"IP Locate Error: {e}")
+            # Return fallback on error
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"city": "UNKNOWN CITY", "lat": 0, "lon": 0}).encode())
 
 
     def proxy_nominatim(self):
