@@ -1,15 +1,11 @@
 FROM python:3.11-slim
 
-# Install git, curl, and docker CLI
+# Install git and docker CLI
+# Docker Compose V2 is now included as a plugin in docker CLI
 RUN apt-get update && apt-get install -y \
     git \
-    curl \
     docker.io \
     && rm -rf /var/lib/apt/lists/*
-
-# Install docker-compose standalone binary
-RUN curl -SL https://github.com/docker/compose/releases/download/v2.29.1/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose \
-    && chmod +x /usr/local/bin/docker-compose
 
 # Fix "dubious ownership" error in git
 RUN git config --global --add safe.directory /app
