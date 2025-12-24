@@ -249,8 +249,8 @@
         .poster-overlay {
             pointer-events: none;
             transition: opacity 0.5s ease-in-out;
-            z-index: 5;
-            /* Above base map, below game elements */
+            z-index: 20;
+            /* Above base map tiles (z-index 10-11) */
         }
     </style>
 </head>
@@ -440,12 +440,11 @@
 
             let currentPosterGrid = null; // Store poster grid from server (4 posters)
 
-            const initPosterGrid = () => {
-                console.log("DEBUG: Initializing Poster Grid...");
+            const initPosterGrid = (data) => {
+                console.log("DEBUG: Initializing Poster Grid with Bounds Expansion...");
                 postersLayer.clearLayers();
-                posters.length = 0; // Clear previous posters
+                posters.length = 0;
 
-                // Use server-provided poster grid (2x2 = 4 posters)
                 if (!currentPosterGrid || currentPosterGrid.length === 0) {
                     console.log("DEBUG: No poster_grid from server");
                     return;
@@ -453,7 +452,7 @@
 
                 console.log(`DEBUG: Using server poster grid with ${currentPosterGrid.length} posters`);
 
-                // Find overall bounds for SVG overlay
+                // Find overall bounds for SVG overlay using both posters and polygons
                 let minLat = Infinity, maxLat = -Infinity;
                 let minLon = Infinity, maxLon = -Infinity;
 
@@ -464,7 +463,25 @@
                     maxLon = Math.max(maxLon, poster.max_lon);
                 });
 
-                console.log(`DEBUG: Overall poster area: lat(${minLat.toFixed(5)}, ${maxLat.toFixed(5)}), lon(${minLon.toFixed(5)}, ${maxLon.toFixed(5)})`);
+                // Crucial: Expand bounds to include all polygons to prevent clipping
+                if (data && data.polygons) {
+                    data.polygons.forEach(poly => {
+                        poly.coords.forEach(coord => {
+                            minLat = Math.min(minLat, coord[0]);
+                            maxLat = Math.max(maxLat, coord[0]);
+                            minLon = Math.min(minLon, coord[1]);
+                            maxLon = Math.max(maxLon, coord[1]);
+                        });
+                    });
+                }
+
+                // Add 5% buffer to prevent edge artifacts
+                const latBuffer = (maxLat - minLat) * 0.05;
+                const lonBuffer = (maxLon - minLon) * 0.05;
+                minLat -= latBuffer; maxLat += latBuffer;
+                minLon -= lonBuffer; maxLon += lonBuffer;
+
+                console.log(`DEBUG: SVG Expanded area (with buffer): lat(${minLat.toFixed(5)}, ${maxLat.toFixed(5)}), lon(${minLon.toFixed(5)}, ${maxLon.toFixed(5)})`);
 
                 // Create SVG overlay for posters with mask
                 const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -475,10 +492,12 @@
                 svgElement.style.width = "100%";
                 svgElement.style.height = "100%";
                 svgElement.style.pointerEvents = "none";
+                svgElement.setAttribute("viewBox", "0 0 1000 1000");
+                svgElement.setAttribute("preserveAspectRatio", "none");
                 svgElement.innerHTML = `
                     <defs>
                         <mask id="poster-reveal-mask">
-                            <rect width="100%" height="100%" fill="black"/>
+                            <rect width="1000" height="1000" fill="black"/>
                             <g id="mask-paths-container" fill="white"></g>
                         </mask>
                     </defs>
@@ -553,18 +572,17 @@
                 const lonRange = svgMaxLon - svgMinLon;
 
                 posters.forEach(p => {
-                    // Poster bounds in geographic coordinates
                     const posterMinLat = p.bounds[0][0];
                     const posterMinLon = p.bounds[0][1];
                     const posterMaxLat = p.bounds[1][0];
                     const posterMaxLon = p.bounds[1][1];
 
-                    // Calculate positions as percentages of SVG bounds
-                    // SVG y-axis is inverted (0 at top), so we invert latitude
-                    const x = ((posterMinLon - svgMinLon) / lonRange) * 100;
-                    const y = ((svgMaxLat - posterMaxLat) / latRange) * 100;
-                    const width = ((posterMaxLon - posterMinLon) / lonRange) * 100;
-                    const height = ((posterMaxLat - posterMinLat) / latRange) * 100;
+                    // Calculate positions in 0-1000 range based on svgBounds
+                    // x, y, width, height relative to viewBox="0 0 1000 1000"
+                    const x = ((posterMinLon - svgMinLon) / lonRange) * 1000;
+                    const y = ((svgMaxLat - posterMaxLat) / latRange) * 1000;
+                    const width = ((posterMaxLon - posterMinLon) / lonRange) * 1000;
+                    const height = ((posterMaxLat - posterMinLat) / latRange) * 1000;
 
                     if (width <= 0 || height <= 0) {
                         console.warn(`Skipping poster ${p.id} - invalid dimensions:`, { width, height });
@@ -573,10 +591,10 @@
 
                     const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
                     image.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-                    image.setAttribute("x", `${x}%`);
-                    image.setAttribute("y", `${y}%`);
-                    image.setAttribute("width", `${width}%`);
-                    image.setAttribute("height", `${height}%`);
+                    image.setAttribute("x", x);
+                    image.setAttribute("y", y);
+                    image.setAttribute("width", width);
+                    image.setAttribute("height", height);
                     image.setAttribute("opacity", isPostersDebugActive ? "0.6" : "1.0");
                     image.setAttribute("preserveAspectRatio", "none");
 
@@ -585,18 +603,18 @@
                     // Debug mode: show borders and numbers
                     if (isPostersDebugActive) {
                         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        rect.setAttribute("x", `${x}%`);
-                        rect.setAttribute("y", `${y}%`);
-                        rect.setAttribute("width", `${width}%`);
-                        rect.setAttribute("height", `${height}%`);
+                        rect.setAttribute("x", x);
+                        rect.setAttribute("y", y);
+                        rect.setAttribute("width", width);
+                        rect.setAttribute("height", height);
                         rect.setAttribute("fill", "none");
                         rect.setAttribute("stroke", "red");
                         rect.setAttribute("stroke-width", "3");
                         imagesContainer.appendChild(rect);
 
                         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                        text.setAttribute("x", `${x + width / 2}%`);
-                        text.setAttribute("y", `${y + height / 2}%`);
+                        text.setAttribute("x", x + width / 2);
+                        text.setAttribute("y", y + height / 2);
                         text.setAttribute("fill", "yellow");
                         text.setAttribute("font-size", "40");
                         text.setAttribute("font-weight", "bold");
@@ -877,6 +895,19 @@
 
                 console.log("DEBUG: Starting Render with Progress Tracking...");
 
+                // --- 0. INITIALIZE POSTERS & MASK EARLY ---
+                // Store poster grid from server if present
+                if (data.poster_grid && data.poster_grid.length > 0) {
+                    currentPosterGrid = data.poster_grid;
+                    console.log(`DEBUG: Stored ${currentPosterGrid.length} posters from server`);
+                } else {
+                    console.log("DEBUG: No poster_grid data received from server");
+                    currentPosterGrid = null;
+                }
+
+                // Initialize poster grid UI and revealMask object
+                initPosterGrid(data);
+
                 groupsLayer.clearLayers();
                 detailsLayer.clearLayers();
 
@@ -890,7 +921,7 @@
                 // --- 0. DEEP ID INTEGRATION & GLOBAL STORAGE ---
                 window.allItems = new Map();
 
-                // --- STORE POSTER GRID FROM SERVER ---
+                /* REMOVED: Moved to start of renderGameElements
                 if (data.poster_grid && data.poster_grid.length > 0) {
                     currentPosterGrid = data.poster_grid;
                     console.log(`DEBUG: Stored ${currentPosterGrid.length} posters from server`);
@@ -898,6 +929,7 @@
                     console.log("DEBUG: No poster_grid data received from server");
                     currentPosterGrid = null;
                 }
+                */
 
                 // --- 1. UID/ID MAPPING (Foreign Key Normalization) ---
                 const lineIdMap = new Map(); // Old ID (number) -> New UID (string)
@@ -1067,14 +1099,10 @@
                     });
                 };
 
-                // 1. Groups (internal use only - not visible to user)
+                // 1. Groups (REMOVED: Technical polygons no longer added to map)
+                /*
                 if (data.groups) {
-                    data.groups.forEach(group => {
-                        L.polygon(group.coords, {
-                            color: 'transparent', stroke: false, fillColor: 'transparent', fillOpacity: 0, weight: 0
-                        }).addTo(groupsLayer);
-                    });
-                }
+                */
 
                 // SHARED DEBUG LOGIC
                 // resetSelection is now defined in parent scope
@@ -1407,7 +1435,7 @@
                 localPolys.forEach(poly => {
                     // Create Visual
                     const pLayer = L.polygon(poly.coords, {
-                        color: 'purple', fillColor: 'purple', fillOpacity: 0.1, weight: 0
+                        color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0
                     }).addTo(detailsLayer);
 
                     // attachDebugClick(pLayer, poly, 'Polygon'); // Removed per user request
@@ -1684,31 +1712,32 @@
                 // RESTORE saved state for this location (async)
                 restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
 
-                // Hook into map movements to refresh the mask and SVG posters 
+                // Hook into map movements to refresh the mask
                 map.on('viewreset move zoom', () => {
-                    // NOTE: Don't call updatePosterSVG() here - it causes images to reload
-                    // SVG overlay coordinates are managed by Leaflet automatically
-                    // updatePosterSVG();
+                    if (!revealMask || !posterSvgOverlay) return;
 
-                    if (!revealMask) return;
-                    // Rebuild all paths in the mask based on current zoom/pan
+                    const svgBounds = posterSvgOverlay.getBounds();
+                    const svgMinLat = svgBounds.getSouth();
+                    const svgMaxLat = svgBounds.getNorth();
+                    const svgMinLon = svgBounds.getWest();
+                    const svgMaxLon = svgBounds.getEast();
+                    const latRange = svgMaxLat - svgMinLat;
+                    const lonRange = svgMaxLon - svgMinLon;
+
+                    // Rebuild all paths in the mask
                     revealMask.innerHTML = '';
                     polygonState.forEach(state => {
                         if (state.current >= state.total && state.coords) {
                             try {
-                                // coords is a SINGLE ARRAY of points, not array of rings
                                 const points = state.coords.map(p => {
-                                    if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') return null;
-                                    try {
-                                        const pt = map.latLngToLayerPoint([p[0], p[1]]);
-                                        return `${pt.x},${pt.y}`;
-                                    } catch (e) {
-                                        return null;
-                                    }
+                                    if (!Array.isArray(p) || p.length < 2) return null;
+                                    // Scale coordinates to 0-1000 range relative to SVG bounds
+                                    const x = ((p[1] - svgMinLon) / lonRange) * 1000;
+                                    const y = ((svgMaxLat - p[0]) / latRange) * 1000;
+                                    return `${x.toFixed(2)},${y.toFixed(2)}`;
                                 }).filter(Boolean).join(' ');
 
                                 const pathData = points ? `M ${points} Z` : '';
-
                                 if (pathData) {
                                     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                                     path.setAttribute("d", pathData);
@@ -1721,8 +1750,7 @@
                     });
                 });
 
-                // Initialize poster grid now that all polygons are loaded into window.allItems
-                initPosterGrid();
+                // Removed: initPosterGrid() call at end (already done at start)
             };
 
             // Restore previously collected circles from server
@@ -1962,33 +1990,29 @@
             // --- THE REVEAL MAGIC (SVG CLIP PATHS) ---
             const revealPolygonPart = (coords) => {
                 console.log("REVEAL: revealPolygonPart called", { coords, revealMask });
-                if (!revealMask || !coords) {
-                    console.warn("REVEAL: Skipping - no mask or coords", { revealMask, coords });
+                if (!revealMask || !coords || !posterSvgOverlay) {
+                    console.warn("REVEAL: Skipping - no mask, coords or overlay", { revealMask, coords });
                     return;
                 }
 
                 try {
-                    // coords is a SINGLE ARRAY of points: [[lat1,lon1], [lat2,lon2], ...]
-                    // NOT an array of rings!
-                    if (!Array.isArray(coords) || coords.length === 0) {
-                        console.warn("REVEAL: coords is not a valid array");
-                        return;
-                    }
+                    const svgBounds = posterSvgOverlay.getBounds();
+                    const svgMinLat = svgBounds.getSouth();
+                    const svgMaxLat = svgBounds.getNorth();
+                    const svgMinLon = svgBounds.getWest();
+                    const svgMaxLon = svgBounds.getEast();
+                    const latRange = svgMaxLat - svgMinLat;
+                    const lonRange = svgMaxLon - svgMinLon;
 
                     const points = coords.map(p => {
-                        if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') return null;
-                        try {
-                            const point = map.latLngToLayerPoint([p[0], p[1]]);
-                            return `${point.x},${point.y}`;
-                        } catch (e) {
-                            console.warn("REVEAL: Failed to convert point", p, e);
-                            return null;
-                        }
+                        if (!Array.isArray(p) || p.length < 2) return null;
+                        // Scale coordinates to 0-1000 range relative to SVG bounds
+                        const x = ((p[1] - svgMinLon) / lonRange) * 1000;
+                        const y = ((svgMaxLat - p[0]) / latRange) * 1000;
+                        return `${x.toFixed(2)},${y.toFixed(2)}`;
                     }).filter(Boolean).join(' ');
 
                     const pathData = points ? `M ${points} Z` : '';
-
-                    console.log("REVEAL: Generated pathData:", pathData);
 
                     if (!pathData) {
                         console.warn("REVEAL: No valid pathData generated");
@@ -1999,7 +2023,6 @@
                     path.setAttribute("d", pathData);
                     revealMask.appendChild(path);
                     console.log("REVEAL: Polygon added to mask. Total paths:", revealMask.children.length);
-                    console.log("REVEAL: Mask HTML:", revealMask.innerHTML);
                 } catch (e) {
                     console.error("Failed to reveal polygon part:", e);
                 }
