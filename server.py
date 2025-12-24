@@ -268,18 +268,35 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                     data = json.loads(response.read().decode())
                     
                     if data.get('status') == 'success':
+                        city = data.get('city')
+                        logger.info(f"IP Geolocation Success: City='{city}', lat={data.get('lat')}, lon={data.get('lon')}")
                         result = {
-                            "city": (data.get('city') or 'Unknown City').upper(),
+                            "city": (city or 'Unknown City').upper(),
                             "lat": data.get('lat', 0),
                             "lon": data.get('lon', 0)
                         }
                     else:
-                        # Fallback if IP lookup fails
-                        result = {
-                            "city": "UNKNOWN CITY",
-                            "lat": 0,
-                            "lon": 0
-                        }
+                        logger.warning(f"IP Geolocation 1st attempt failed: {data.get('message')}. Retrying as server/localhost...")
+                        # RETRY: Try without IP (uses server's external IP)
+                        # This handles cases where client_ip is a private LAN IP (e.g. 192.168.x.x) which ip-api rejects
+                        retry_url = "http://ip-api.com/json/?fields=status,message,city,lat,lon"
+                        req_retry = urllib.request.Request(retry_url, headers=headers)
+                        with urllib.request.urlopen(req_retry, timeout=5) as response_retry:
+                             if response_retry.status == 200:
+                                data_retry = json.loads(response_retry.read().decode())
+                                if data_retry.get('status') == 'success':
+                                    city = data_retry.get('city')
+                                    logger.info(f"IP Geolocation Retry Success: City='{city}'")
+                                    result = {
+                                        "city": (city or 'Unknown City').upper(),
+                                        "lat": data_retry.get('lat', 0),
+                                        "lon": data_retry.get('lon', 0)
+                                    }
+                                else:
+                                    logger.error(f"IP Geolocation Retry Failed: {data_retry.get('message')}")
+                                    result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
+                             else:
+                                result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
                 else:
                     result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
             
