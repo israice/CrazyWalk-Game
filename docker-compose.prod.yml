@@ -7,6 +7,7 @@ services:
       - "80:8000"
     environment:
       - REDIS_HOST=redis
+      - REDIS_PORT=6500
       - PYTHONDONTWRITEBYTECODE=1
     networks:
       - pc2-net
@@ -33,6 +34,9 @@ services:
     image: redis:alpine
     container_name: CrazyWalk-Redis
     restart: always
+    command: redis-server --port 6500
+    ports:
+      - "6500:6500"
     networks:
       - pc2-net
 
