@@ -87,20 +87,16 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
     def end_headers(self):
-        """Add caching headers. Controlled by DISABLE_CACHE env variable."""
-        # Check if caching is disabled (default: True for development)
-        disable_cache = os.environ.get('DISABLE_CACHE', 'true').lower() == 'true'
+        """Add caching headers. Always disabled for development."""
+        # ⚠️ WARNING: DO NOT ENABLE BROWSER CACHING DURING DEVELOPMENT ⚠️
+        # Caching causes browsers to use old file versions even after server restart
+        # This led to multiple debugging issues where changes weren't visible
+        # Only re-enable this for production deployment with proper versioning
         
-        if disable_cache:
-            cache_ctrl = "no-cache, no-store, must-revalidate"
-        else:
-            # Production: Cache assets for 1 hour, but not HTML/API
-            cache_ctrl = "public, max-age=3600"
-            if hasattr(self, 'path'):
-                if self.path.endswith('.html') or self.path == '/' or self.path.startswith('/api/'):
-                    cache_ctrl = "no-cache, no-store, must-revalidate"
-
-        self.send_header("Cache-Control", cache_ctrl)
+        # Always disable cache completely
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")  # HTTP/1.0 compatibility
+        self.send_header("Expires", "0")  # Proxies
         super().end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -550,8 +546,9 @@ def ensure_redis_running():
     try:
         r = get_redis_client()
         r.ping()
+        logger.info("Flushing Redis database...")
         r.flushdb()
-        logger.info(f"Redis is running and accessible (Port {os.getenv('REDIS_PORT', 6379)}). Database flushed.")
+        logger.info(f"✅ Redis database FLUSHED successfully (Port {os.getenv('REDIS_PORT', 6379)})")
         return
     except Exception:
         # If default failed, try port 6500 (common dev port)
@@ -559,8 +556,9 @@ def ensure_redis_running():
             os.environ['REDIS_PORT'] = '6500'
             r = get_redis_client()
             r.ping()
+            logger.info("Flushing Redis database...")
             r.flushdb()
-            logger.info("Redis is running and accessible (Port 6500). Database flushed.")
+            logger.info("✅ Redis database FLUSHED successfully (Port 6500)")
             return
         except Exception:
             # If 6500 also failed, proceed to start Docker
@@ -583,8 +581,9 @@ def ensure_redis_running():
         for i in range(retries):
             try:
                 r.ping()
-                r.flushdb() # <--- Flush after successful start
-                logger.info("Redis started successfully (Port 6500). Database flushed.")
+                logger.info("Flushing Redis database...")
+                r.flushdb()
+                logger.info("✅ Redis database FLUSHED successfully (Port 6500)")
                 return
             except Exception:
                 time.sleep(2)

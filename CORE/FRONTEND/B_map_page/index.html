@@ -252,31 +252,6 @@
             z-index: 5;
             /* Above base map, below game elements */
         }
-
-        /* Debug Button for Posters */
-        #btn-debug-posters {
-            position: absolute;
-            bottom: 2vh;
-            right: 2vh;
-            width: 6vh;
-            height: 6vh;
-            background: rgba(0, 0, 0, 0.7);
-            border: 2px solid white;
-            border-radius: 50%;
-            color: white;
-            font-size: 3vh;
-            display: none;
-            /* Only in debug */
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 200;
-        }
-
-        #btn-debug-posters.active {
-            border-color: red;
-            box-shadow: 0 0 15px red;
-        }
     </style>
 </head>
 
@@ -296,9 +271,6 @@
             <p id="error-message">No map data found.</p>
             <button class="btn-retry" id="retry-btn">RETRY</button>
         </div>
-
-        <!-- Posters Debug Button -->
-        <div id="btn-debug-posters" title="Toggle Posters Visibility">🖼️</div>
 
     </div>
     <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
@@ -455,7 +427,7 @@
                 topBarContainer.style.opacity = '1';
                 setTimeout(() => {
                     loadingGif.style.display = 'none';
-                    initPosterGrid(); // Init posters once map is ready
+                    // initPosterGrid moved to renderGameElements after polygons are loaded
                 }, 600);
             };
 
@@ -466,16 +438,33 @@
             let revealMaskPath = null;
             let posterSvgOverlay = null; // SVG overlay for posters
 
+            let currentPosterGrid = null; // Store poster grid from server (4 posters)
+
             const initPosterGrid = () => {
                 console.log("DEBUG: Initializing Poster Grid...");
                 postersLayer.clearLayers();
+                posters.length = 0; // Clear previous posters
 
-                // Define poster dimensions in degrees (approximate)
-                const LAT_SIZE = 0.003; // ~333m
-                const LON_SIZE = 0.004; // ~444m
+                // Use server-provided poster grid (2x2 = 4 posters)
+                if (!currentPosterGrid || currentPosterGrid.length === 0) {
+                    console.log("DEBUG: No poster_grid from server");
+                    return;
+                }
 
-                const startLat = DEFAULT_LAT - (LAT_SIZE * 1);
-                const startLon = DEFAULT_LON - (LON_SIZE * 2.5);
+                console.log(`DEBUG: Using server poster grid with ${currentPosterGrid.length} posters`);
+
+                // Find overall bounds for SVG overlay
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLon = Infinity, maxLon = -Infinity;
+
+                currentPosterGrid.forEach(poster => {
+                    minLat = Math.min(minLat, poster.min_lat);
+                    maxLat = Math.max(maxLat, poster.max_lat);
+                    minLon = Math.min(minLon, poster.min_lon);
+                    maxLon = Math.max(maxLon, poster.max_lon);
+                });
+
+                console.log(`DEBUG: Overall poster area: lat(${minLat.toFixed(5)}, ${maxLat.toFixed(5)}), lon(${minLon.toFixed(5)}, ${maxLon.toFixed(5)})`);
 
                 // Create SVG overlay for posters with mask
                 const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -496,8 +485,14 @@
                     <g id="poster-images-container" mask="url(#poster-reveal-mask)"></g>
                 `;
 
-                // Add to map pane
-                posterSvgOverlay = L.svgOverlay(svgElement, map.getBounds(), {
+                // Create proper LatLngBounds for the SVG overlay
+                const svgBounds = L.latLngBounds(
+                    [minLat, minLon],  // Southwest corner
+                    [maxLat, maxLon]   // Northeast corner
+                );
+
+                // Add to map pane with correct bounds
+                posterSvgOverlay = L.svgOverlay(svgElement, svgBounds, {
                     interactive: false,
                     pane: 'tilePane'
                 }).addTo(map);
@@ -505,20 +500,32 @@
                 revealMask = svgElement.querySelector('#mask-paths-container');
                 const imagesContainer = svgElement.querySelector('#poster-images-container');
 
-                // Create poster image elements as SVG images
-                for (let i = 0; i < 10; i++) {
-                    const row = Math.floor(i / 5);
-                    const col = i % 5;
+                // Create posters from server data
+                currentPosterGrid.forEach(poster => {
                     const bounds = [
-                        [startLat + row * LAT_SIZE, startLon + col * LON_SIZE],
-                        [startLat + (row + 1) * LAT_SIZE, startLon + (col + 1) * LON_SIZE]
+                        [poster.min_lat, poster.min_lon],
+                        [poster.max_lat, poster.max_lon]
                     ];
 
-                    const imageUrl = `/GAME_POSTERS/${i + 1}.jpg`;
+                    posters.push({
+                        bounds,
+                        id: poster.id,
+                        imageUrl: poster.image_url
+                    });
 
-                    // Store for debug toggle
-                    posters.push({ bounds, id: i + 1, imageUrl });
-                }
+                    console.log(`DEBUG: Poster ${poster.id}: lat(${poster.min_lat.toFixed(5)}, ${poster.max_lat.toFixed(5)}), lon(${poster.min_lon.toFixed(5)}, ${poster.max_lon.toFixed(5)})`);
+
+                    if (poster.id === 5) {
+                        const poster5CenterLat = (poster.min_lat + poster.max_lat) / 2;
+                        const poster5CenterLon = (poster.min_lon + poster.max_lon) / 2;
+                        const userPos = userMarker.getLatLng();
+                        console.log(`DEBUG: ========== POSTER #5 CENTER CHECK ==========`);
+                        console.log(`DEBUG: Poster #5 center: ${poster5CenterLat.toFixed(6)}, ${poster5CenterLon.toFixed(6)}`);
+                        console.log(`DEBUG: User marker pos:  ${userPos.lat.toFixed(6)}, ${userPos.lng.toFixed(6)}`);
+                        console.log(`DEBUG: Difference: lat=${Math.abs(poster5CenterLat - userPos.lat).toFixed(6)}, lon=${Math.abs(poster5CenterLon - userPos.lng).toFixed(6)}`);
+                        console.log(`DEBUG: =============================================`);
+                    }
+                });
 
                 console.log(`DEBUG: Created ${posters.length} poster overlays`);
                 updatePosterSVG();
@@ -535,16 +542,29 @@
 
                 imagesContainer.innerHTML = '';
 
-                posters.forEach(p => {
-                    // Get screen coordinates for bounds
-                    const point1 = map.latLngToLayerPoint([p.bounds[0][0], p.bounds[0][1]]);
-                    const point2 = map.latLngToLayerPoint([p.bounds[1][0], p.bounds[1][1]]);
+                // Get SVG bounds (geographic coordinates)
+                const svgBounds = posterSvgOverlay.getBounds();
+                const svgMinLat = svgBounds.getSouth();
+                const svgMaxLat = svgBounds.getNorth();
+                const svgMinLon = svgBounds.getWest();
+                const svgMaxLon = svgBounds.getEast();
 
-                    // Calculate actual top-left and dimensions (handle coordinate system)
-                    const x = Math.min(point1.x, point2.x);
-                    const y = Math.min(point1.y, point2.y);
-                    const width = Math.abs(point2.x - point1.x);
-                    const height = Math.abs(point2.y - point1.y);
+                const latRange = svgMaxLat - svgMinLat;
+                const lonRange = svgMaxLon - svgMinLon;
+
+                posters.forEach(p => {
+                    // Poster bounds in geographic coordinates
+                    const posterMinLat = p.bounds[0][0];
+                    const posterMinLon = p.bounds[0][1];
+                    const posterMaxLat = p.bounds[1][0];
+                    const posterMaxLon = p.bounds[1][1];
+
+                    // Calculate positions as percentages of SVG bounds
+                    // SVG y-axis is inverted (0 at top), so we invert latitude
+                    const x = ((posterMinLon - svgMinLon) / lonRange) * 100;
+                    const y = ((svgMaxLat - posterMaxLat) / latRange) * 100;
+                    const width = ((posterMaxLon - posterMinLon) / lonRange) * 100;
+                    const height = ((posterMaxLat - posterMinLat) / latRange) * 100;
 
                     if (width <= 0 || height <= 0) {
                         console.warn(`Skipping poster ${p.id} - invalid dimensions:`, { width, height });
@@ -553,10 +573,10 @@
 
                     const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
                     image.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-                    image.setAttribute("x", x);
-                    image.setAttribute("y", y);
-                    image.setAttribute("width", width);
-                    image.setAttribute("height", height);
+                    image.setAttribute("x", `${x}%`);
+                    image.setAttribute("y", `${y}%`);
+                    image.setAttribute("width", `${width}%`);
+                    image.setAttribute("height", `${height}%`);
                     image.setAttribute("opacity", isPostersDebugActive ? "0.6" : "1.0");
                     image.setAttribute("preserveAspectRatio", "none");
 
@@ -565,18 +585,18 @@
                     // Debug mode: show borders and numbers
                     if (isPostersDebugActive) {
                         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        rect.setAttribute("x", x);
-                        rect.setAttribute("y", y);
-                        rect.setAttribute("width", width);
-                        rect.setAttribute("height", height);
+                        rect.setAttribute("x", `${x}%`);
+                        rect.setAttribute("y", `${y}%`);
+                        rect.setAttribute("width", `${width}%`);
+                        rect.setAttribute("height", `${height}%`);
                         rect.setAttribute("fill", "none");
                         rect.setAttribute("stroke", "red");
                         rect.setAttribute("stroke-width", "3");
                         imagesContainer.appendChild(rect);
 
                         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                        text.setAttribute("x", x + width / 2);
-                        text.setAttribute("y", y + height / 2);
+                        text.setAttribute("x", `${x + width / 2}%`);
+                        text.setAttribute("y", `${y + height / 2}%`);
                         text.setAttribute("fill", "yellow");
                         text.setAttribute("font-size", "40");
                         text.setAttribute("font-weight", "bold");
@@ -748,7 +768,7 @@
                     return;
                 }
 
-                const url = `/api/game_data?lat=${lat}&lon=${lon}&rebuild=${forceRebuild}&_t=${Date.now()}`;
+                const url = `/api/game_data?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&rebuild=${forceRebuild}&_t=${Date.now()}`;
                 console.log(`GPS: Fetching from ${url}`);
 
                 fetch(url)
@@ -869,6 +889,17 @@
 
                 // --- 0. DEEP ID INTEGRATION & GLOBAL STORAGE ---
                 window.allItems = new Map();
+
+                // --- STORE POSTER GRID FROM SERVER ---
+                if (data.poster_grid && data.poster_grid.length > 0) {
+                    currentPosterGrid = data.poster_grid;
+                    console.log(`DEBUG: Stored ${currentPosterGrid.length} posters from server`);
+                } else {
+                    console.log("DEBUG: No poster_grid data received from server");
+                    currentPosterGrid = null;
+                }
+
+                // --- 1. UID/ID MAPPING (Foreign Key Normalization) ---
                 const lineIdMap = new Map(); // Old ID (number) -> New UID (string)
 
                 const generateUID = (prefix) => {
@@ -1265,6 +1296,35 @@
                             const mergeCount = data.merge_count || 1;
                             const mergeInfo = mergeCount > 1 ? `🔗 Merged From: <b>${mergeCount}</b> polygons<br>` : '';
 
+                            // Calculate which posters intersect with this polygon
+                            const intersectingPosters = [];
+                            if (currentPosterGrid && data.coords && data.coords.length > 0) {
+                                // Get polygon bounds
+                                let polyMinLat = Infinity, polyMaxLat = -Infinity;
+                                let polyMinLon = Infinity, polyMaxLon = -Infinity;
+                                data.coords.forEach(coord => {
+                                    polyMinLat = Math.min(polyMinLat, coord[0]);
+                                    polyMaxLat = Math.max(polyMaxLat, coord[0]);
+                                    polyMinLon = Math.min(polyMinLon, coord[1]);
+                                    polyMaxLon = Math.max(polyMaxLon, coord[1]);
+                                });
+
+                                // Check intersection with each poster
+                                currentPosterGrid.forEach(poster => {
+                                    const intersects = !(polyMaxLat < poster.min_lat ||
+                                        polyMinLat > poster.max_lat ||
+                                        polyMaxLon < poster.min_lon ||
+                                        polyMinLon > poster.max_lon);
+                                    if (intersects) {
+                                        intersectingPosters.push(poster.id);
+                                    }
+                                });
+                            }
+
+                            const posterInfo = intersectingPosters.length > 0
+                                ? `🖼️ Posters: <b>${intersectingPosters.length}</b> (IDs: ${intersectingPosters.join(', ')})<br>`
+                                : '';
+
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
                                     <b>Polygon Stats:</b><br>
@@ -1272,6 +1332,7 @@
                                     🔵 Blue Circles: <b>${blueCount}</b><br>
                                     ⚪ White Lines: <b>${whiteLinesCount}</b><br>
                                     🟢 Green Circles: <b>${greenCount}</b><br>
+                                    ${posterInfo}
                                     --------------------------<br>
                                     ∑ Total Circles: <b>${totalPoints}</b>
                                 </div>
@@ -1370,7 +1431,8 @@
                         coords: poly.coords,
                         total_points: poly.total_points,
                         blue_circles_count: poly.blue_circles_count || 0,
-                        merge_count: poly.merge_count || 1
+                        merge_count: poly.merge_count || 1,
+                        poster_ids: poly.poster_ids || []  // Add poster IDs from polygon data
                     };
                     window.allItems.set(labelDebugData.uid, labelDebugData);
 
@@ -1458,6 +1520,19 @@
                         pLabel.setIcon(icon);
                     }
                 });
+
+                // Restore poster masks for completed polygons (after all polygons initialized)
+                // This ensures that when loading from cache, completed polygons show their posters
+                console.log("DEBUG: Checking for completed polygons to restore poster masks...");
+                let restoredMasksCount = 0;
+                polygonState.forEach(state => {
+                    if (state.current >= state.total && state.coords) {
+                        console.log(`DEBUG: Restoring poster mask for completed polygon ${state.id}`);
+                        revealPolygonPart(state.coords);
+                        restoredMasksCount++;
+                    }
+                });
+                console.log(`DEBUG: Restored ${restoredMasksCount} poster masks for completed polygons`);
 
                 // 3. White Lines (Index)
                 if (data.white_lines) {
@@ -1645,6 +1720,9 @@
                         }
                     });
                 });
+
+                // Initialize poster grid now that all polygons are loaded into window.allItems
+                initPosterGrid();
             };
 
             // Restore previously collected circles from server
@@ -1881,14 +1959,6 @@
                 }
             });
 
-            // Posters Debug Toggle
-            const btnDebugPosters = document.getElementById('btn-debug-posters');
-            btnDebugPosters.onclick = () => {
-                isPostersDebugActive = !isPostersDebugActive;
-                btnDebugPosters.classList.toggle('active', isPostersDebugActive);
-                updatePostersVisibility();
-            };
-
             // --- THE REVEAL MAGIC (SVG CLIP PATHS) ---
             const revealPolygonPart = (coords) => {
                 console.log("REVEAL: revealPolygonPart called", { coords, revealMask });
@@ -1967,8 +2037,8 @@
                 );
             };
 
-            // Navigation / Top Bar Logic 
-            fetch('/B_map_page/components/top_bar.html')
+            // Navigation / Top Bar Logic (with cache-busting)
+            fetch(`/B_map_page/components/top_bar.html?v=${Date.now()}`)
                 .then(response => response.text())
                 .then(html => {
                     document.getElementById('top-bar-container').innerHTML = html;
@@ -2013,6 +2083,11 @@
                             map.closePopup();
                             resetSelection();
                         }
+
+                        // Dispatch event for posters button visibility
+                        document.dispatchEvent(new CustomEvent('debug-mode-change', {
+                            detail: { active: isDebugActive }
+                        }));
                     });
                 }
 
@@ -2066,6 +2141,16 @@
                     menuBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         topBar.classList.toggle('expanded');
+                    });
+                }
+
+                // POSTERS Button Handler (now in top bar)
+                const btnDebugPosters = document.getElementById('btn-debug-posters');
+                if (btnDebugPosters) {
+                    btnDebugPosters.addEventListener('click', () => {
+                        isPostersDebugActive = !isPostersDebugActive;
+                        btnDebugPosters.classList.toggle('active', isPostersDebugActive);
+                        updatePostersVisibility();
                     });
                 }
 
