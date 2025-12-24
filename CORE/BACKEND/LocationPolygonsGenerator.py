@@ -415,20 +415,55 @@ class LocationPolygonsGenerator:
                 start_lat = center_lat - (1.5 * POSTER_LAT_SIZE)  # Center - 1.5 posters down
                 start_lon = center_lon - (1.5 * POSTER_LON_SIZE)  # Center - 1.5 posters left
                 
+                # Scan for available images in GAME_POSTERS
+                posters_dir = os.path.join(self.data_dir, '..', 'DATA', 'GAME_POSTERS')
+                valid_extensions = ('.jpg', '.jpeg', '.png')
+                available_images = []
+                
+                if os.path.exists(posters_dir):
+                    for f in os.listdir(posters_dir):
+                        if f.lower().endswith(valid_extensions):
+                            available_images.append(f)
+                
+                if not available_images:
+                    logger.warning("No posters found in GAME_POSTERS! Using default fallback IDs.")
+                    # Fallback to simulated IDs if empty (shouldn't happen in prod)
+                    available_images = [f"{i}.jpg" for i in range(1, 10)]
+
+                import random
+                # Select 9 images. 
+                # If we have >= 9, sample unique ones.
+                # If we have < 9, sample with replacement (or just cycle them).
+                if len(available_images) >= 9:
+                    selected_images = random.sample(available_images, 9)
+                else:
+                    logger.warning(f"Only {len(available_images)} posters found. Repeating to fill grid.")
+                    # Fill 9 slots by cycling available images
+                    selected_images = [available_images[i % len(available_images)] for i in range(9)]
+                    random.shuffle(selected_images) # Shuffle so the pattern isn't obvious
+
+                logger.info(f"Selected posters for grid: {selected_images}")
+
                 # Create 3x3 grid (9 posters)
                 # Assign IDs from top to bottom so #5 is in center
                 poster_grid = []
+                img_idx = 0
                 for row in range(2, -1, -1):  # Start from row 2 (top) down to row 0 (bottom)
                     for col in range(3):
                         # Simple formula: row 2 = IDs 7,8,9; row 1 = IDs 4,5,6; row 0 = IDs 1,2,3
                         poster_id = row * 3 + col + 1
+                        
+                        # Use the randomly selected image
+                        image_filename = selected_images[img_idx]
+                        img_idx += 1
+                        
                         poster = {
                             'id': poster_id,
                             'min_lat': start_lat + row * POSTER_LAT_SIZE,
                             'max_lat': start_lat + (row + 1) * POSTER_LAT_SIZE,
                             'min_lon': start_lon + col * POSTER_LON_SIZE,
                             'max_lon': start_lon + (col + 1) * POSTER_LON_SIZE,
-                            'image_url': f'/GAME_POSTERS/{poster_id}.jpg'
+                            'image_url': f'/GAME_POSTERS/{image_filename}'
                         }
                         poster_grid.append(poster)
                         

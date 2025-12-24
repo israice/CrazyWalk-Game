@@ -442,6 +442,12 @@
 
             const initPosterGrid = (data) => {
                 console.log("DEBUG: Initializing Poster Grid with Bounds Expansion...");
+                if (posterSvgOverlay) {
+                    console.log("DEBUG: Removing existing poster SVG overlay");
+                    posterSvgOverlay.remove();
+                    posterSvgOverlay = null;
+                }
+
                 postersLayer.clearLayers();
                 posters.length = 0;
 
