@@ -25,12 +25,16 @@
 > https://crazywalk.weforks.org/
 
 ### Last Dev Update
-- v0.0.19 - added buttons to menu when activated
+- v0.0.27 - added POSTERS instead finished polygons
 <div align="center">
   <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.19-1.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.19-2.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.19-3.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-1.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-2.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-3.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-4.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-5.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-6.png" alt="Dashboard" height="300">
+  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-7.png" alt="Dashboard" height="300">
 </div>
 
 <!-- ---------------------- -->
@@ -197,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard ab3cf36
+  git reset --hard 06758f1
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -298,7 +302,14 @@
     - fixed combined polygons perimeter
     - added city title based ip and geo aproove to guest button
     - fixed hidden circles syayment when going back to fake location
-  - [x] v0.0.27 - added POSTERS instead green polygons 
+  - [x] v0.0.27 - added POSTERS instead finished polygons 
+    - fixed posters center
+    - fixed posters view when polygon finished
+    - fixed posters on both locations
+    - added posters randomizer
+    - testing city fix on home page
+    - fixed united poligon perimeter 
+    - README.md screenshots version updated 
 
 
   - ### Next Tasks
@@ -318,7 +329,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.27 - added POSTERS instead green polygons"
+  git commit -m "v0.0.27 - README.md screenshots version updated"
   git push
   ```
 

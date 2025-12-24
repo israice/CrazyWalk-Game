@@ -86,7 +86,10 @@ class LocationPolygonsGenerator:
         """
         small_lines = set(small_poly.get('boundary_white_lines', []))
         
-        for line_id in small_lines:
+        # Sort for deterministic merging order
+        sorted_lines = sorted(list(small_lines))
+        
+        for line_id in sorted_lines:
             # Find all polygons that share this line
             sharing_polys = line_to_polys_map.get(line_id, [])
             for candidate in sharing_polys:
@@ -165,10 +168,10 @@ class LocationPolygonsGenerator:
             # Verify that these lines are actually on the new boundary.
             validated_lines = []
             
-            # Create a "tube" around the exterior boundary.
-            # Relaxed buffer: 2.5e-5 degrees is approx 2.5 meters radius (5m width tube).
-            # This ensures we capture lines even if there's slight drift.
-            boundary_tube = merged_geom.exterior.buffer(2.5e-5)
+            # Create a "tube" around the boundary (handles holes too).
+            # Relaxed buffer: 4.0e-5 degrees is approx 4-5 meters radius.
+            # This ensures we capture lines even if there's drift or they are part of a hole.
+            boundary_tube = merged_geom.boundary.buffer(4.0e-5)
             
             for line_id in combined_lines:
                 wl = white_lines_map.get(line_id)
@@ -192,19 +195,27 @@ class LocationPolygonsGenerator:
                 intersection = boundary_tube.intersection(ls)
                 coverage = intersection.length / ls.length
                 
-                # Relaxed threshold: 0.75 (75%)
-                # Spur lines are typically < 10% coverage, so 75% is safe for true boundaries.
-                if coverage > 0.75:
+                # Relaxed threshold: 0.15 (15%)
+                # Allows lines that only partially touch (due to simplifications) but excludes purely internal shortcuts.
+                if coverage > 0.15:
                     validated_lines.append(line_id)
+                    # logger.info(f"    -> Kept line {line_id} (coverage={coverage:.2f})")
                 else:
                     logger.info(f"    -> Removed ghost line {line_id} (coverage={coverage:.2f})")
 
             combined_lines = validated_lines
             
-            # Sum total points
+            # Sum total points from scratch based on kept lines to be accurate?
+            # Actually, total_points is simpler to just sum, but if we drop lines we should drop their points?
+            # The current logic just sums poly_a + poly_b totals. 
+            # But if a line is a "ghost" (internal shared line that didn't fully dissolve?), it should be removed.
+            # However, the logic calculates TOTAL AREA points.
+            # Ideally we recalculate total_points based on validated_lines later in generate_map.
+            # For now, we trust the sum but relying on generate_map's recalculation step is safer.
+            # Let's just sum for now.
             total_pts = poly_a.get('total_points', 0) + poly_b.get('total_points', 0)
             
-            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {len(new_coords)} coords")
+            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {len(new_coords)} coords, {len(combined_lines)} lines")
             
             return {
                 'id': poly_a['id'],  # Keep first polygon's ID
@@ -289,11 +300,13 @@ class LocationPolygonsGenerator:
             logger.info(f"Filtered Green Circles: {original_gc_count} -> {len(green_circles)}")
             
             # --- RECALCULATE total_points FOR MERGED POLYGONS ---
-            # Build map: line_id -> green_count
+            # Build map: line_id -> green_count AND line_id -> (start, end)
             line_green_counts = {}
+            line_nodes_map = {}
             for wl in white_lines:
                 line_id = wl.get('id')
                 line_green_counts[line_id] = wl.get('green_count', 0)
+                line_nodes_map[line_id] = (wl['start'], wl['end'])
             
             # Build set of all blue circle coordinates (filtered list)
             blue_circle_coords = set()
@@ -308,14 +321,34 @@ class LocationPolygonsGenerator:
                     green_total += line_green_counts.get(line_id, 0)
                 
                 # Count blue circles that are on this polygon's boundary
-                # Match polygon vertices with actual blue circle coordinates
-                polygon_vertices = set()
-                for coord in poly.get('coords', []):
-                    vertex_key = (round(coord[0], 7), round(coord[1], 7))
-                    polygon_vertices.add(vertex_key)
+                # NEW LOGIC: Use TOPOLOGY (white lines) not GEOMETRY (polygon vertices)
+                # This fixes issues where merged polygons (buffer) shift coords slightly off the blue circles.
                 
-                # Only count vertices that are actual blue circles
-                blue_count = len(polygon_vertices & blue_circle_coords)
+                polygon_nodes = set()
+                for line_id in poly.get('boundary_white_lines', []):
+                     # Find the line object
+                     # We can't easily look up by ID in list unless we map it. 
+                     # Optimisation: Build map earlier or just loop? 
+                     # We built `line_green_counts` earlier, but that only has counts.
+                     # We need the START/END nodes of the lines.
+                     # Re-use white_lines list? It's filtered.
+                     pass
+                
+                # To do this efficiently, let's map ID -> (start, end) above.
+                
+                # ... (See below for map creation insertion) ...
+                
+                # ACTUAL REPLACEMENT BLOCK:
+                # Assuming `line_nodes_map` exists (we will add it above this loop)
+                polygon_nodes = set()
+                for line_id in poly.get('boundary_white_lines', []):
+                    if line_id in line_nodes_map:
+                        s, e = line_nodes_map[line_id]
+                        polygon_nodes.add((round(s[0], 7), round(s[1], 7)))
+                        polygon_nodes.add((round(e[0], 7), round(e[1], 7)))
+                
+                # Intersection of Polygon's nodes (from lines) AND Valid Blue Circles
+                blue_count = len(polygon_nodes & blue_circle_coords)
                 
                 old_total = poly.get('total_points', 0)
                 new_total = green_total + blue_count
@@ -720,10 +753,16 @@ class LocationPolygonsGenerator:
         
         relevant_set = set(relevant_nodes)
         
-        for start_node in relevant_nodes:
+        # Sort for deterministic iteration
+        sorted_relevant_nodes = sorted(list(relevant_nodes))
+        
+        for start_node in sorted_relevant_nodes:
             if start_node not in adjacency:
                 continue
-            for neighbor in adjacency[start_node]:
+            
+            # Sort neighbors for deterministic path finding
+            neighbors = sorted(list(adjacency[start_node]))
+            for neighbor in neighbors:
                 edge_key = tuple(sorted((start_node, neighbor)))
                 if edge_key in visited:
                     continue
