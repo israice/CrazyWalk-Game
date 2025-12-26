@@ -27,6 +27,7 @@ class MapControls {
         this.lastPosition = null;
         this.visibilityRules = [];
         this.snapLines = []; // Array of arrays of [lat, lon]
+        this.keyboardEnabled = true;
 
         this.init();
     }
@@ -101,6 +102,11 @@ class MapControls {
         if (!lines) return;
         this.snapLines = lines.map(l => l.path);
         console.log(`Controls: Loaded ${this.snapLines.length} lines for snapping.`);
+    }
+
+    setKeyboardEnabled(enabled) {
+        this.keyboardEnabled = enabled;
+        console.log(`Controls: Keyboard controls ${enabled ? 'ENABLED' : 'DISABLED'}`);
     }
 
     /**
@@ -446,6 +452,8 @@ class MapControls {
         };
 
         document.addEventListener('keydown', (e) => {
+            if (!this.keyboardEnabled) return;
+
             const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'c'];
             if (!navKeys.includes(e.key)) return;
 

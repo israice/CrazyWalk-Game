@@ -444,6 +444,12 @@ class LocationPolygonsGenerator:
                 # [4][5][6]  <- #5 is at user spawn point
                 # [1][2][3]
                 
+                # Create 3x3 grid centered on user location
+                # Grid layout:
+                # [7][8][9]
+                # [4][5][6]  <- #5 is at user spawn point
+                # [1][2][3]
+                
                 # Starting position: bottom-left corner of grid
                 start_lat = center_lat - (1.5 * POSTER_LAT_SIZE)  # Center - 1.5 posters down
                 start_lon = center_lon - (1.5 * POSTER_LON_SIZE)  # Center - 1.5 posters left
@@ -464,16 +470,31 @@ class LocationPolygonsGenerator:
                     available_images = [f"{i}.jpg" for i in range(1, 10)]
 
                 import random
-                # Select 9 images. 
-                # If we have >= 9, sample unique ones.
-                # If we have < 9, sample with replacement (or just cycle them).
-                if len(available_images) >= 9:
-                    selected_images = random.sample(available_images, 9)
+                
+                # --- POSTER PERSISTENCE ---
+                # Check Redis for existing poster assignment for this location
+                # Key based on input lat/lon (rounded to ~1m precision to handle float drift)
+                poster_cache_key = f"game:posters:{round(lat, 6)}_{round(lon, 6)}"
+                cached_selected_images = load_from_redis(poster_cache_key)
+                
+                if cached_selected_images:
+                    logger.info(f"Reusing persisted posters for {lat}, {lon}")
+                    selected_images = cached_selected_images
                 else:
-                    logger.warning(f"Only {len(available_images)} posters found. Repeating to fill grid.")
-                    # Fill 9 slots by cycling available images
-                    selected_images = [available_images[i % len(available_images)] for i in range(9)]
-                    random.shuffle(selected_images) # Shuffle so the pattern isn't obvious
+                    # Select 9 images. 
+                    # If we have >= 9, sample unique ones.
+                    # If we have < 9, sample with replacement (or just cycle them).
+                    if len(available_images) >= 9:
+                        selected_images = random.sample(available_images, 9)
+                    else:
+                        logger.warning(f"Only {len(available_images)} posters found. Repeating to fill grid.")
+                        # Fill 9 slots by cycling available images
+                        selected_images = [available_images[i % len(available_images)] for i in range(9)]
+                        random.shuffle(selected_images) # Shuffle so the pattern isn't obvious
+                    
+                    # Save to Redis (No expiration, cleared on server start)
+                    save_to_redis(poster_cache_key, selected_images, expiration=None)
+                    logger.info(f"Persisted new poster selection for {lat}, {lon}")
 
                 logger.info(f"Selected posters for grid: {selected_images}")
 

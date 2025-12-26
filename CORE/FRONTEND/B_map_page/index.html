@@ -348,6 +348,7 @@
                 maxZoom: 18  // Max Zoom In
             });
             const map = controls.getMap();
+            let gpsWatchId = null;
 
             // Create dedicated pane for posters (не затрагивается debug фильтрами)
             map.createPane('postersPane');
@@ -707,6 +708,19 @@
             // Reusable function to process coordinates (Logic)
             const processCoordinates = (lat, lon, accuracy, label) => {
                 console.log(`DEBUG: [Map Page] Processing ${label} Position: ${lat}, ${lon} (Acc: ${accuracy}m)`);
+
+                // --- SNAP TO NEAREST CIRCLE ---
+                if (window.findNearestActiveCircle) {
+                    const snapped = window.findNearestActiveCircle(lat, lon);
+                    if (snapped) {
+                        // 1 degree lat approx 111km -> 111139 meters
+                        console.log(`DEBUG: Snapping to circle at ${snapped.lat}, ${snapped.lon} (dist: ${(snapped.dist * 111139).toFixed(1)}m)`);
+                        lat = snapped.lat;
+                        lon = snapped.lon;
+                    } else {
+                        console.log("DEBUG: No snap target found. Using raw GPS.");
+                    }
+                }
 
                 if (label === 'LOW_ACCURACY' && hasPreciseFix) {
                     console.log("DEBUG: Ignoring Low Accuracy update (Precise already found).");
@@ -1716,6 +1730,47 @@
                 console.log(`GPS: Visibility check complete. Current zoom: ${currentZoom}. detailsLayer has ${detailsLayer.getLayers().length} layers.`);
                 console.log(`GPS: Polygons visible at zoom >= 18. Current: ${currentZoom >= 18 ? 'YES' : 'NO'}`);
 
+                // --- SNAP LOGIC EXPORT & INITIAL SNAP ---
+                // Defined BEFORE setupProgressHiding so it can be used immediately
+                window.findNearestActiveCircle = (userLat, userLon) => {
+                    let nearest = null;
+                    let minDist = Infinity;
+                    const SNAP_DIST_DEG = 0.001; // Increased to ~100 meters
+
+                    circleLayerMap.forEach((layer, key) => {
+                        const [cLat, cLon] = key.split(',').map(Number);
+                        const dist = Math.sqrt(Math.pow(cLat - userLat, 2) + Math.pow(cLon - userLon, 2));
+
+                        if (dist < SNAP_DIST_DEG) {
+                            // console.log(`DEBUG: Candidate circle at ${cLat},${cLon} dist: ${dist}`);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearest = { lat: cLat, lon: cLon, dist: dist };
+                            }
+                        }
+                    });
+
+                    if (nearest) {
+                        console.log(`DEBUG: Found Nearest Circle: ${nearest.lat},${nearest.lon} (Dist: ${nearest.dist})`);
+                    } else {
+                        console.log(`DEBUG: No circle found within ${SNAP_DIST_DEG} degrees.`);
+                    }
+
+                    return nearest;
+                };
+
+                // INITIAL SNAP CHECK
+                // Since processCoordinates might have run before we had circle data,
+                // check NOW if we should snap the user.
+                const currentPos = userMarker.getLatLng();
+                const initialSnap = window.findNearestActiveCircle(currentPos.lat, currentPos.lng);
+                if (initialSnap) {
+                    console.log(`DEBUG: Initial Snap triggered! Moving from ${currentPos.lat},${currentPos.lng} to ${initialSnap.lat},${initialSnap.lon}`);
+                    // Move marker directly
+                    userMarker.setLatLng([initialSnap.lat, initialSnap.lon]);
+                    controls.updateUserPosition(userMarker, initialSnap.lat, initialSnap.lon, (isGpsActive && window.loadedQuality !== 'NONE'));
+                }
+
                 controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
                 setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
 
@@ -1759,6 +1814,8 @@
                         }
                     });
                 });
+
+
 
                 // Removed: initPosterGrid() call at end (already done at start)
             };
@@ -1812,17 +1869,57 @@
             const setupProgressHiding = (layerMap, circleMap, polyState, lineMap) => {
                 const checkAndHide = () => {
                     const pos = userMarker.getLatLng();
-                    const key = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+                    const exactKey = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
 
-                    const target = layerMap.get(key);
+                    console.log(`DEBUG: CheckAndHide checking pos: ${exactKey}`);
+
+                    let target = layerMap.get(exactKey);
+
+                    // Fallback: Fuzzy search if exact match misses (due to float drift or manual snap differences)
+                    if (!target && window.findNearestActiveCircle) {
+                        const nearest = window.findNearestActiveCircle(pos.lat, pos.lng);
+                        // Strict threshold for "arrived" (e.g. < 10cm or just exact snap check with epsilon)
+                        if (nearest && nearest.dist < 0.000001) {
+                            const fuzzyKey = `${nearest.lat.toFixed(6)},${nearest.lon.toFixed(6)}`;
+                            console.log(`DEBUG: Exact match failed, but found fuzzy match: ${fuzzyKey} (dist: ${nearest.dist})`);
+                            target = layerMap.get(fuzzyKey);
+                        }
+                    }
+
                     if (target) {
                         // Check if already hidden
                         if (target.options.opacity !== 0) {
+                            console.log(`DEBUG: HIDING CIRCLE at ${exactKey}`);
                             // HIDE IT
                             target.setStyle({ opacity: 0, fillOpacity: 0 });
 
                             // TRACK collected circle for persistence
-                            collectedCircles.add(key);
+                            // Use the key of the target we actually found (might be fuzzyKey)
+                            // We can't easily get the key from the layer? 
+                            // We can re-derive it if we used the fuzzy fallback logic above properly.
+                            // But wait, `collectedCircles` stores KEYS.
+                            // If we used fuzzy match, we need the KEY of the fuzzy match.
+                            // Let's ensure we use the correct key.
+
+                            // Iterate to find key if we have the target object but not key? 
+                            // layerMap is Key->Target. 
+                            // Reverse lookup is slow. 
+                            // Let's assume exactKey or we need the fuzzyKey found above.
+
+                            // Re-refining the fallback to capture the key:
+                            let targetKey = exactKey;
+                            if (target === layerMap.get(exactKey)) {
+                                // good
+                            } else {
+                                // Must have been fuzzy
+                                // Recalculate fuzzy key
+                                if (window.findNearestActiveCircle) {
+                                    const nearest = window.findNearestActiveCircle(pos.lat, pos.lng);
+                                    if (nearest) targetKey = `${nearest.lat.toFixed(6)},${nearest.lon.toFixed(6)}`;
+                                }
+                            }
+
+                            collectedCircles.add(targetKey);
 
                             // Safe Tooltip Check (Must be a function and truthy)
                             if (typeof target.getTooltip === 'function' && target.getTooltip()) {
@@ -1830,7 +1927,8 @@
                             }
 
                             // UPDATE PROGRESS
-                            const relevantPolys = circleMap.get(key);
+                            // We need the key to look up relevantPolys
+                            const relevantPolys = circleMap.get(targetKey);
                             if (relevantPolys) {
                                 relevantPolys.forEach(pid => {
                                     const state = polyState.get(pid);
@@ -2039,7 +2137,7 @@
             };
 
             const startLocationWatch = () => {
-                console.log("DEBUG: [Map Page] Requesting browser geolocation (permission should be granted)...");
+                console.log("DEBUG: [Map Page] Starting GPS Watch...");
 
                 if (!("geolocation" in navigator)) {
                     alert("Geolocation not supported by this browser.");
@@ -2047,27 +2145,33 @@
                     return;
                 }
 
-                hasPreciseFix = false;
+                // Clear any existing watch
+                if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
 
-                // Используем разрешение, выданное на home page
-                navigator.geolocation.getCurrentPosition(
+                // Use High Accuracy Watch
+                gpsWatchId = navigator.geolocation.watchPosition(
                     (pos) => {
-                        console.log("DEBUG: GPS Position received:", pos.coords);
-                        processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'HIGH_ACCURACY');
+                        console.log("DEBUG: GPS Watch Update:", pos.coords);
+                        processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'GPS_WATCH');
                     },
                     (err) => {
-                        console.error("DEBUG: Geolocation failed:", err);
-                        if (err.code === 1) {
-                            alert("Location access denied. Please grant permission.");
-                        } else if (err.code === 3) {
-                            alert("Location timeout. Please try again.");
-                        } else {
-                            alert("Unable to get location: " + err.message);
+                        console.error("DEBUG: GPS Watch Error:", err);
+                        // Optional: Handle timeout by keeping last known position or retrying
+                        if (err.code === 1) { // PERMISSION_DENIED
+                            stopLocationWatch();
+                            alert("Location access denied.");
                         }
-                        revealMap();
                     },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
                 );
+            };
+
+            const stopLocationWatch = () => {
+                if (gpsWatchId !== null) {
+                    navigator.geolocation.clearWatch(gpsWatchId);
+                    gpsWatchId = null;
+                    console.log("DEBUG: GPS Watch Stopped.");
+                }
             };
 
             // Navigation / Top Bar Logic (with cache-busting)
@@ -2129,45 +2233,50 @@
                         isGpsActive = !isGpsActive;
 
                         if (isGpsActive) {
+
+                            // SAVE current position and location key before switching to GPS
+                            const currentPos = userMarker.getLatLng();
+                            savedGpsPosition = { lat: currentPos.lat, lon: currentPos.lng };
+                            savedLocationKey = currentLocationKey; // Save exact key
+                            console.log(`DEBUG: Saving Manual Pos: ${savedGpsPosition.lat}, ${savedGpsPosition.lon} Key: ${savedLocationKey}`);
+
                             console.log("DEBUG: GPS Toggled ON");
                             gpsBtn.classList.add('active');
 
-                            // SAVE current position and location key before switching to GPS/real location
-                            const currentPos = userMarker.getLatLng();
-                            savedGpsPosition = { lat: currentPos.lat, lon: currentPos.lng };
-                            savedLocationKey = currentLocationKey; // Save exact key for cache lookup
-                            console.log(`DEBUG: Saved position before GPS: ${savedGpsPosition.lat}, ${savedGpsPosition.lon}`);
-                            console.log(`DEBUG: Saved location key: ${savedLocationKey}`);
-
-                            // Show loading GIF immediately
-                            loadingGif.style.display = 'block';
-                            loadingGif.style.opacity = '1';
-                            mapElement.style.opacity = '0.3';
-                            topBarContainer.style.opacity = '0';
+                            if (loadingGif) {
+                                loadingGif.style.display = 'block';
+                                loadingGif.style.opacity = '1';
+                            }
+                            if (mapElement) mapElement.style.opacity = '0.3';
+                            if (topBarContainer) topBarContainer.style.opacity = '0';
                             hasRevealed = false;
 
-                            // Reset State on fresh activation
-                            window.loadedQuality = 'NONE';
                             startLocationWatch();
+
                         } else {
-                            console.log("DEBUG: GPS Toggled OFF. Reverting to saved position.");
+                            console.log("DEBUG: GPS Toggled OFF");
                             gpsBtn.classList.remove('active');
-                            hasPreciseFix = false;
-                            window.loadedQuality = 'NONE';
 
-                            // Use saved position or default
-                            const returnLat = savedGpsPosition?.lat ?? DEFAULT_LAT;
-                            const returnLon = savedGpsPosition?.lon ?? DEFAULT_LON;
-                            console.log(`DEBUG: Returning to position: ${returnLat}, ${returnLon}`);
+                            stopLocationWatch();
 
-                            // Use Controls to reset view to saved position
-                            controls.resetView(returnLat, returnLon);
-                            userMarker.setLatLng([returnLat, returnLon]);
+                            // RESTORE Manual Position
+                            if (savedGpsPosition) {
+                                console.log(`DEBUG: Restoring Manual Pos: ${savedGpsPosition.lat}, ${savedGpsPosition.lon}`);
 
-                            // Use SAVED location key for cache lookup (not recalculated)
-                            loadGameDataWithKey(returnLat, returnLon, savedLocationKey);
+                                hasPreciseFix = false;
+                                window.loadedQuality = 'NONE';
+
+                                // Move User
+                                userMarker.setLatLng([savedGpsPosition.lat, savedGpsPosition.lon]);
+                                controls.resetView(savedGpsPosition.lat, savedGpsPosition.lon);
+
+                                // Reload Data for that location
+                                loadGameDataWithKey(savedGpsPosition.lat, savedGpsPosition.lon, savedLocationKey);
+                            }
                         }
                     });
+
+
                 }
 
                 if (menuBtn && topBar) {
