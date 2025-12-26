@@ -349,6 +349,10 @@
             });
             const map = controls.getMap();
 
+            // Create dedicated pane for posters (не затрагивается debug фильтрами)
+            map.createPane('postersPane');
+            map.getPane('postersPane').style.zIndex = 200; // Ниже overlay pane, но выше tile pane
+
             // --- QUADRANT NAVIGATION HELPER ---
             let lastInputTime = 0; // Debounce tracker
             let blockMouseEvents = false; // Touch Lockout flag
@@ -519,7 +523,7 @@
                 // Add to map pane with correct bounds
                 posterSvgOverlay = L.svgOverlay(svgElement, svgBounds, {
                     interactive: false,
-                    pane: 'tilePane'
+                    pane: 'postersPane'  // Используем выделенный pane для постеров
                 }).addTo(map);
 
                 revealMask = svgElement.querySelector('#mask-paths-container');
@@ -601,7 +605,7 @@
                     image.setAttribute("y", y);
                     image.setAttribute("width", width);
                     image.setAttribute("height", height);
-                    image.setAttribute("opacity", isPostersDebugActive ? "0.6" : "1.0");
+                    image.setAttribute("opacity", "1.0");  // Всегда 100% прозрачности для оригинального цвета
                     image.setAttribute("preserveAspectRatio", "none");
 
                     imagesContainer.appendChild(image);

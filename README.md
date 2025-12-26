@@ -201,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard 06758f1
+  git reset --hard c7bd935
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -310,6 +310,7 @@
     - testing city fix on home page
     - fixed united poligon perimeter 
     - README.md screenshots version updated 
+    - testting prod 1 
 
 
   - ### Next Tasks
@@ -329,7 +330,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.27 - README.md screenshots version updated"
+  git commit -m "v0.0.27 - testting prod 2 "
   git push
   ```
 
