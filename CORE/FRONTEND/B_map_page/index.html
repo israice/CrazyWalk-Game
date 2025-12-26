@@ -363,6 +363,13 @@
             let selectedLayers = [];
             let originalStyles = [];
 
+            // Shared Debug Maps (Global to DOMContentLoaded for access by toggleHiddenDebug)
+            let _lineLayerMap = null;
+            let _circleLayerMap = null;
+            let _blueCircleLayerMap = null;
+            let _greenCirclesByLine = null;
+            let _polygonState = null;
+
             const resetSelection = () => {
                 selectedLayers.forEach((layer, i) => {
                     if (layer && originalStyles[i] && typeof layer.setStyle === 'function') {
@@ -506,14 +513,16 @@
                 svgElement.setAttribute("viewBox", "0 0 1000 1000");
                 svgElement.setAttribute("preserveAspectRatio", "none");
                 svgElement.innerHTML = `
-                    <defs>
-                        <mask id="poster-reveal-mask">
-                            <rect width="1000" height="1000" fill="black"/>
-                            <g id="mask-paths-container" fill="white"></g>
-                        </mask>
-                    </defs>
-                    <g id="poster-images-container" mask="url(#poster-reveal-mask)"></g>
-                `;
+                <defs>
+                    <mask id="poster-reveal-mask">
+                        <rect width="1000" height="1000" fill="black"/>
+                        <g id="mask-paths-container" fill="white"></g>
+                    </mask>
+                </defs>
+                <g id="debug-poster-bg" style="display:none; opacity: 0.4; pointer-events: none;"></g>
+                <g id="poster-images-container" mask="url(#poster-reveal-mask)"></g>
+                <g id="debug-poster-overlay" style="display:none; pointer-events: none;"></g>
+            `;
 
                 // Create proper LatLngBounds for the SVG overlay
                 const svgBounds = L.latLngBounds(
@@ -568,9 +577,14 @@
                 if (!svg) return;
 
                 const imagesContainer = svg.querySelector('#poster-images-container');
-                if (!imagesContainer) return;
+                const bgContainer = svg.querySelector('#debug-poster-bg');
+                const overlayContainer = svg.querySelector('#debug-poster-overlay');
+
+                if (!imagesContainer || !bgContainer || !overlayContainer) return;
 
                 imagesContainer.innerHTML = '';
+                bgContainer.innerHTML = '';
+                overlayContainer.innerHTML = '';
 
                 // Get SVG bounds (geographic coordinates)
                 const svgBounds = posterSvgOverlay.getBounds();
@@ -588,8 +602,6 @@
                     const posterMaxLat = p.bounds[1][0];
                     const posterMaxLon = p.bounds[1][1];
 
-                    // Calculate positions in 0-1000 range based on svgBounds
-                    // x, y, width, height relative to viewBox="0 0 1000 1000"
                     const x = ((posterMinLon - svgMinLon) / lonRange) * 1000;
                     const y = ((svgMaxLat - posterMaxLat) / latRange) * 1000;
                     const width = ((posterMaxLon - posterMinLon) / lonRange) * 1000;
@@ -600,18 +612,23 @@
                         return;
                     }
 
-                    const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                    image.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-                    image.setAttribute("x", x);
-                    image.setAttribute("y", y);
-                    image.setAttribute("width", width);
-                    image.setAttribute("height", height);
-                    image.setAttribute("opacity", "1.0");  // Всегда 100% прозрачности для оригинального цвета
-                    image.setAttribute("preserveAspectRatio", "none");
+                    // 1. Background Image (Ghost) - Always opacity 0.4 if visible
+                    const bgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+                    bgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
+                    bgImage.setAttribute("x", x);
+                    bgImage.setAttribute("y", y);
+                    bgImage.setAttribute("width", width);
+                    bgImage.setAttribute("height", height);
+                    // Wait, if container has 0.6, child 1.0 = 0.6. 
+                    bgImage.setAttribute("preserveAspectRatio", "none");
+                    bgContainer.appendChild(bgImage);
 
-                    imagesContainer.appendChild(image);
+                    // 2. Main Game Image - Always opacity 1.0 (Masked)
+                    const mainImage = bgImage.cloneNode(true);
+                    mainImage.setAttribute("opacity", "1.0");
+                    imagesContainer.appendChild(mainImage);
 
-                    // Debug mode: show borders and numbers
+                    // 3. Debug Overlay (Borders and Numbers)
                     if (isPostersDebugActive) {
                         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                         rect.setAttribute("x", x);
@@ -621,7 +638,7 @@
                         rect.setAttribute("fill", "none");
                         rect.setAttribute("stroke", "red");
                         rect.setAttribute("stroke-width", "3");
-                        imagesContainer.appendChild(rect);
+                        overlayContainer.appendChild(rect);
 
                         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                         text.setAttribute("x", x + width / 2);
@@ -632,32 +649,88 @@
                         text.setAttribute("text-anchor", "middle");
                         text.setAttribute("dominant-baseline", "middle");
                         text.textContent = `#${p.id}`;
-                        imagesContainer.appendChild(text);
+                        overlayContainer.appendChild(text);
                     }
                 });
 
-                console.log(`DEBUG: Updated ${posters.length} SVG poster images`);
+                console.log(`DEBUG: Updated poster layers`);
             };
 
             const updatePostersVisibility = () => {
-                if (isPostersDebugActive && posterSvgOverlay) {
+                if (posterSvgOverlay) {
                     const svg = posterSvgOverlay.getElement();
                     if (svg) {
+                        const bgContainer = svg.querySelector('#debug-poster-bg');
+                        const overlayContainer = svg.querySelector('#debug-poster-overlay');
                         const imagesContainer = svg.querySelector('#poster-images-container');
-                        if (imagesContainer) {
-                            imagesContainer.setAttribute('mask', 'none');
-                        }
-                    }
-                } else if (posterSvgOverlay) {
-                    const svg = posterSvgOverlay.getElement();
-                    if (svg) {
-                        const imagesContainer = svg.querySelector('#poster-images-container');
+
+                        // Main container ALWAYS masked
                         if (imagesContainer) {
                             imagesContainer.setAttribute('mask', 'url(#poster-reveal-mask)');
                         }
+
+                        // Toggle debug layers
+                        const display = isPostersDebugActive ? 'inline' : 'none';
+                        if (bgContainer) bgContainer.style.display = display;
+                        if (overlayContainer) overlayContainer.style.display = display;
                     }
                 }
                 updatePosterSVG();
+                toggleHiddenDebug(isPostersDebugActive);
+            };
+
+            const toggleHiddenDebug = (show) => {
+                if (!_circleLayerMap || !_polygonState || !_lineLayerMap) return;
+
+                console.log(`DEBUG: Toggling hidden elements: ${show ? 'SHOW ALL' : 'RESTORE HIDDEN'}`);
+
+                // 1. Handle Collected Circles
+                collectedCircles.forEach(key => {
+                    const layer = _circleLayerMap.get(key);
+                    if (layer) {
+                        if (show) {
+                            // Reveal
+                            const isBlue = layer.options.color === 'blue' || (layer.options.fillColor === '#00ccff');
+                            layer.setStyle({
+                                opacity: 1,
+                                fillOpacity: isBlue ? 0.8 : 1
+                            });
+
+                            // Restore Blue Circle Tooltip (Number)
+                            if (layer.connections !== undefined && !layer.getTooltip()) {
+                                layer.bindTooltip(String(layer.connections), {
+                                    permanent: true,
+                                    direction: 'center',
+                                    className: 'circle-label'
+                                });
+                            }
+                        } else {
+                            // Re-hide
+                            layer.setStyle({ opacity: 0, fillOpacity: 0 });
+
+                            // Remove tooltip again if it was restored
+                            if (layer.getTooltip()) {
+                                layer.unbindTooltip();
+                            }
+                        }
+                    }
+                });
+
+                // 2. Handle Lines from Completed Polygons
+                _polygonState.forEach(state => {
+                    if (state.current >= state.total && state.lines) {
+                        state.lines.forEach(lid => {
+                            const lineLayer = _lineLayerMap.get(String(lid));
+                            if (lineLayer) {
+                                if (show) {
+                                    lineLayer.setStyle({ opacity: 1, fillOpacity: 1 }); // Lines usually opacity 1
+                                } else {
+                                    lineLayer.setStyle({ opacity: 0, fillOpacity: 0 });
+                                }
+                            }
+                        });
+                    }
+                });
             };
 
             const addPolygonToMask = (coords) => {
@@ -1003,13 +1076,14 @@
                 if (data.polygons) {
                     data.polygons.forEach(poly => {
                         // UNIFIED ID SCHEME: 
-                        // Generate Random UID and use it as the ONLY valid ID.
-                        // This ensures:
-                        // 1. Debug UI shows "POLYGON_..."
-                        // 2. Logic works (using string ID)
-                        // 3. Persistence resets on reload (since ID changes)
+                        // Use Server ID if available for persistence. Fallback to Random if missing.
+                        // We prefix with POLYGON_ for internal consistency if it's a raw number.
+                        if (poly.id !== undefined) {
+                            poly.uid = String(poly.id); // Use stable ID
+                        } else {
+                            poly.uid = generateUID('POLYGON');
+                        }
 
-                        poly.uid = generateUID('POLYGON');
                         poly.id = poly.uid; // UNIFIED.
 
                         // Map Wrapper: Update boundary references
@@ -1132,10 +1206,7 @@
                 // resetSelection is now defined in parent scope
 
                 // Lazy references for maps (filled after circles/lines created)
-                let _lineLayerMap = null;
-                let _circleLayerMap = null;
-                let _blueCircleLayerMap = null; // Extra map for blue circles by coord key
-                let _greenCirclesByLine = null; // lineId -> [layer, layer, ...]
+                // Variables moved to parent scope (DOMContentLoaded)
 
                 const attachDebugClick = (layer, data, type) => {
                     layer.on('click', (e) => {
@@ -1439,11 +1510,12 @@
                 };
 
                 // Helper to set lazy references after maps are created
-                const setDebugMaps = (lineMap, circleMap, blueMap, greenByLine) => {
+                const setDebugMaps = (lineMap, circleMap, blueMap, greenByLine, polyState) => {
                     _lineLayerMap = lineMap;
                     _circleLayerMap = circleMap;
                     _blueCircleLayerMap = blueMap;
                     _greenCirclesByLine = greenByLine;
+                    _polygonState = polyState;
                 };
 
                 // Map click to clear selection
@@ -1661,6 +1733,10 @@
                         const marker = L.circleMarker([circle.lat, circle.lon], {
                             radius: 8, color: 'blue', fillColor: '#00ccff', fillOpacity: 0.8
                         }).addTo(detailsLayer);
+
+                        // Save connection count for debug restoration
+                        marker.connections = circle.connections;
+
                         marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
                         // Blue circles are large enough, no composite needed yet unless requested
                         addToMap(circle.lat, circle.lon, marker, 'blue');
@@ -1719,7 +1795,7 @@
                 }
 
                 // Set debug maps for polygon highlighting feature
-                setDebugMaps(lineLayerMap, circleLayerMap, blueCircleLayerMap, greenCirclesByLine);
+                setDebugMaps(lineLayerMap, circleLayerMap, blueCircleLayerMap, greenCirclesByLine, polygonState);
 
                 // Red Lines / Street Names removed. 
                 // We now use the Google Text Overlay in map_controls.js
@@ -1820,42 +1896,90 @@
                 // Removed: initPosterGrid() call at end (already done at start)
             };
 
-            // Restore previously collected circles from server
+            // Restore previously collected circles from server AND LocalStorage
             const restoreSavedCircles = async (layerMap, circleMap, polyState, lineMap) => {
                 if (!currentLocationKey) return;
 
-                const savedCircles = await loadLocationState(currentLocationKey);
-                if (savedCircles.size === 0) {
+                const combinedCircles = new Set();
+
+                // 1. Load from LocalStorage (fast, offline capable)
+                try {
+                    const localData = localStorage.getItem(`collected_${currentLocationKey}`);
+                    if (localData) {
+                        const parsed = JSON.parse(localData);
+                        if (Array.isArray(parsed)) {
+                            parsed.forEach(k => combinedCircles.add(k));
+                            console.log(`DEBUG: Loaded ${parsed.length} circles from LocalStorage`);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("DEBUG: Failed to load local circles:", e);
+                }
+
+                // 2. Load from Server (authoritative)
+                try {
+                    const savedCircles = await loadLocationState(currentLocationKey);
+                    if (savedCircles && savedCircles.size > 0) {
+                        savedCircles.forEach(k => combinedCircles.add(k));
+                        console.log(`DEBUG: Loaded ${savedCircles.size} circles from Server`);
+                    }
+                } catch (e) {
+                    console.warn("DEBUG: Failed to load server circles:", e);
+                }
+
+                if (combinedCircles.size === 0) {
                     console.log("DEBUG: No saved circles to restore for this location");
                     return;
                 }
 
-                console.log(`DEBUG: Restoring ${savedCircles.size} previously collected circles...`);
+                console.log(`DEBUG: Restoring ${combinedCircles.size} unique collected circles...`);
 
                 let restoredCount = 0;
-                savedCircles.forEach(key => {
+                combinedCircles.forEach(key => {
                     const target = layerMap.get(key);
-                    if (target && target.options.opacity !== 0) {
-                        // Hide the circle
-                        target.setStyle({ opacity: 0, fillOpacity: 0 });
 
-                        // Track as collected
-                        collectedCircles.add(key);
+                    // Add to current session tracking
+                    collectedCircles.add(key);
+
+                    if (target) {
+                        // Check visibility rules
+                        const shouldHide = !isPostersDebugActive;
+
+                        if (shouldHide && target.options.opacity !== 0) {
+                            target.setStyle({ opacity: 0, fillOpacity: 0 });
+                        }
 
                         // Remove tooltip if exists
                         if (typeof target.getTooltip === 'function' && target.getTooltip()) {
                             target.unbindTooltip();
                         }
 
-                        // Update polygon progress
+                        // UPDATE POLYGON PROGRESS
+                        // Only if we haven't already processed this circle in this session?
+                        // Actually, polyState.current is reset to 0 (or localStorage value).
+                        // If we use localStorage value, it might ALREADY include these.
+                        // FIX: We rely on calculation from scratch if we don't trust localStorage counts 
+                        // OR we blindly increment.
+                        // Problem: If localStorage count is 5, and we process 5 circles here, we get 10?
+                        // SOLUTION: Reset polygon current state to 0 before restoration if we are doing full restoration?
+                        // Or rely on the fact that restoration is idempotent?
+                        // Currently: polyState.current = parseInt(localStorage...);
+                        // If we restore, we increment. Double counting risk!
+
+                        // We must be careful. If we use localStorage for counts, we shouldn't re-increment.
+                        // BUT, localStorage counts might differ from collectedCircles list.
+                        // BEST APPROACH: Reset 'current' to 0 and re-calculate from collectedCircles list.
+                        // This ensures consistency.
+
                         const relevantPolys = circleMap.get(key);
                         if (relevantPolys) {
                             relevantPolys.forEach(pid => {
                                 const state = polyState.get(pid);
-                                if (state && state.current < state.total) {
-                                    state.current++;
-                                    updatePolygonVisuals(state, lineMap);
-                                }
+                                // Note: We only increment if NOT already complete? No, re-count.
+                                // But we can't easily reset 0 globally unless we did it earlier.
+                                // Let's check init loop.
+                                // In init: pState.current = localStorage...
+                                // Risk of double count is high.
                             });
                         }
 
@@ -1863,7 +1987,41 @@
                     }
                 });
 
-                console.log(`DEBUG: Restored ${restoredCount} circles to hidden state`);
+                // RE-CALCULATE POLYGON TOTALS SAFELY
+                // Instead of incremental, let's just count hits from the set.
+                // This prevents LocalStorage count vs Circle List desync.
+
+                polyState.forEach(state => {
+                    // Reset to 0
+                    state.current = 0;
+
+                    // Iterate all circles in this polygon
+                    // We need to know which circles belong to this polygon.
+                    // 'state' doesn't list its circles directly (only count).
+                    // But 'circleMap' (circleToPolyMap) maps Circle -> [Polys].
+                    // We can iterate 'combinedCircles' (which are keys) and check circleMap.
+                });
+
+                combinedCircles.forEach(key => {
+                    const relevantPolys = circleMap.get(key);
+                    if (relevantPolys) {
+                        relevantPolys.forEach(pid => {
+                            const state = polyState.get(pid);
+                            if (state) state.current++;
+                        });
+                    }
+                });
+
+                // Now apply visuals
+                let restoredMasksCount = 0;
+                polyState.forEach(state => {
+                    updatePolygonVisuals(state, lineMap);
+                    if (state.current >= state.total && state.coords) {
+                        restoredMasksCount++;
+                    }
+                });
+
+                console.log(`DEBUG: Restored ${restoredCount} circles and ${restoredMasksCount} completed polygons`);
             };
 
             const setupProgressHiding = (layerMap, circleMap, polyState, lineMap) => {
@@ -1886,40 +2044,40 @@
                         }
                     }
 
+
                     if (target) {
-                        // Check if already hidden
-                        if (target.options.opacity !== 0) {
-                            console.log(`DEBUG: HIDING CIRCLE at ${exactKey}`);
-                            // HIDE IT
-                            target.setStyle({ opacity: 0, fillOpacity: 0 });
+                        // Re-calculate targetKey (since target might be from fuzzy match)
+                        let targetKey = exactKey;
+                        // If exact match failed, we need to recover the key from the target... 
+                        // Actually, we can just re-run the logic or check if we have the key.
+                        // Ideally we should have stored the found key. 
 
-                            // TRACK collected circle for persistence
-                            // Use the key of the target we actually found (might be fuzzyKey)
-                            // We can't easily get the key from the layer? 
-                            // We can re-derive it if we used the fuzzy fallback logic above properly.
-                            // But wait, `collectedCircles` stores KEYS.
-                            // If we used fuzzy match, we need the KEY of the fuzzy match.
-                            // Let's ensure we use the correct key.
+                        // Let's re-run the fuzzy logic to be safe and simple
+                        if (target !== layerMap.get(exactKey) && window.findNearestActiveCircle) {
+                            const nearest = window.findNearestActiveCircle(pos.lat, pos.lng);
+                            if (nearest) targetKey = `${nearest.lat.toFixed(6)},${nearest.lon.toFixed(6)}`;
+                        }
 
-                            // Iterate to find key if we have the target object but not key? 
-                            // layerMap is Key->Target. 
-                            // Reverse lookup is slow. 
-                            // Let's assume exactKey or we need the fuzzyKey found above.
+                        const isCollected = collectedCircles.has(targetKey);
+                        if (!isCollected) {
+                            console.log(`DEBUG: COLLECTED CIRCLE at ${exactKey}`);
 
-                            // Re-refining the fallback to capture the key:
-                            let targetKey = exactKey;
-                            if (target === layerMap.get(exactKey)) {
-                                // good
-                            } else {
-                                // Must have been fuzzy
-                                // Recalculate fuzzy key
-                                if (window.findNearestActiveCircle) {
-                                    const nearest = window.findNearestActiveCircle(pos.lat, pos.lng);
-                                    if (nearest) targetKey = `${nearest.lat.toFixed(6)},${nearest.lon.toFixed(6)}`;
-                                }
-                            }
-
+                            // 1. Mark Collected
                             collectedCircles.add(targetKey);
+
+                            // 2. Persist Local
+                            localStorage.setItem(`collected_${currentLocationKey}`, JSON.stringify(Array.from(collectedCircles)));
+
+                            // 3. Persist Server (Debounced/Throttled usually, but here immediate-ish)
+                            // Note: frequent saves might spam server. 
+                            // Optimized: saveLocationState is simple fetch. 
+
+                            // 4. Hide Visual (Unless Debug Posters Active)
+                            if (!isPostersDebugActive) {
+                                target.setStyle({ opacity: 0, fillOpacity: 0 });
+                            } else {
+                                target.setStyle({ color: '#555', opacity: 0.5 }); // Visual Feedback in Debug
+                            }
 
                             // Safe Tooltip Check (Must be a function and truthy)
                             if (typeof target.getTooltip === 'function' && target.getTooltip()) {
