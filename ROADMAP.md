@@ -85,7 +85,7 @@
 - [ ] each time user moving to circle, that circle will go hidden
 ## finished polygons
 - [ ] when no hidden circles left around polygon make polygon green and hide white circles in his center and polygons green lines
-- [ ] when blue circle have all his polygons around change blue to orange
+- [x] when blue circle have all his polygons around change blue to orange
 
 ## expend map
 - [ ] when userMarker on blue circle, expend the map to his missing polygons
