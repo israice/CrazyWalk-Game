@@ -554,7 +554,7 @@
 
                     console.log(`DEBUG: Poster ${poster.id}: lat(${poster.min_lat.toFixed(5)}, ${poster.max_lat.toFixed(5)}), lon(${poster.min_lon.toFixed(5)}, ${poster.max_lon.toFixed(5)})`);
 
-                    if (poster.id === 5) {
+                    if (poster.position === 5) {
                         const poster5CenterLat = (poster.min_lat + poster.max_lat) / 2;
                         const poster5CenterLon = (poster.min_lon + poster.max_lon) / 2;
                         const userPos = userMarker.getLatLng();
@@ -644,7 +644,7 @@
                         text.setAttribute("x", x + width / 2);
                         text.setAttribute("y", y + height / 2);
                         text.setAttribute("fill", "yellow");
-                        text.setAttribute("font-size", "40");
+                        text.setAttribute("font-size", "13");
                         text.setAttribute("font-weight", "bold");
                         text.setAttribute("text-anchor", "middle");
                         text.setAttribute("dominant-baseline", "middle");
@@ -1073,18 +1073,20 @@
                 }
 
                 // C. Process Polygons (Depend on Lines)
+                const polyIdMap = new Map(); // Old ID (poly_X) -> New UID (POLYGON_xxx)
                 if (data.polygons) {
                     data.polygons.forEach(poly => {
-                        // UNIFIED ID SCHEME: 
-                        // Use Server ID if available for persistence. Fallback to Random if missing.
-                        // We prefix with POLYGON_ for internal consistency if it's a raw number.
-                        if (poly.id !== undefined) {
-                            poly.uid = String(poly.id); // Use stable ID
-                        } else {
-                            poly.uid = generateUID('POLYGON');
-                        }
+                        const originalId = poly.id; // Save original ID before overwriting
 
+                        // UNIFIED ID SCHEME: 
+                        // Generate random UID for polygons
+                        poly.uid = generateUID('POLYGON');
                         poly.id = poly.uid; // UNIFIED.
+
+                        // Store mapping for later use
+                        if (originalId !== undefined) {
+                            polyIdMap.set(String(originalId), poly.uid);
+                        }
 
                         // Map Wrapper: Update boundary references
                         if (poly.boundary_white_lines) {
@@ -1103,7 +1105,28 @@
                     data.blue_circles.forEach(circle => {
                         circle.uid = generateUID('BLUE_CIRCLE');
                         circle.id = circle.uid;
+
+                        // Update connected_polygon_ids to use new UIDs
+                        if (circle.connected_polygon_ids) {
+                            circle.connected_polygon_ids = circle.connected_polygon_ids.map(oldId => {
+                                const newId = polyIdMap.get(String(oldId));
+                                return newId || oldId;
+                            });
+                        }
+
                         window.allItems.set(circle.uid, circle);
+                    });
+                }
+
+                // D2. Update White Lines connected_polygon_ids
+                if (data.white_lines) {
+                    data.white_lines.forEach(line => {
+                        if (line.connected_polygon_ids) {
+                            line.connected_polygon_ids = line.connected_polygon_ids.map(oldId => {
+                                const newId = polyIdMap.get(String(oldId));
+                                return newId || oldId;
+                            });
+                        }
                     });
                 }
 
@@ -1467,6 +1490,8 @@
                             const greenCount = data.green_circles_count || 0;
                             const totalCircles = data.total_circles || (blueEndpoints + greenCount);
                             const lineLength = data.length ? data.length.toFixed(2) : '?';
+                            const connectedPolyCount = data.connected_polygons_count || 0;
+                            const connectedPolyIds = data.connected_polygon_ids ? data.connected_polygon_ids.join(', ') : 'None';
 
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#fff7e6; border-radius:4px; border:1px solid #ffd591;">
@@ -1474,6 +1499,7 @@
                                     📏 Length: <b>${lineLength}m</b><br>
                                     🔵 Blue Endpoints: <b>${blueEndpoints}</b><br>
                                     🟢 Green Circles: <b>${greenCount}</b><br>
+                                    🔗 Polygons: <b>${connectedPolyCount}</b><br>
                                     --------------------------<br>
                                     ∑ Total Circles: <b>${totalCircles}</b>
                                 </div>
@@ -1488,8 +1514,20 @@
                                 <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
                                     <b>Blue Circle Stats:</b><br>
                                     Connections: <b>${data.connections || '?'}</b><br>
-                                    🔗 Polygons: <b>${connectedCount}</b><br>
-                                    IDs: <span style="font-size:10px;">${connectedIds}</span>
+                                    🔗 Polygons: <b>${connectedCount}</b>
+                                </div>
+                            `;
+                        }
+                        // STATS FOR GREEN CIRCLES
+                        else if (type.includes('Green Circle')) {
+                            const connectedCount = data.connected_polygons_count || 0;
+                            const lineId = data.line_id || '?';
+
+                            statsHtml = `
+                                <div style="margin-bottom:8px; padding:4px; background:#e6ffe6; border-radius:4px; border:1px solid #91ff91;">
+                                    <b>Green Circle Stats:</b><br>
+                                    📍 Line ID: <b style="font-size:10px;">${lineId}</b><br>
+                                    🔗 Polygons: <b>${connectedCount}</b>
                                 </div>
                             `;
                         }

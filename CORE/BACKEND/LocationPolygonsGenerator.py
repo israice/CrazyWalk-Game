@@ -460,6 +460,34 @@ class LocationPolygonsGenerator:
                      
                 # logger.info(f"Blue Circle {bc['id']}: connected to {len(connected_polys)} polygons")
 
+            # --- CALCULATE POLYGON CONNECTIONS FOR WHITE LINES ---
+            # Map: white_line_id -> set(polygon_ids)
+            wl_poly_map = {wl['id']: set() for wl in white_lines}
+            
+            for poly in polygons:
+                poly_id = poly['id']
+                for line_id in poly.get('boundary_white_lines', []):
+                    if line_id in wl_poly_map:
+                        wl_poly_map[line_id].add(poly_id)
+            
+            # Update White Lines with this data
+            for wl in white_lines:
+                connected_polys = list(wl_poly_map.get(wl['id'], []))
+                wl['connected_polygon_ids'] = connected_polys
+                wl['connected_polygons_count'] = len(connected_polys)
+
+            # --- CALCULATE POLYGON CONNECTIONS FOR GREEN CIRCLES ---
+            # Green circles inherit polygon connections from their parent white line
+            for gc in green_circles:
+                parent_line_id = gc.get('line_id')
+                if parent_line_id and parent_line_id in wl_poly_map:
+                    connected_polys = list(wl_poly_map[parent_line_id])
+                    gc['connected_polygon_ids'] = connected_polys
+                    gc['connected_polygons_count'] = len(connected_polys)
+                else:
+                    gc['connected_polygon_ids'] = []
+                    gc['connected_polygons_count'] = 0
+
             
             # --- CALCULATE POSTER GRID (3x3 = 9 POSTERS) ---
             # Create a fixed 3x3 grid centered on the geometric center of all polygons
@@ -522,6 +550,11 @@ class LocationPolygonsGenerator:
                     available_images = [f"{i}.jpg" for i in range(1, 10)]
 
                 import random
+                import secrets
+                
+                def generate_uid(prefix):
+                    """Generate a random UID like POSTER_phy5i6tgz"""
+                    return f"{prefix}_{secrets.token_hex(4)}"
                 
                 # --- POSTER PERSISTENCE ---
                 # Check Redis for existing poster assignment for this location
@@ -557,7 +590,8 @@ class LocationPolygonsGenerator:
                 for row in range(2, -1, -1):  # Start from row 2 (top) down to row 0 (bottom)
                     for col in range(3):
                         # Simple formula: row 2 = IDs 7,8,9; row 1 = IDs 4,5,6; row 0 = IDs 1,2,3
-                        poster_id = row * 3 + col + 1
+                        poster_id = generate_uid('POSTER')
+                        poster_position = row * 3 + col + 1  # Keep numeric position for debugging
                         
                         # Use the randomly selected image
                         image_filename = selected_images[img_idx]
@@ -565,6 +599,7 @@ class LocationPolygonsGenerator:
                         
                         poster = {
                             'id': poster_id,
+                            'position': poster_position,  # Numeric position 1-9 for reference
                             'min_lat': start_lat + row * POSTER_LAT_SIZE,
                             'max_lat': start_lat + (row + 1) * POSTER_LAT_SIZE,
                             'min_lon': start_lon + col * POSTER_LON_SIZE,
@@ -574,10 +609,10 @@ class LocationPolygonsGenerator:
                         poster_grid.append(poster)
                         
                         # Log each poster for debugging
-                        logger.info(f"Poster #{poster_id} (row={row}, col={col}): lat({poster['min_lat']:.6f}, {poster['max_lat']:.6f}), lon({poster['min_lon']:.6f}, {poster['max_lon']:.6f})")
+                        logger.info(f"Poster {poster_id} (pos={poster_position}, row={row}, col={col}): lat({poster['min_lat']:.6f}, {poster['max_lat']:.6f}), lon({poster['min_lon']:.6f}, {poster['max_lon']:.6f})")
                         
                         # Debug: log center poster specifically
-                        if poster_id == 5:
+                        if poster_position == 5:
                             poster_center_lat = (poster['min_lat'] + poster['max_lat']) / 2
                             poster_center_lon = (poster['min_lon'] + poster['max_lon']) / 2
                             logger.info(f"Poster #5 (center): bounds lat({poster['min_lat']:.6f}, {poster['max_lat']:.6f}), lon({poster['min_lon']:.6f}, {poster['max_lon']:.6f})")
