@@ -142,6 +142,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             logger.info(f"MATCHED Poster Route: {self.path}")
             self.handle_serve_poster()
             return
+        if self.path.startswith('/README.md'):
+            self.handle_serve_readme()
+            return
 
         if self.command == 'GET':
             super().do_GET()
@@ -430,6 +433,29 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(f.read())
         except Exception as e:
             logger.error(f"Error serving poster: {e}")
+            self.send_error(500, str(e))
+
+    def handle_serve_readme(self):
+        """Serve README.md from project root for version badge."""
+        try:
+            readme_path = os.path.join(os.getcwd(), 'README.md')
+            
+            if not os.path.exists(readme_path):
+                logger.error(f"README.md not found: {readme_path}")
+                self.send_error(404, "README.md Not Found")
+                return
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/markdown; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'no-cache')  # Always fresh for version check
+            self.end_headers()
+            
+            with open(readme_path, 'rb') as f:
+                self.wfile.write(f.read())
+                
+        except Exception as e:
+            logger.error(f"Error serving README.md: {e}")
             self.send_error(500, str(e))
 
     def proxy_nominatim(self):

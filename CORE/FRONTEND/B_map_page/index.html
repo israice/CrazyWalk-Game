@@ -252,6 +252,45 @@
             z-index: 20;
             /* Above base map tiles (z-index 10-11) */
         }
+
+        /* Version Badge */
+        #version-badge {
+            position: absolute;
+            top: 1vh;
+            left: 1vh;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(30, 30, 30, 0.9));
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 1.5vh;
+            font-weight: bold;
+            padding: 0.5vh 1vh;
+            border-radius: 0.5vh;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            z-index: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, background 0.3s;
+            text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+        }
+
+        #version-badge.updated {
+            background: linear-gradient(135deg, rgba(255, 100, 0, 0.9), rgba(200, 50, 0, 0.9));
+            color: #fff;
+            border-color: rgba(255, 200, 0, 0.5);
+            animation: pulse-version 1s ease-in-out 3;
+        }
+
+        @keyframes pulse-version {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
     </style>
 </head>
 
@@ -272,6 +311,9 @@
             <button class="btn-retry" id="retry-btn">RETRY</button>
         </div>
 
+        <!-- Version Badge -->
+        <div id="version-badge">v0.0.0</div>
+
     </div>
     <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
 
@@ -283,6 +325,49 @@
     <script src="/B_map_page/components/map_controls.js?v=9"></script>
 
     <script>
+        // Version Badge Loader - Fetches version from README.md
+        (async function loadVersionBadge() {
+            const STORAGE_KEY = 'crazywalk_version';
+            const versionBadge = document.getElementById('version-badge');
+
+            try {
+                // Fetch README.md from server root
+                const response = await fetch('/README.md?t=' + Date.now());
+                if (!response.ok) throw new Error('README.md not found');
+
+                const text = await response.text();
+
+                // Parse version from git commit line: git commit -m "v0.0.27 - ..."
+                const match = text.match(/git commit -m "(v[\d.]+)/m);
+                if (!match) throw new Error('Version not found in README.md');
+
+                const currentVersion = match[1];
+                const savedVersion = localStorage.getItem(STORAGE_KEY);
+
+                // Update badge text
+                versionBadge.textContent = currentVersion;
+
+                // Check if version changed
+                if (savedVersion && savedVersion !== currentVersion) {
+                    console.log(`DEBUG: Version updated: ${savedVersion} → ${currentVersion}`);
+                    versionBadge.classList.add('updated');
+                    // Remove animation class after 3 seconds
+                    setTimeout(() => versionBadge.classList.remove('updated'), 3000);
+                }
+
+                // Save current version
+                localStorage.setItem(STORAGE_KEY, currentVersion);
+
+                // Show badge
+                versionBadge.style.opacity = '1';
+                console.log(`DEBUG: Version badge loaded: ${currentVersion}`);
+
+            } catch (err) {
+                console.warn('DEBUG: Failed to load version badge:', err.message);
+                versionBadge.style.display = 'none';
+            }
+        })();
+
         document.addEventListener('DOMContentLoaded', () => {
             const mapElement = document.getElementById('map');
             const loadingGif = document.getElementById('loading-gif');
