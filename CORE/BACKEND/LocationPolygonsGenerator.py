@@ -408,6 +408,58 @@ class LocationPolygonsGenerator:
             
             if len(blue_circles) != original_bc_count:
                 logger.info(f"Filtered internal blue circles: {original_bc_count} -> {len(blue_circles)}")
+
+            # --- CALCULATE POLYGON CONNECTIONS FOR BLUE CIRCLES ---
+            # Map: blue_circle_id -> set(polygon_ids)
+            bc_poly_map = {bc['id']: set() for bc in blue_circles}
+            
+            # Helper: Find blue circle ID by coord
+            # Optimisation: Build coord -> id map
+            coord_to_bc_id = {}
+            for bc in blue_circles:
+                key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                coord_to_bc_id[key] = bc['id']
+            
+            # Helper: Find line by ID to get start/end
+            line_map = {wl['id']: wl for wl in white_lines}
+            
+            for poly in polygons:
+                poly_id = poly['id']
+                for line_id in poly.get('boundary_white_lines', []):
+                    wl = line_map.get(line_id)
+                    if not wl: 
+                        continue
+                        
+                    # Get start and end coords of the white line
+                    s = wl['start']
+                    e = wl['end']
+                    s_key = (round(s[0], 7), round(s[1], 7))
+                    e_key = (round(e[0], 7), round(e[1], 7))
+                    
+                    # If these coords correspond to a blue circle, link the polygon
+                    if s_key in coord_to_bc_id:
+                        bc_id = coord_to_bc_id[s_key]
+                        bc_poly_map[bc_id].add(poly_id)
+                        
+                    if e_key in coord_to_bc_id:
+                        bc_id = coord_to_bc_id[e_key]
+                        bc_poly_map[bc_id].add(poly_id)
+            
+            # Update Blue Circles with this data
+            for bc in blue_circles:
+                connected_polys = list(bc_poly_map.get(bc['id'], []))
+                bc['connected_polygon_ids'] = connected_polys
+                bc['connected_polygons_count'] = len(connected_polys)
+                
+                # Check for saturation: connections (roads) == connected polygons (loops)
+                # If equal, it means every road connected to this intersection is part of a polygon value.
+                if bc['connections'] == bc['connected_polygons_count'] and bc['connections'] > 0:
+                     bc['is_saturated'] = True
+                else:
+                     bc['is_saturated'] = False
+                     
+                # logger.info(f"Blue Circle {bc['id']}: connected to {len(connected_polys)} polygons")
+
             
             # --- CALCULATE POSTER GRID (3x3 = 9 POSTERS) ---
             # Create a fixed 3x3 grid centered on the geometric center of all polygons

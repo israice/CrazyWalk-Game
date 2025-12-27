@@ -1479,6 +1479,20 @@
                                 </div>
                             `;
                         }
+                        // STATS FOR BLUE CIRCLES
+                        else if (type.includes('Blue Circle') || (type === 'Start/End Node')) {
+                            const connectedCount = data.connected_polygons_count || 0;
+                            const connectedIds = data.connected_polygon_ids ? data.connected_polygon_ids.join(', ') : 'None';
+
+                            statsHtml = `
+                                <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
+                                    <b>Blue Circle Stats:</b><br>
+                                    Connections: <b>${data.connections || '?'}</b><br>
+                                    🔗 Polygons: <b>${connectedCount}</b><br>
+                                    IDs: <span style="font-size:10px;">${connectedIds}</span>
+                                </div>
+                            `;
+                        }
 
                         const container = document.createElement('div');
                         container.innerHTML = `
@@ -1730,8 +1744,13 @@
 
                 if (data.blue_circles) {
                     data.blue_circles.forEach(circle => {
+                        // Saturated (Orange) vs Normal (Blue)
+                        const isSaturated = circle.is_saturated || false;
+                        const mainColor = isSaturated ? '#ff7b00' : 'blue';       // Orange vs Blue
+                        const fillColor = isSaturated ? '#ffa600' : '#00ccff';    // Light Orange vs Light Blue
+
                         const marker = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 8, color: 'blue', fillColor: '#00ccff', fillOpacity: 0.8
+                            radius: 8, color: mainColor, fillColor: fillColor, fillOpacity: 0.8
                         }).addTo(detailsLayer);
 
                         // Save connection count for debug restoration
