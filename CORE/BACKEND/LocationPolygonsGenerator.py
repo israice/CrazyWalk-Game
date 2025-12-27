@@ -1007,12 +1007,13 @@ class LocationPolygonsGenerator:
             logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
         
         # --- MERGE SMALL POLYGONS ---
-        if polygons_data:
-            white_lines_map = {wl['id']: wl for wl in white_lines}
-            original_count = len(polygons_data)
-            polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
-            if len(polygons_data) != original_count:
-                logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
+        # User requested to disable grouping of small polygons (2025-12-27)
+        # if polygons_data:
+        #     white_lines_map = {wl['id']: wl for wl in white_lines}
+        #     original_count = len(polygons_data)
+        #     polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
+        #     if len(polygons_data) != original_count:
+        #         logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
             
         save_to_redis(KEY_POLYGONS, polygons_data)
         
