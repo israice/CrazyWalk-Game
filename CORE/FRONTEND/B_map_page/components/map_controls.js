@@ -628,40 +628,8 @@ class MapControls {
     }
 
     applyMobileRotationPatch() {
-        // [Existing Patch Code Omitted for brevity in logs, but included in file write]
-        if (typeof L === 'undefined') { return; }
-        const originalOnMove = L.Draggable.prototype._onMove;
-        L.Draggable.prototype._onMove = function (e) {
-            if (window.innerWidth <= 1024) {
-                if (e.touches && e.touches.length > 1) { this._moved = true; return; }
-                var first = (e.touches && e.touches.length === 1 ? e.touches[0] : e);
-                var newPoint = new L.Point(first.clientX, first.clientY);
-                var offset = newPoint.subtract(this._startPoint);
-                var rotatedOffset = new L.Point(offset.y, -offset.x);
-                if (!rotatedOffset.x && !rotatedOffset.y) { return; }
-                if (Math.abs(rotatedOffset.x) + Math.abs(rotatedOffset.y) < this.options.clickTolerance) { return; }
-                e.preventDefault();
-                if (!this._moved) {
-                    this.fire('dragstart');
-                    this._moved = true;
-                    this._startPos = L.DomUtil.getPosition(this._element).subtract(rotatedOffset);
-                    L.DomUtil.addClass(document.body, 'leaflet-dragging');
-                    this._lastTarget = e.target || e.srcElement;
-                    if (window.SVGElementInstance && this._lastTarget instanceof SVGElementInstance) {
-                        this._lastTarget = this._lastTarget.correspondingUseElement;
-                    }
-                    L.DomUtil.addClass(this._lastTarget, 'leaflet-drag-target');
-                }
-                this._newPos = this._startPos.add(rotatedOffset);
-                this._animated = true;
-                L.Util.cancelAnimFrame(this._animRequest);
-                this._lastEvent = e;
-                this._animRequest = L.Util.requestAnimFrame(this._updatePosition, this, true);
-            } else {
-                originalOnMove.call(this, e);
-            }
-        };
-        console.log("MapControls: Mobile rotation patch applied.");
+        // Mobile rotation patch removed - no longer needed as screen rotation was disabled
+        console.log("MapControls: Mobile rotation patch disabled (rotation removed).");
     }
 }
 

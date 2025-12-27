@@ -29,6 +29,9 @@
         // Mask URL to show only root address
         window.history.replaceState(null, '', '/');
     </script>
+    <!-- Preload iPhone Frame (highest priority) -->
+    <link rel="preload" href="/B_map_page/components/iphone.png" as="image" fetchpriority="high">
+
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -105,7 +108,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-90deg);
-            z-index: 100;
+            z-index: 9999;
             /* On top of everything */
             pointer-events: none;
         }
@@ -125,17 +128,12 @@
             }
 
             .black-square {
-                width: 100vh;
-                /* Fallback */
-                width: 100dvh;
-                /* Match dynamic screen height when rotated */
-                height: 100vw;
+                width: 100vw;
+                height: 100vh;
+                height: 100dvh;
                 border-radius: 0;
-                transform: translate(-50%, -50%) rotate(90deg);
-                /* Rotate interface 90 degrees for mobile */
+                transform: translate(-50%, -50%);
             }
-
-
         }
 
         /* Label Styles */
@@ -1272,6 +1270,65 @@
                     });
                 }
 
+                // G. Build blue circle data map for neighbor polygon calculations
+                const blueCircleDataMap = new Map(); // coord key -> { connections, connected_polygon_ids }
+                if (data.blue_circles) {
+                    data.blue_circles.forEach(bc => {
+                        const key = `${bc.lat.toFixed(7)},${bc.lon.toFixed(7)}`;
+                        blueCircleDataMap.set(key, {
+                            id: bc.id,
+                            connections: bc.connections || 0,
+                            connected_polygon_ids: bc.connected_polygon_ids || [],
+                            connected_polygons_count: bc.connected_polygons_count || 0
+                        });
+                    });
+                }
+
+                // H. Calculate neighbor polygons for each polygon (through shared white lines)
+                // Build white line data map for quick lookup
+                const whiteLineDataMap = new Map(); // line_id -> { connected_polygons_count, connected_polygon_ids }
+                if (data.white_lines) {
+                    data.white_lines.forEach(wl => {
+                        whiteLineDataMap.set(wl.id, {
+                            id: wl.id,
+                            connected_polygons_count: wl.connected_polygons_count || 0,
+                            connected_polygon_ids: wl.connected_polygon_ids || []
+                        });
+                    });
+                }
+
+                if (data.polygons && data.white_lines) {
+                    data.polygons.forEach(poly => {
+                        const neighborPolygonIds = new Set();
+                        let missingPolygons = 0;
+
+                        // Check each white line on this polygon's boundary
+                        if (poly.boundary_white_lines) {
+                            poly.boundary_white_lines.forEach(lineId => {
+                                const wlData = whiteLineDataMap.get(lineId);
+                                if (wlData) {
+                                    // If white line only connects to 1 polygon, no neighbor on that side
+                                    if (wlData.connected_polygons_count === 1) {
+                                        missingPolygons++;
+                                    }
+
+                                    // Find neighbor polygons (excluding current polygon)
+                                    if (wlData.connected_polygon_ids) {
+                                        wlData.connected_polygon_ids.forEach(pid => {
+                                            if (pid !== poly.id && pid !== poly.uid) {
+                                                neighborPolygonIds.add(pid);
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+
+                        poly.neighbor_polygon_ids = Array.from(neighborPolygonIds);
+                        poly.neighbor_polygons_count = neighborPolygonIds.size;
+                        poly.missing_polygons = missingPolygons;
+                    });
+                }
 
                 // STATE STORAGE (Closure Scope)
                 const polygonState = new Map(); // ID -> { current: 0, total: N, polyLayer, labelLayer, lineIds }
@@ -1513,7 +1570,8 @@
                         // Ensure UID is visible if property name is different
                         if (data.uid) debugData.uid = data.uid;
 
-                        const prettyJSON = JSON.stringify(contentObj, null, 2);
+                        // prettyJSON will be finalized after stats calculations (for polygons, we add neighbor data)
+                        let prettyJSON = JSON.stringify(contentObj, null, 2);
                         const idDisplay = contentObj.uid ? `<b>ID:</b> ${contentObj.uid}<br>` : (contentObj.id ? `<b>ID:</b> ${contentObj.id}<br>` : '');
 
                         // CALCULATE STATS FOR POLYGONS
@@ -1556,6 +1614,27 @@
                                 ? `🖼️ Posters: <b>${intersectingPosters.length}</b> (IDs: ${intersectingPosters.join(', ')})<br>`
                                 : '';
 
+                            // Neighbor polygon info
+                            const neighborCount = data.neighbor_polygons_count || 0;
+                            const missingPolygons = data.missing_polygons || 0;
+                            const neighborInfo = neighborCount > 0 || missingPolygons > 0
+                                ? `<div style="margin-top:4px; padding:4px; background:#fff3e6; border-radius:4px; border:1px solid #ffd591;">
+                                    <b>🏘️ Neighbors:</b><br>
+                                    Adjacent Polygons: <b>${neighborCount}</b><br>
+                                    ⚠️ Missing Polygons: <b style="color:${missingPolygons > 0 ? '#ff4d4f' : '#52c41a'}">${missingPolygons}</b>
+                                   </div>`
+                                : '';
+
+                            // Add neighbor IDs to contentObj for JSON copy
+                            if (data.neighbor_polygon_ids && data.neighbor_polygon_ids.length > 0) {
+                                contentObj.neighbor_polygon_ids = data.neighbor_polygon_ids;
+                            }
+                            contentObj.neighbor_polygons_count = neighborCount;
+                            contentObj.missing_polygons = missingPolygons;
+
+                            // Regenerate prettyJSON with new fields
+                            prettyJSON = JSON.stringify(contentObj, null, 2);
+
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
                                     <b>Polygon Stats:</b><br>
@@ -1567,6 +1646,7 @@
                                     --------------------------<br>
                                     ∑ Total Circles: <b>${totalPoints}</b>
                                 </div>
+                                ${neighborInfo}
                             `;
                         }
                         // STATS FOR WHITE LINES
@@ -1693,7 +1773,11 @@
                         total_points: poly.total_points,
                         blue_circles_count: poly.blue_circles_count || 0,
                         merge_count: poly.merge_count || 1,
-                        poster_ids: poly.poster_ids || []  // Add poster IDs from polygon data
+                        poster_ids: poly.poster_ids || [],
+                        // Neighbor polygon data
+                        neighbor_polygon_ids: poly.neighbor_polygon_ids || [],
+                        neighbor_polygons_count: poly.neighbor_polygons_count || 0,
+                        missing_polygons: poly.missing_polygons || 0
                     };
                     window.allItems.set(labelDebugData.uid, labelDebugData);
 

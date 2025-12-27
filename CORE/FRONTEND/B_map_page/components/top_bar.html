@@ -2,23 +2,23 @@
     /* Top Bar Container */
     .top-controls {
         position: absolute;
-        top: 4vh;
+        top: 2vh;
         left: 0;
         width: 100%;
-        padding: 0 6vh;
-        /* Matches original right offset */
+        padding: 0 2vw;
         box-sizing: border-box;
 
         display: flex;
-        gap: 8vh;
+        /* Dynamic gap: scales with viewport, min 4px, max 4vh */
+        gap: clamp(4px, 2vw, 4vh);
         z-index: 50;
 
         align-items: center;
         justify-content: flex-end;
-        /* Keep buttons on right */
 
         pointer-events: none;
-        /* Let clicks pass through empty space */
+        flex-wrap: nowrap;
+        /* Force single row */
     }
 
     /* Expanded State */
@@ -26,47 +26,35 @@
         top: 0;
         right: 0;
         width: 100%;
-        /* Ensure full width */
-        /* Adjusted height to include padding + button height + bottom spacing */
-        height: 14vh;
+        height: auto;
+        min-height: 10vh;
+        padding: 2vh 2vw;
         background-color: rgba(255, 255, 255, 0.2);
         backdrop-filter: blur(10px);
-
-        /* Essential for keeping buttons in place: */
-        padding-top: 4vh;
-        /* Matches original top: 4vh */
-        padding-right: 6vh;
-        /* Matches original right: 4vh */
-        padding-left: 6vh;
-
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        align-items: flex-start;
-        /* Ensures buttons stick to the top padding line */
+        align-items: center;
         pointer-events: auto;
-        /* Block clicks when menu is open */
         justify-content: flex-end;
-        /* Keep logout/settings logic if any, currently flex-end pushes them? Wait. */
     }
 
-    /* When expanded, we need to ensure the menu items flow correctly. 
-       The original code had 'justify-content: flex-end'. 
-       Let's keep that. 
-    */
-
+    /* Control Button - Scalable Size */
     .control-btn {
-        width: 6vh;
-        height: 6vh;
+        /* Dynamic size: min 32px, scales with vh, max 6vh */
+        width: clamp(32px, 6vw, 6vh);
+        height: clamp(32px, 6vw, 6vh);
+        min-width: 32px;
+        min-height: 32px;
         background-color: rgba(30, 30, 30, 0.8);
         border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(5px);
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 1vh;
+        border-radius: clamp(4px, 1vh, 1vh);
         cursor: pointer;
         transition: all 0.3s ease;
-        flex-shrink: 0;
-        /* Prevent squishing */
+        flex-shrink: 1;
+        /* Allow shrinking to fit */
         -webkit-user-select: none;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
@@ -92,8 +80,8 @@
 
     /* POSTERS button emoji styling */
     #btn-debug-posters {
-        font-size: 3.5vh;
-        line-height: 6vh;
+        font-size: clamp(16px, 3.5vh, 3.5vh);
+        line-height: 1;
     }
 
     /* Expanded Menu Button Style: Red Border */
@@ -104,7 +92,6 @@
 
     .top-controls.expanded #menu-btn svg {
         fill: white;
-        /* Revert fill to white as per new style */
     }
 
     /* Hide Social Group when expanded */
@@ -129,54 +116,65 @@
 
     /* New Menu Items Container */
     .menu-items {
-        display: flex;
-        gap: 4vh;
         display: none;
-        /* margin-right removed to let parent gap handle spacing */
+        gap: clamp(4px, 2vw, 4vh);
     }
 
     .top-controls.expanded .menu-items {
         display: flex;
-        /* Show instantly */
     }
 
-    /* Social Icons Container (Centered) */
+    /* Social Icons Container (Centered on large screens) */
     .social-group {
         display: flex;
-        gap: 2vh;
+        gap: clamp(4px, 1.5vw, 2vh);
         position: absolute;
         left: 50%;
         transform: translateX(-50%);
         pointer-events: auto;
+        flex-shrink: 1;
     }
 
-    /* Mobile Responsive Adjustments for Social Icons */
-    @media (max-width: 1024px) {
-        .top-controls {
-            top: 2vh;
-            padding: 0 2vh;
-        }
-
-        .top-controls.expanded {
-            top: 0;
-            padding-top: 2vh;
-            padding-right: 2vh;
-            padding-left: 2vh;
-        }
-
+    /* Small screens: make social group flow with other buttons */
+    @media (max-width: 768px) {
         .social-group {
             position: relative;
-            /* Remove absolute centering */
             left: auto;
             transform: none;
             margin-right: auto;
-            /* Push buttons to right */
-            gap: 1.5vh;
+        }
+
+        .top-controls {
+            gap: clamp(2px, 1.5vw, 2vh);
+            padding: 0 1vw;
         }
 
         .control-btn {
-            width: 8vh;
-            height: 8vh;
+            /* Smaller on very small screens */
+            width: clamp(28px, 8vw, 5vh);
+            height: clamp(28px, 8vw, 5vh);
+            min-width: 28px;
+            min-height: 28px;
+        }
+    }
+
+    /* Very small screens (phones in portrait) */
+    @media (max-width: 480px) {
+        .control-btn {
+            width: clamp(24px, 10vw, 40px);
+            height: clamp(24px, 10vw, 40px);
+            min-width: 24px;
+            min-height: 24px;
+            border-radius: 4px;
+        }
+
+        .top-controls {
+            gap: 2px;
+            padding: 0 4px;
+        }
+
+        #btn-debug-posters {
+            font-size: 14px;
         }
     }
 
