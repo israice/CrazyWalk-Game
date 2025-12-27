@@ -201,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard c7bd935
+  git reset --hard e8fbd9d
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -311,6 +311,11 @@
     - fixed united poligon perimeter 
     - README.md screenshots version updated 
     - testting prod 1 
+    - fixed poster colors as original colors
+    - fixed posters randomaizer and saving between locations
+    - fixed posters transparety in debug mode
+    - added orange circles as completed
+    - added info about polygons to elements in debug popups
 
 
   - ### Next Tasks
@@ -330,7 +335,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.27 - testting prod 2 "
+  git commit -m "v0.0.27 - added info about polygons to elements in debug popups 2"
   git push
   ```
 
