@@ -511,7 +511,7 @@
 
             // Initialize Layer Groups
             const groupsLayer = L.layerGroup().addTo(map);
-            const detailsLayer = L.layerGroup().addTo(map);
+            const detailsLayer = L.layerGroup(); // Don't add to map yet - wait until all elements loaded
             const completedPolygonsLayer = L.layerGroup().addTo(map); // Always visible layer for completed zones
             const postersLayer = L.layerGroup().addTo(map); // Background posters
 
@@ -2565,6 +2565,12 @@
                 if (isDebugActive) {
                     console.log('DEBUG: renderGameElements complete - updating debug box intersections');
                     updateDebugBoxIntersections();
+                }
+
+                // Add detailsLayer to map AFTER all elements are loaded (synchronous rendering)
+                if (!map.hasLayer(detailsLayer)) {
+                    detailsLayer.addTo(map);
+                    console.log('DEBUG: detailsLayer added to map - all elements rendered synchronously');
                 }
 
                 // Removed: initPosterGrid() call at end (already done at start)
