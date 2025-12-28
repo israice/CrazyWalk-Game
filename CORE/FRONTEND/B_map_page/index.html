@@ -1200,6 +1200,45 @@
                 // --- 0. DEEP ID INTEGRATION & GLOBAL STORAGE ---
                 window.allItems = new Map();
 
+                // --- HELPER: UPDATE MASK PORTS ---
+                // Defined early to be available for applyCollectedState
+                const updateMaskPaths = () => {
+                    if (!revealMask || !posterSvgOverlay) return;
+
+                    const svgBounds = posterSvgOverlay.getBounds();
+                    const svgMinLat = svgBounds.getSouth();
+                    const svgMaxLat = svgBounds.getNorth();
+                    const svgMinLon = svgBounds.getWest();
+                    const svgMaxLon = svgBounds.getEast();
+                    const latRange = svgMaxLat - svgMinLat;
+                    const lonRange = svgMaxLon - svgMinLon;
+
+                    // Rebuild all paths in the mask
+                    revealMask.innerHTML = '';
+                    polygonState.forEach(state => {
+                        if (state.current >= state.total && state.coords) {
+                            try {
+                                const points = state.coords.map(p => {
+                                    if (!Array.isArray(p) || p.length < 2) return null;
+                                    // Scale coordinates to 0-1000 range relative to SVG bounds
+                                    const x = ((p[1] - svgMinLon) / lonRange) * 1000;
+                                    const y = ((svgMaxLat - p[0]) / latRange) * 1000;
+                                    return `${x.toFixed(2)},${y.toFixed(2)}`;
+                                }).filter(Boolean).join(' ');
+
+                                const pathData = points ? `M ${points} Z` : '';
+                                if (pathData) {
+                                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                                    path.setAttribute("d", pathData);
+                                    revealMask.appendChild(path);
+                                }
+                            } catch (e) {
+                                console.warn(`Failed to update mask for polygon ${state.id}:`, e);
+                            }
+                        }
+                    });
+                };
+
                 /* REMOVED: Moved to start of renderGameElements
                 if (data.poster_grid && data.poster_grid.length > 0) {
                     currentPosterGrid = data.poster_grid;
@@ -2208,51 +2247,95 @@
                 controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
                 setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
 
-                // RESTORE saved state for this location (async)
-                restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap)
-                    .then(() => {
-                        console.log("DEBUG: State restoration complete. Updating mask.");
-                        updateMaskPaths();
-                    });
+                // --- STATE APPLICATION LOGIC ---
+                // Helper to apply a set of collected keys to the map state
+                const applyCollectedState = (keysToApply) => {
+                    if (!keysToApply || keysToApply.size === 0) return;
 
+                    console.log(`DEBUG: Applying ${keysToApply.size} collected circles to state...`);
+                    let appliedCount = 0;
 
-                // Hook into map movements to refresh the mask
-                const updateMaskPaths = () => {
-                    if (!revealMask || !posterSvgOverlay) return;
+                    keysToApply.forEach(key => {
+                        const target = circleLayerMap.get(key);
 
-                    const svgBounds = posterSvgOverlay.getBounds();
-                    const svgMinLat = svgBounds.getSouth();
-                    const svgMaxLat = svgBounds.getNorth();
-                    const svgMinLon = svgBounds.getWest();
-                    const svgMaxLon = svgBounds.getEast();
-                    const latRange = svgMaxLat - svgMinLat;
-                    const lonRange = svgMaxLon - svgMinLon;
+                        // Ensure it's in our memory tracking
+                        collectedCircles.add(key);
 
-                    // Rebuild all paths in the mask
-                    revealMask.innerHTML = '';
-                    polygonState.forEach(state => {
-                        if (state.current >= state.total && state.coords) {
-                            try {
-                                const points = state.coords.map(p => {
-                                    if (!Array.isArray(p) || p.length < 2) return null;
-                                    // Scale coordinates to 0-1000 range relative to SVG bounds
-                                    const x = ((p[1] - svgMinLon) / lonRange) * 1000;
-                                    const y = ((svgMaxLat - p[0]) / latRange) * 1000;
-                                    return `${x.toFixed(2)},${y.toFixed(2)}`;
-                                }).filter(Boolean).join(' ');
-
-                                const pathData = points ? `M ${points} Z` : '';
-                                if (pathData) {
-                                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                                    path.setAttribute("d", pathData);
-                                    revealMask.appendChild(path);
-                                }
-                            } catch (e) {
-                                console.warn(`Failed to update mask for polygon ${state.id}:`, e);
+                        if (target) {
+                            // Check visibility rules
+                            const shouldHide = !isPostersDebugActive;
+                            if (shouldHide && target.options.opacity !== 0) {
+                                target.setStyle({ opacity: 0, fillOpacity: 0 });
                             }
+                            if (typeof target.getTooltip === 'function' && target.getTooltip()) {
+                                target.unbindTooltip();
+                            }
+                            // Update visual for hit box too if composite
+                            if (target.visualSibling) {
+                                if (shouldHide) target.visualSibling.setStyle({ opacity: 0, fillOpacity: 0 });
+                            }
+
+                            // Update visual progress maps
+                            const relevantPolys = circleToPolyMap.get(key);
+                            if (relevantPolys) {
+                                relevantPolys.forEach(pid => {
+                                    const state = polygonState.get(pid);
+                                    if (state) state.current++; // Increment local count
+                                });
+                            }
+                            appliedCount++;
                         }
                     });
+
+                    // Recalculate Polygon Completion & Visuals
+                    let completedAndMasked = 0;
+                    polygonState.forEach(state => {
+                        updatePolygonVisuals(state, lineLayerMap);
+                        if (state.current >= state.total && state.coords) {
+                            completedAndMasked++;
+                        }
+                    });
+
+                    console.log(`DEBUG: Applied state. Completed polygons: ${completedAndMasked}`);
+
+                    // FORCE MASK UPDATE NOW (Synchronous)
+                    updateMaskPaths();
                 };
+
+                // 1. SYNC APPLY: Apply what we already have in memory (Important for Expansion!)
+                // Reset polygon counts first (globally for this render)
+                polygonState.forEach(state => state.current = 0);
+
+                if (collectedCircles.size > 0) {
+                    console.log(`DEBUG: Sync applying ${collectedCircles.size} memory-cached circles...`);
+                    applyCollectedState(collectedCircles);
+                } else {
+                    // Even if empty, update mask (it might be empty)
+                    updateMaskPaths();
+                }
+
+                // 2. ASYNC FETCH: Fetch from server/localstorage to catch up anything missing
+                fetchSavedCircles(currentLocationKey)
+                    .then(savedKeys => {
+                        console.log("DEBUG: Async restoration complete.");
+
+                        // FILTER: Only apply keys that are NOT already in collectedCircles (memory)
+                        // This prevents double-counting progress since collectedCircles were already applied synchronously above.
+                        const newKeys = new Set();
+                        savedKeys.forEach(key => {
+                            if (!collectedCircles.has(key)) {
+                                newKeys.add(key);
+                            }
+                        });
+
+                        if (newKeys.size > 0) {
+                            console.log(`DEBUG: Applying ${newKeys.size} NEW keys found from server...`);
+                            applyCollectedState(newKeys);
+                        } else {
+                            console.log("DEBUG: No new keys from server to apply.");
+                        }
+                    });
+
 
                 map.on('viewreset move zoom', updateMaskPaths);
 
@@ -2264,15 +2347,14 @@
                 // Removed: initPosterGrid() call at end (already done at start)
             };
 
-            // Restore previously collected circles from server AND LocalStorage
-            const restoreSavedCircles = async (layerMap, circleMap, polyState, lineMap) => {
-                if (!currentLocationKey) return;
-
+            // NEW: Helper to fetch saved circles (Pure Data Fetching)
+            const fetchSavedCircles = async (locationKey) => {
                 const combinedCircles = new Set();
+                if (!locationKey) return combinedCircles;
 
                 // 1. Load from LocalStorage (fast, offline capable)
                 try {
-                    const localData = localStorage.getItem(`collected_${currentLocationKey}`);
+                    const localData = localStorage.getItem(`collected_${locationKey}`);
                     if (localData) {
                         const parsed = JSON.parse(localData);
                         if (Array.isArray(parsed)) {
@@ -2286,7 +2368,7 @@
 
                 // 2. Load from Server (authoritative)
                 try {
-                    const savedCircles = await loadLocationState(currentLocationKey);
+                    const savedCircles = await loadLocationState(locationKey);
                     if (savedCircles && savedCircles.size > 0) {
                         savedCircles.forEach(k => combinedCircles.add(k));
                         console.log(`DEBUG: Loaded ${savedCircles.size} circles from Server`);
@@ -2295,106 +2377,13 @@
                     console.warn("DEBUG: Failed to load server circles:", e);
                 }
 
-                // 3. Include currently verified 'collectedCircles' in memory
-                // This handles the migration case where we expanded (changed Key) but kept memory state.
-                collectedCircles.forEach(k => combinedCircles.add(k));
-
-                if (combinedCircles.size === 0) {
-                    console.log("DEBUG: No saved circles to restore for this location");
-                    return;
-                }
-
-                console.log(`DEBUG: Restoring ${combinedCircles.size} unique collected circles...`);
-
-                let restoredCount = 0;
-                combinedCircles.forEach(key => {
-                    const target = layerMap.get(key);
-
-                    // Add to current session tracking
-                    collectedCircles.add(key);
-
-                    if (target) {
-                        // Check visibility rules
-                        const shouldHide = !isPostersDebugActive;
-
-                        if (shouldHide && target.options.opacity !== 0) {
-                            target.setStyle({ opacity: 0, fillOpacity: 0 });
-                        }
-
-                        // Remove tooltip if exists
-                        if (typeof target.getTooltip === 'function' && target.getTooltip()) {
-                            target.unbindTooltip();
-                        }
-
-                        // UPDATE POLYGON PROGRESS
-                        // Only if we haven't already processed this circle in this session?
-                        // Actually, polyState.current is reset to 0 (or localStorage value).
-                        // If we use localStorage value, it might ALREADY include these.
-                        // FIX: We rely on calculation from scratch if we don't trust localStorage counts 
-                        // OR we blindly increment.
-                        // Problem: If localStorage count is 5, and we process 5 circles here, we get 10?
-                        // SOLUTION: Reset polygon current state to 0 before restoration if we are doing full restoration?
-                        // Or rely on the fact that restoration is idempotent?
-                        // Currently: polyState.current = parseInt(localStorage...);
-                        // If we restore, we increment. Double counting risk!
-
-                        // We must be careful. If we use localStorage for counts, we shouldn't re-increment.
-                        // BUT, localStorage counts might differ from collectedCircles list.
-                        // BEST APPROACH: Reset 'current' to 0 and re-calculate from collectedCircles list.
-                        // This ensures consistency.
-
-                        const relevantPolys = circleMap.get(key);
-                        if (relevantPolys) {
-                            relevantPolys.forEach(pid => {
-                                const state = polyState.get(pid);
-                                // Note: We only increment if NOT already complete? No, re-count.
-                                // But we can't easily reset 0 globally unless we did it earlier.
-                                // Let's check init loop.
-                                // In init: pState.current = localStorage...
-                                // Risk of double count is high.
-                            });
-                        }
-
-                        restoredCount++;
-                    }
-                });
-
-                // RE-CALCULATE POLYGON TOTALS SAFELY
-                // Instead of incremental, let's just count hits from the set.
-                // This prevents LocalStorage count vs Circle List desync.
-
-                polyState.forEach(state => {
-                    // Reset to 0
-                    state.current = 0;
-
-                    // Iterate all circles in this polygon
-                    // We need to know which circles belong to this polygon.
-                    // 'state' doesn't list its circles directly (only count).
-                    // But 'circleMap' (circleToPolyMap) maps Circle -> [Polys].
-                    // We can iterate 'combinedCircles' (which are keys) and check circleMap.
-                });
-
-                combinedCircles.forEach(key => {
-                    const relevantPolys = circleMap.get(key);
-                    if (relevantPolys) {
-                        relevantPolys.forEach(pid => {
-                            const state = polyState.get(pid);
-                            if (state) state.current++;
-                        });
-                    }
-                });
-
-                // Now apply visuals
-                let restoredMasksCount = 0;
-                polyState.forEach(state => {
-                    updatePolygonVisuals(state, lineMap);
-                    if (state.current >= state.total && state.coords) {
-                        restoredMasksCount++;
-                    }
-                });
-
-                console.log(`DEBUG: Restored ${restoredCount} circles and ${restoredMasksCount} completed polygons`);
+                return combinedCircles;
             };
+
+            // Restore previously collected circles from server AND LocalStorage
+            // REFACTORED: Now accepts pure data or fetches if needed
+
+
 
             const setupProgressHiding = (layerMap, circleMap, polyState, lineMap, blueMap) => {
                 const checkAndHide = () => {
