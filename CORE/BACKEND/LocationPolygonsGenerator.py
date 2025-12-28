@@ -964,9 +964,13 @@ class LocationPolygonsGenerator:
                     # This ensures we only show circles for the filtered polygons
                     filtered_polygon_ids = {p['id'] for p in filtered_polygons}
 
+                    # First, collect existing circles at visible endpoints
+                    existing_coords = {}  # coord_key -> blue_circle
                     filtered_blue_circles = []
+
                     for bc in blue_circles:
                         bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                        existing_coords[bc_key] = bc
 
                         # ONLY show circles that are endpoints of visible white lines
                         if bc_key in visible_blue_coords:
@@ -979,6 +983,31 @@ class LocationPolygonsGenerator:
                             # 2. Orange (saturated) AND all its polygons are visible
                             if not bc.get('is_saturated', False) or all_connected_visible:
                                 filtered_blue_circles.append(bc)
+
+                    # Create missing circles for visible line endpoints (where count == 2 globally)
+                    # These are needed for complete polygon display
+                    created_count = 0
+                    for coord_key in visible_blue_coords:
+                        if coord_key not in existing_coords:
+                            lat, lon = coord_key
+                            # Create a simple blue circle for this endpoint
+                            new_circle = {
+                                'id': f"BC_{lat}_{lon}",
+                                'lat': lat,
+                                'lon': lon,
+                                'connections': 2,  # Assumed straight segment
+                                'active_connections': 2,
+                                'connected_white_lines': [],
+                                'connected_polygon_ids': [],
+                                'connected_polygons_count': 0,
+                                'is_saturated': False,  # Always blue (not saturated)
+                                'uid': f"BLUE_CIRCLE_{lat}_{lon}".replace('.', '_').replace('-', 'm')
+                            }
+                            filtered_blue_circles.append(new_circle)
+                            created_count += 1
+
+                    if created_count > 0:
+                        logger.info(f"Created {created_count} blue circles for visible line endpoints")
 
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
