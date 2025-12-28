@@ -940,10 +940,14 @@ class LocationPolygonsGenerator:
                         visible_blue_coords.add(end_key)
 
                     # Filter blue circles (only those at visible white line endpoints)
+                    # IMPORTANT: Exclude saturated circles (orange) - only show expansion-ready circles (blue)
+                    # Saturated circles appear when ALL connected polygons are collected
+                    # On initial load, we only show 2 polygons, so no circles should be saturated yet
                     filtered_blue_circles = []
                     for bc in blue_circles:
                         bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
-                        if bc_key in visible_blue_coords:
+                        # Only include if: 1) at visible line endpoint AND 2) not saturated (is expansion point)
+                        if bc_key in visible_blue_coords and not bc.get('is_saturated', False):
                             filtered_blue_circles.append(bc)
 
                     # Filter green circles (only those on visible white lines)
