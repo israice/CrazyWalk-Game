@@ -41,43 +41,116 @@ class LocationPolygonsGenerator:
         Check if a circle with given radius can fit entirely inside the polygon.
         The white circle label is approximately 30x30 pixels, which at typical zoom
         translates to roughly 15 meters radius.
-        
+
         Coords are in [lat, lon] format, but Shapely needs (x, y) = (lon, lat).
         """
         try:
             # Swap from [lat, lon] to (lon, lat) for Shapely
             shapely_coords = [(c[1], c[0]) for c in coords]
-            
+
             poly = Polygon(shapely_coords)
             if not poly.is_valid:
                 poly = poly.buffer(0)
             if poly.is_empty or poly.area == 0:
                 logger.info(f"_can_fit_circle: empty/zero area polygon")
                 return False
-            
+
             centroid = poly.centroid
-            
+
             # Check if centroid is inside polygon
             if not poly.contains(centroid):
                 logger.info(f"_can_fit_circle: centroid outside polygon")
                 return False
-            
+
             # Calculate minimum distance from centroid to polygon boundary
             boundary = poly.exterior
             min_distance_deg = centroid.distance(boundary)
-            
+
             # Convert to meters (approximate: 1 degree ≈ 111km at equator)
             min_distance_meters = min_distance_deg * 111000
-            
+
             fits = min_distance_meters >= radius_meters
-            
+
             # Always log for debugging
             logger.info(f"_can_fit_circle: min_dist={min_distance_meters:.2f}m, radius={radius_meters}m, fits={fits}")
-            
+
             return fits
         except Exception as e:
             logger.warning(f"_can_fit_circle error: {e}")
             return True  # Assume fits if check fails
+
+    def _calculate_label_position(self, coords, center):
+        """
+        Calculate the optimal position for the white circle label.
+        Places it on a radius from center towards the longest edge of the polygon.
+
+        This ensures the small circle is positioned in the direction of the largest
+        segment, maximizing the chance it fits inside the polygon.
+
+        Args:
+            coords: Polygon coordinates in [lat, lon] format
+            center: Polygon center as (lat, lon) tuple
+
+        Returns:
+            (lat, lon) tuple for the label position
+        """
+        try:
+            if not coords or len(coords) < 3:
+                return center
+
+            # Find the longest edge of the polygon
+            max_length = 0
+            longest_edge_midpoint = None
+
+            for i in range(len(coords) - 1):
+                p1 = coords[i]
+                p2 = coords[i + 1]
+
+                # Calculate edge length using haversine
+                edge_length = self.haversine_distance(p1, p2)
+
+                if edge_length > max_length:
+                    max_length = edge_length
+                    # Calculate midpoint of this edge
+                    longest_edge_midpoint = (
+                        (p1[0] + p2[0]) / 2,
+                        (p1[1] + p2[1]) / 2
+                    )
+
+            if not longest_edge_midpoint:
+                return center
+
+            # Calculate direction vector from center to longest edge midpoint
+            dx = longest_edge_midpoint[0] - center[0]
+            dy = longest_edge_midpoint[1] - center[1]
+
+            # Normalize the direction
+            length = math.sqrt(dx*dx + dy*dy)
+            if length == 0:
+                return center
+
+            dx_norm = dx / length
+            dy_norm = dy / length
+
+            # Calculate radius in degrees
+            # We want the small circle (15px radius ≈ 7-8 meters at zoom 18)
+            # to be offset from center towards the largest segment
+            # Using a small offset: ~0.00003 degrees ≈ 3-4 meters
+            radius_deg = 0.00003
+
+            # Calculate new position
+            new_lat = center[0] + dx_norm * radius_deg
+            new_lon = center[1] + dy_norm * radius_deg
+
+            logger.info(f"_calculate_label_position: center=({center[0]:.6f}, {center[1]:.6f}), "
+                       f"longest_edge={max_length:.2f}m, "
+                       f"new_pos=({new_lat:.6f}, {new_lon:.6f})")
+
+            return (new_lat, new_lon)
+
+        except Exception as e:
+            logger.warning(f"_calculate_label_position error: {e}, using center")
+            return center
     
     def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map):
         """
@@ -1045,24 +1118,29 @@ class LocationPolygonsGenerator:
                 if not poly.is_valid:
                     poly = poly.buffer(0)
                 center = poly.centroid
-                
+
                 # STABLE ID GENERATION (2025-12-28)
                 # Use hash of centroid coordinates (rounded) to ensure ID persists across rebuilds/expansions.
                 # Format: poly_LAT_LON
                 # Rounding to 5 decimal places (~1.1 meter precision) to handle minor drift during regeneration
-                clat = round(center.x, 5) 
+                clat = round(center.x, 5)
                 clon = round(center.y, 5)
-                
+
                 # Use simple coordinate string as ID to be readable and unique
                 stable_id = f"poly_{clat}_{clon}".replace('.', '')
-                
+
                 # Debug log for ID generation
                 # logger.info(f"Generated Stable ID: {stable_id} for centroid ({center.x}, {center.y})")
-                
+
+                # Calculate optimal label position (towards longest edge)
+                center_tuple = (center.x, center.y)
+                label_position = self._calculate_label_position(coords, center_tuple)
+
                 polygons_data.append({
                     'id': stable_id,
                     'coords': coords,
-                    'center': (center.x, center.y),
+                    'center': center_tuple,
+                    'label_position': label_position,  # NEW: Optimized position for white circle
                     'total_points': total_pts,
                     'boundary_white_lines': list(b_ids),
                     'merge_count': 1

@@ -1954,12 +1954,14 @@
                     // attachDebugClick(pLayer, poly, 'Polygon'); // Removed per user request
 
                     // Create Label (Small Percentage Circle)
-                    const pLabel = L.marker([poly.center[0], poly.center[1]], {
+                    // Use optimized label_position (towards longest edge) if available, otherwise fall back to center
+                    const labelPos = poly.label_position || poly.center;
+                    const pLabel = L.marker([labelPos[0], labelPos[1]], {
                         icon: L.divIcon({
                             className: 'poly-label',
                             html: `<div style="background:white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
                             iconSize: [30, 30],
-                            iconAnchor: [-30, 15] // Offset to right (Swapped)
+                            iconAnchor: [15, 15] // Center the label on the position
                         }),
                         interactive: true // Ensure it captures clicks
                     }).addTo(detailsLayer);
@@ -2010,6 +2012,7 @@
                         parent_polygon_uid: poly.uid,
                         boundary_white_lines: poly.boundary_white_lines,
                         center: poly.center,
+                        label_position: labelPos,  // NEW: Optimized position for label
                         coords: poly.coords,
                         total_points: poly.total_points,
                         blue_circles_count: poly.blue_circles_count || 0,
