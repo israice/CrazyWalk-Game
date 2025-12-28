@@ -964,9 +964,13 @@ class LocationPolygonsGenerator:
                     # This ensures both endpoints of visible lines are shown, even if one leads to hidden polygon
                     filtered_polygon_ids = {p['id'] for p in filtered_polygons}
 
+                    # Track which endpoints already have circles
+                    existing_circle_coords = set()
                     filtered_blue_circles = []
+
                     for bc in blue_circles:
                         bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                        existing_circle_coords.add(bc_key)
 
                         # Check if this circle is an endpoint of any visible white line
                         is_visible_endpoint = bc_key in visible_blue_coords
@@ -984,6 +988,27 @@ class LocationPolygonsGenerator:
                             # 2. Orange (saturated) but only if ALL its polygons are visible
                             if not bc.get('is_saturated', False) or all_connected_visible:
                                 filtered_blue_circles.append(bc)
+
+                    # Create virtual blue circles for visible line endpoints that don't have circles
+                    # This happens when count == 2 (straight road segment) but we need circles for display
+                    for coord_key in visible_blue_coords:
+                        if coord_key not in existing_circle_coords:
+                            # Create a virtual blue circle for this endpoint
+                            lat, lon = coord_key
+                            virtual_circle = {
+                                'id': f"VIRTUAL_BC_{lat}_{lon}",
+                                'lat': lat,
+                                'lon': lon,
+                                'connections': 2,  # Straight segment
+                                'active_connections': 0,
+                                'connected_white_lines': [],
+                                'connected_polygon_ids': [],
+                                'connected_polygons_count': 0,
+                                'is_saturated': False,  # Virtual circles are always blue (expansion points)
+                                'uid': f"VIRTUAL_BC_{lat}_{lon}"
+                            }
+                            filtered_blue_circles.append(virtual_circle)
+                            logger.debug(f"Created virtual blue circle at ({lat}, {lon}) for visible line endpoint")
 
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
