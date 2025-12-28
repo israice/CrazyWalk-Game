@@ -904,22 +904,43 @@ class LocationPolygonsGenerator:
             logger.info("========================================")
 
             # Filter for initial mode - show only polygons connected to spawn point
-            if mode == 'initial' and green_circles and polygons:
-                # Find nearest green circle to spawn point (lat, lon)
-                min_dist = float('inf')
-                nearest_gc = None
+            # Filter for expand mode - show only polygons connected to clicked blue circle
+            if mode in ['initial', 'expand'] and polygons:
+                connected_poly_ids = None
 
-                for gc in green_circles:
-                    dist = ((gc['lat'] - lat) ** 2 + (gc['lon'] - lon) ** 2) ** 0.5
-                    if dist < min_dist:
-                        min_dist = dist
-                        nearest_gc = gc
+                if mode == 'initial':
+                    # Find nearest green circle to spawn point (lat, lon)
+                    min_dist = float('inf')
+                    nearest_gc = None
 
-                if nearest_gc and nearest_gc.get('connected_polygon_ids'):
-                    connected_ids = set(nearest_gc['connected_polygon_ids'])
+                    for gc in green_circles:
+                        dist = ((gc['lat'] - lat) ** 2 + (gc['lon'] - lon) ** 2) ** 0.5
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_gc = gc
 
+                    if nearest_gc and nearest_gc.get('connected_polygon_ids'):
+                        connected_poly_ids = set(nearest_gc['connected_polygon_ids'])
+                        logger.info(f"Initial mode: Starting green circle {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
+
+                elif mode == 'expand':
+                    # Find nearest blue circle to clicked point (lat, lon)
+                    min_dist = float('inf')
+                    nearest_bc = None
+
+                    for bc in blue_circles:
+                        dist = ((bc['lat'] - lat) ** 2 + (bc['lon'] - lon) ** 2) ** 0.5
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_bc = bc
+
+                    if nearest_bc and nearest_bc.get('connected_polygon_ids'):
+                        connected_poly_ids = set(nearest_bc['connected_polygon_ids'])
+                        logger.info(f"Expand mode: Clicked blue circle {nearest_bc['id']}, connected polygons: {nearest_bc['connected_polygon_ids']}")
+
+                if connected_poly_ids:
                     # Filter polygons
-                    filtered_polygons = [p for p in polygons if p['id'] in connected_ids]
+                    filtered_polygons = [p for p in polygons if p['id'] in connected_poly_ids]
 
                     # Collect boundary white line IDs from filtered polygons
                     visible_line_ids = set()
@@ -954,11 +975,10 @@ class LocationPolygonsGenerator:
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
                     filtered_green_circles = [gc for gc in green_circles if gc.get('line_id') in line_ids_set]
 
-                    logger.info(f"INITIAL MODE FILTER: {len(polygons)} -> {len(filtered_polygons)} polygons, "
+                    logger.info(f"{mode.upper()} MODE FILTER: {len(polygons)} -> {len(filtered_polygons)} polygons, "
                                f"{len(white_lines)} -> {len(filtered_white_lines)} lines, "
                                f"{len(blue_circles)} -> {len(filtered_blue_circles)} blue circles, "
                                f"{len(green_circles)} -> {len(filtered_green_circles)} green circles")
-                    logger.info(f"Starting green circle: {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
 
                     # Replace with filtered data
                     polygons = filtered_polygons
