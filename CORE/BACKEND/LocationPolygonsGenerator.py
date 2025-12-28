@@ -961,7 +961,7 @@ class LocationPolygonsGenerator:
                         visible_blue_coords.add(end_key)
 
                     # Filter blue circles (only those at visible white line endpoints)
-                    # Recalculate saturation based on FILTERED polygons, not global dataset
+                    # Keep original saturation logic, but filter out saturated circles that don't have all their polygons visible
                     filtered_polygon_ids = {p['id'] for p in filtered_polygons}
 
                     filtered_blue_circles = []
@@ -969,21 +969,14 @@ class LocationPolygonsGenerator:
                         bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
 
                         if bc_key in visible_blue_coords:
-                            # Recalculate saturation: is circle saturated relative to VISIBLE polygons?
-                            # A circle is saturated if ALL its connected polygons are in the filtered set
+                            # Check if this saturated circle has ALL its connected polygons visible
                             bc_connected_polys = set(bc.get('connected_polygon_ids', []))
-                            is_saturated_in_context = bc_connected_polys.issubset(filtered_polygon_ids) and len(bc_connected_polys) > 0
+                            all_connected_visible = bc_connected_polys.issubset(filtered_polygon_ids)
 
-                            # Update the is_saturated flag based on filtered context
-                            bc['is_saturated'] = is_saturated_in_context
-
-                            if mode == 'initial':
-                                # Initial mode: show all blue circles at polygon vertices
+                            # Don't show saturated (orange) circles if not all their polygons are displayed
+                            # Only show: 1) blue circles (not saturated) OR 2) orange circles with all polygons visible
+                            if not bc.get('is_saturated', False) or all_connected_visible:
                                 filtered_blue_circles.append(bc)
-                            elif mode == 'expand':
-                                # Expand mode: only show non-saturated circles (expansion points)
-                                if not is_saturated_in_context:
-                                    filtered_blue_circles.append(bc)
 
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
