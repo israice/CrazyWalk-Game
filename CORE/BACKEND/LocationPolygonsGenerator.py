@@ -930,18 +930,36 @@ class LocationPolygonsGenerator:
                     # Filter white lines
                     filtered_white_lines = [wl for wl in white_lines if wl['id'] in visible_line_ids]
 
+                    # Collect blue circle coordinates from endpoints of visible white lines
+                    visible_blue_coords = set()
+                    for wl in filtered_white_lines:
+                        # White line endpoints are [lat, lon]
+                        start_key = (round(wl['start'][0], 7), round(wl['start'][1], 7))
+                        end_key = (round(wl['end'][0], 7), round(wl['end'][1], 7))
+                        visible_blue_coords.add(start_key)
+                        visible_blue_coords.add(end_key)
+
+                    # Filter blue circles (only those at visible white line endpoints)
+                    filtered_blue_circles = []
+                    for bc in blue_circles:
+                        bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                        if bc_key in visible_blue_coords:
+                            filtered_blue_circles.append(bc)
+
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
                     filtered_green_circles = [gc for gc in green_circles if gc.get('line_id') in line_ids_set]
 
                     logger.info(f"INITIAL MODE FILTER: {len(polygons)} -> {len(filtered_polygons)} polygons, "
                                f"{len(white_lines)} -> {len(filtered_white_lines)} lines, "
+                               f"{len(blue_circles)} -> {len(filtered_blue_circles)} blue circles, "
                                f"{len(green_circles)} -> {len(filtered_green_circles)} green circles")
                     logger.info(f"Starting green circle: {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
 
                     # Replace with filtered data
                     polygons = filtered_polygons
                     white_lines = filtered_white_lines
+                    blue_circles = filtered_blue_circles
                     green_circles = filtered_green_circles
 
             return {
