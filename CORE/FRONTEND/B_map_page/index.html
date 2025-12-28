@@ -2069,13 +2069,17 @@
                     }
 
                     // Debug Bounding Box
-                    // Position at polygon center (same as large circle)
+                    // Must encompass both circles in any direction
+                    // Large circle: 60px diameter (radius 30px)
+                    // Small circle: 30px diameter (radius 15px), positioned 45px from center
+                    // Maximum extent: 30px (large radius) + 45px (offset) + 15px (small radius) = 90px
+                    // So we need a box of 180x180 centered on large circle
                     const pDebugBox = L.marker([centerPos[0], centerPos[1]], {
                         icon: L.divIcon({
                             className: 'debug-boundary-box',
                             html: '',
-                            iconSize: [90, 60],
-                            iconAnchor: [30, 30] // Centered on large circle
+                            iconSize: [180, 180], // Square box to contain circles in any direction
+                            iconAnchor: [90, 90] // Center on large circle
                         }),
                         interactive: false
                     }).addTo(detailsLayer);
