@@ -2794,6 +2794,114 @@
                 map.panTo([lat, lon]);
             });
 
+            // Function to check if a line segment intersects with a rectangle (debug box)
+            const lineIntersectsRect = (lineStart, lineEnd, rectBounds) => {
+                // rectBounds = { north, south, east, west }
+                // Check if line segment intersects with any of the 4 rectangle edges
+
+                const rectCorners = [
+                    [rectBounds.north, rectBounds.west],  // Top-left
+                    [rectBounds.north, rectBounds.east],  // Top-right
+                    [rectBounds.south, rectBounds.east],  // Bottom-right
+                    [rectBounds.south, rectBounds.west]   // Bottom-left
+                ];
+
+                const rectEdges = [
+                    [rectCorners[0], rectCorners[1]], // Top edge
+                    [rectCorners[1], rectCorners[2]], // Right edge
+                    [rectCorners[2], rectCorners[3]], // Bottom edge
+                    [rectCorners[3], rectCorners[0]]  // Left edge
+                ];
+
+                // Check if line endpoints are inside rectangle
+                const p1Inside = lineStart[0] >= rectBounds.south && lineStart[0] <= rectBounds.north &&
+                                lineStart[1] >= rectBounds.west && lineStart[1] <= rectBounds.east;
+                const p2Inside = lineEnd[0] >= rectBounds.south && lineEnd[0] <= rectBounds.north &&
+                                lineEnd[1] >= rectBounds.west && lineEnd[1] <= rectBounds.east;
+
+                if (p1Inside || p2Inside) return true;
+
+                // Check line-line intersection for each rectangle edge
+                const doSegmentsIntersect = (p1, p2, p3, p4) => {
+                    const ccw = (A, B, C) => (C[1]-A[1])*(B[0]-A[0]) > (B[1]-A[1])*(C[0]-A[0]);
+                    return ccw(p1,p3,p4) !== ccw(p2,p3,p4) && ccw(p1,p2,p3) !== ccw(p1,p2,p4);
+                };
+
+                for (const edge of rectEdges) {
+                    if (doSegmentsIntersect(lineStart, lineEnd, edge[0], edge[1])) {
+                        return true;
+                    }
+                }
+
+                return false;
+            };
+
+            // Function to update white line colors based on debug box intersections
+            const updateDebugBoxIntersections = () => {
+                if (!_polygonState || !_lineLayerMap) return;
+
+                console.log('DEBUG: Checking debug box intersections...');
+
+                _polygonState.forEach(state => {
+                    if (!state.debugBox || !state.lines) return;
+
+                    // Get debug box bounds in lat/lng
+                    const boxBounds = state.debugBox.getElement().getBoundingClientRect();
+                    const map = state.debugBox._map;
+                    if (!map) return;
+
+                    // Convert pixel bounds to lat/lng bounds
+                    const topLeft = map.containerPointToLatLng([boxBounds.left, boxBounds.top]);
+                    const bottomRight = map.containerPointToLatLng([boxBounds.right, boxBounds.bottom]);
+
+                    const rectBounds = {
+                        north: topLeft.lat,
+                        south: bottomRight.lat,
+                        east: bottomRight.lng,
+                        west: topLeft.lng
+                    };
+
+                    // Check each boundary line
+                    state.lines.forEach(lineId => {
+                        const lineComposite = _lineLayerMap.get(String(lineId));
+                        if (!lineComposite || !lineComposite.visual) return;
+
+                        const lineLatLngs = lineComposite.visual.getLatLngs();
+
+                        // Check each segment of the polyline
+                        let intersects = false;
+                        for (let i = 0; i < lineLatLngs.length - 1; i++) {
+                            const start = [lineLatLngs[i].lat, lineLatLngs[i].lng];
+                            const end = [lineLatLngs[i + 1].lat, lineLatLngs[i + 1].lng];
+
+                            if (lineIntersectsRect(start, end, rectBounds)) {
+                                intersects = true;
+                                break;
+                            }
+                        }
+
+                        // Change color if intersects
+                        if (intersects) {
+                            lineComposite.visual.setStyle({ color: 'blue' });
+                            console.log(`DEBUG: Line ${lineId} intersects with debug box - colored blue`);
+                        }
+                    });
+                });
+            };
+
+            // Function to reset all white lines to original color
+            const resetWhiteLineColors = () => {
+                if (!_lineLayerMap) return;
+
+                console.log('DEBUG: Resetting white line colors...');
+
+                _lineLayerMap.forEach((lineComposite, lineId) => {
+                    if (lineComposite && lineComposite.visual) {
+                        lineComposite.visual.setStyle({ color: 'white' });
+                    }
+                });
+            };
+
             // Handle Debug Mode Toggles (via map_controls.js or top bar)
             document.addEventListener('debug-mode-change', (e) => {
                 isDebugActive = e.detail.active;
@@ -2924,11 +3032,17 @@
                             // Add Class to Body for global styling
                             document.body.classList.add('debug-mode');
 
+                            // Check for debug box intersections with white lines
+                            updateDebugBoxIntersections();
+
                         } else {
                             console.log("DEBUG: Debug Mode DISABLED");
                             debugBtn.classList.remove('active');
                             // Remove Class
                             document.body.classList.remove('debug-mode');
+
+                            // Reset all white lines to original color
+                            resetWhiteLineColors();
 
                             map.closePopup();
                             resetSelection();
