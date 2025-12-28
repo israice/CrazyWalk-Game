@@ -986,9 +986,13 @@ class LocationPolygonsGenerator:
 
                     # Create missing circles for visible line endpoints (where count == 2 globally)
                     # These are needed for complete polygon display
+                    logger.info(f"Checking {len(visible_blue_coords)} visible endpoints against {len(existing_coords)} existing circles")
+
                     created_count = 0
+                    missing_coords = []
                     for coord_key in visible_blue_coords:
                         if coord_key not in existing_coords:
+                            missing_coords.append(coord_key)
                             lat, lon = coord_key
                             # Create a simple blue circle for this endpoint
                             new_circle = {
@@ -1007,7 +1011,9 @@ class LocationPolygonsGenerator:
                             created_count += 1
 
                     if created_count > 0:
-                        logger.info(f"Created {created_count} blue circles for visible line endpoints")
+                        logger.info(f"Created {created_count} blue circles for missing endpoints: {missing_coords[:3]}...")
+
+                    logger.info(f"Total filtered blue circles: {len(filtered_blue_circles)}")
 
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
