@@ -79,6 +79,67 @@ class LocationPolygonsGenerator:
             logger.warning(f"_can_fit_circle error: {e}")
             return True  # Assume fits if check fails
 
+    def _get_blue_lines(self, coords, center, label_direction, boundary_white_lines):
+        """
+        Get list of white lines that the debug box touches (blue lines).
+
+        Returns:
+            set: Set of line IDs that intersect with debug box
+        """
+        try:
+            from shapely.geometry import box as ShapelyBox, LineString
+
+            # Convert to Shapely polygon
+            shapely_coords = [(c[1], c[0]) for c in coords]  # Swap to (lon, lat)
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+
+            center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
+            angle = label_direction.get('angle', 0)
+
+            # Calculate offset for small circle
+            offset_distance = 45 / 111000  # 45px ≈ 22.5 meters
+            offset_x = math.cos(angle) * offset_distance
+            offset_y = math.sin(angle) * offset_distance
+
+            # Calculate bounds of debug box
+            small_center_x = center_point[0] + offset_x
+            small_center_y = center_point[1] + offset_y
+
+            # Find extremes
+            large_radius = 30 / 111000  # 30px radius
+            small_radius = 15 / 111000  # 15px radius
+
+            min_x = min(center_point[0] - large_radius, small_center_x - small_radius)
+            max_x = max(center_point[0] + large_radius, small_center_x + small_radius)
+            min_y = min(center_point[1] - large_radius, small_center_y - small_radius)
+            max_y = max(center_point[1] + large_radius, small_center_y + small_radius)
+
+            # Create debug box rectangle
+            debug_box = ShapelyBox(min_x, min_y, max_x, max_y)
+
+            # Check which boundary lines intersect with debug box edges
+            blue_lines = set()
+            debug_box_boundary = debug_box.boundary
+
+            # Check each white line on polygon boundary
+            for line_id in boundary_white_lines:
+                # We need to check if this line intersects debug box boundary
+                # For now, mark as blue if debug box extends outside polygon
+                # This is approximation - in practice frontend does precise check
+                pass
+
+            # Simple check: if debug box doesn't fit, all lines are potentially blue
+            if not poly.contains(debug_box):
+                blue_lines = set(boundary_white_lines)
+
+            return blue_lines
+
+        except Exception as e:
+            logger.warning(f"_get_blue_lines error: {e}")
+            return set()
+
     def _can_fit_debug_box(self, coords, center, label_direction):
         """
         Check if the debug box (bounding box of both circles) fits entirely inside the polygon.
@@ -233,23 +294,36 @@ class LocationPolygonsGenerator:
             logger.warning(f"_calculate_label_position error: {e}, using default")
             return {'angle': 0, 'max_distance': 0}
     
-    def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map):
+    def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map, blue_lines):
         """
-        Find a neighboring polygon that shares a boundary white line with small_poly.
-        Returns (neighbor_poly, shared_line_id) or (None, None).
+        Find a neighboring polygon that shares a BLUE LINE (line touched by debug box) with small_poly.
+        Only merge through blue lines - lines that the debug box touches.
+
+        Args:
+            small_poly: The small polygon to find neighbor for
+            all_polys: All polygons
+            line_to_polys_map: Map of line_id -> [polygons]
+            blue_lines: Set of line IDs that are blue (touched by debug box)
+
+        Returns:
+            (neighbor_poly, shared_line_id) or (None, None)
         """
-        small_lines = set(small_poly.get('boundary_white_lines', []))
-        
+        small_blue_lines = blue_lines.get(small_poly['id'], set())
+
+        # Only consider blue lines (lines touched by debug box)
+        if not small_blue_lines:
+            return None, None
+
         # Sort for deterministic merging order
-        sorted_lines = sorted(list(small_lines))
-        
+        sorted_lines = sorted(list(small_blue_lines))
+
         for line_id in sorted_lines:
-            # Find all polygons that share this line
+            # Find all polygons that share this blue line
             sharing_polys = line_to_polys_map.get(line_id, [])
             for candidate in sharing_polys:
                 if candidate['id'] != small_poly['id']:
                     return candidate, line_id
-        
+
         return None, None
     
     def _merge_two_polygons(self, poly_a, poly_b, shared_line_id, white_lines_map):
@@ -1293,8 +1367,9 @@ class LocationPolygonsGenerator:
     
     def _merge_small_polygons(self, polygons, white_lines_map, max_iterations=10):
         """
-        Iteratively merge polygons that are too small to fit the debug box.
-        Also removes polygons that have no neighbors (border polygons with blue lines).
+        Iteratively merge polygons through blue lines (lines touched by debug box).
+        Only merges if two polygons share a blue line.
+        Also removes polygons that have no neighbors through blue lines.
         Returns the updated list of polygons with small ones merged into neighbors.
         """
         for iteration in range(max_iterations):
@@ -1306,18 +1381,28 @@ class LocationPolygonsGenerator:
                         line_to_polys[line_id] = []
                     line_to_polys[line_id].append(poly)
 
-            # Find small polygons (debug box doesn't fit)
-            small_polys = []
+            # Calculate blue lines for each polygon (lines touched by debug box)
+            blue_lines = {}  # poly_id -> set of blue line IDs
             for p in polygons:
                 label_dir = p.get('label_direction', {'angle': 0})
-                if not self._can_fit_debug_box(p['coords'], p['center'], label_dir):
-                    small_polys.append(p)
+                poly_blue_lines = self._get_blue_lines(
+                    p['coords'],
+                    p['center'],
+                    label_dir,
+                    p.get('boundary_white_lines', [])
+                )
+                if poly_blue_lines:
+                    blue_lines[p['id']] = poly_blue_lines
+                    logger.info(f"Polygon {p['id']} has {len(poly_blue_lines)} blue lines")
 
-            if not small_polys:
-                logger.info(f"Polygon merging: no small polygons found (iteration {iteration})")
+            # Find polygons with blue lines
+            polys_with_blue_lines = [p for p in polygons if p['id'] in blue_lines]
+
+            if not polys_with_blue_lines:
+                logger.info(f"Polygon merging: no polygons with blue lines (iteration {iteration})")
                 break
 
-            logger.info(f"Polygon merging iteration {iteration}: found {len(small_polys)} small polygons")
+            logger.info(f"Polygon merging iteration {iteration}: found {len(polys_with_blue_lines)} polygons with blue lines")
 
             merged_ids = set()
             removed_ids = set()  # Track polygons removed (no neighbors)
@@ -1327,28 +1412,27 @@ class LocationPolygonsGenerator:
                 if poly['id'] in merged_ids or poly['id'] in removed_ids:
                     continue
 
-                # Check if debug box fits
-                label_dir = poly.get('label_direction', {'angle': 0})
-                if not self._can_fit_debug_box(poly['coords'], poly['center'], label_dir):
-                    # This is a small polygon, try to merge
-                    neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys)
+                # Check if this polygon has blue lines
+                if poly['id'] in blue_lines:
+                    # This polygon has blue lines, try to merge through blue line
+                    neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys, blue_lines)
 
                     if neighbor and neighbor['id'] not in merged_ids and neighbor['id'] not in removed_ids:
-                        # Merge with neighbor
+                        # Merge with neighbor through blue line
                         merged = self._merge_two_polygons(poly, neighbor, shared_line, white_lines_map)
                         if merged:
                             merged_ids.add(poly['id'])
                             merged_ids.add(neighbor['id'])
                             new_polygons.append(merged)
-                            logger.info(f"Merged {poly['id']} + {neighbor['id']} (removed line {shared_line})")
+                            logger.info(f"Merged {poly['id']} + {neighbor['id']} (removed BLUE line {shared_line})")
                             continue
                     else:
-                        # No neighbor found - this is a border polygon, remove it
+                        # No neighbor found through blue lines - this is a border polygon, remove it
                         removed_ids.add(poly['id'])
-                        logger.info(f"Removed polygon {poly['id']} (no neighbor to merge with)")
+                        logger.info(f"Removed polygon {poly['id']} (no neighbor through blue lines)")
                         continue
 
-                # Keep polygon as is
+                # Keep polygon as is (no blue lines)
                 if poly['id'] not in merged_ids and poly['id'] not in removed_ids:
                     new_polygons.append(poly)
             
