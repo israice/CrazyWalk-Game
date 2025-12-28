@@ -1961,46 +1961,30 @@
                             className: 'poly-label',
                             html: `<div style="background:white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
                             iconSize: [30, 30],
-                            iconAnchor: [15, 15] // Center the label on the position
+                            iconAnchor: [-30, 15] // Offset to right to make space for promo circle
                         }),
                         interactive: true // Ensure it captures clicks
                     }).addTo(detailsLayer);
 
-                    // Create Large Promo Circle (Adjacent)
-                    // Offset: We want it to "cling" to the small circle.
-                    // Small R=15px. Large R=30px (Size=60).
-                    // Center-to-Center distance = 15 + 30 = 45px.
-                    // Let's offset it by 45px to the right (X axis).
-                    // Leaflet IconAnchor is relative to the top-left of the icon box.
-                    // To place the marker's "anchor point" (latlng) at a specific spot relative to visual...
-                    // Actually easier: simpler logic is anchor [X, Y].
-                    // Small circle anchor is [15, 15] (Center).
-                    // Large circle: Size [60, 60]. Center is [30, 30].
-                    // If we want it to right of the text label...
-                    // We use the SAME lat/lng anchor for both markers (poly.center).
-                    // For small circle, anchor [15, 15] places center at latlng.
-                    // For large circle, to be 45px to right...
-                    // We shift the anchor point LEFT by 45px.
-                    // Anchor = [-15, 30]. (X=-15 means left edge is 15px to RIGHT of anchor... wait.)
-                    // Icon Anchor [x, y]: The point of the icon which corresponds to marker's location.
-                    // If Anchor is [-15, 30], then the point (-15, 30) of the image is at LatLng.
-                    // This means the image starts 15px to the RIGHT of LatLng.
-                    // Center X of image (30) will be at 30 + 15 = 45px to right. Perfect.
-                    // Y=30 (Center vertical).
-
+                    // Create Large Promo Circle (Adjacent to small circle)
+                    // Both circles share the same lat/lng position but use different iconAnchors
+                    // Small circle: radius=15px, iconAnchor=[-30, 15] places it 30px LEFT of position
+                    // Large circle: radius=30px, iconAnchor=[30, 30] places it centered at position
+                    // This makes small circle cling to the left edge of large circle
+                    // Total width: 30px (small) + 60px (large) = 90px
 
                     // Use Backend-assigned GIF
                     const gifFile = poly.promo_gif;
                     let pPromo = null;
                     if (gifFile) {
-                        pPromo = L.marker([poly.center[0], poly.center[1]], {
+                        pPromo = L.marker([labelPos[0], labelPos[1]], {
                             icon: L.divIcon({
                                 className: 'poly-promo',
                                 html: `<div style="background:white; border-radius:50%; width:60px; height:60px; overflow:hidden; border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
                                         <img src="/GAME_PROMOS/${gifFile}" style="width:100%; height:100%; object-fit:cover;">
                                       </div>`,
                                 iconSize: [60, 60],
-                                iconAnchor: [30, 30] // Centered (Swapped)
+                                iconAnchor: [30, 30] // Centered at position
                             }),
                             interactive: true
                         }).addTo(detailsLayer);
@@ -2071,12 +2055,13 @@
                     }
 
                     // Debug Bounding Box
-                    const pDebugBox = L.marker([poly.center[0], poly.center[1]], {
+                    // Position at labelPos to align with both circles
+                    const pDebugBox = L.marker([labelPos[0], labelPos[1]], {
                         icon: L.divIcon({
                             className: 'debug-boundary-box',
                             html: '',
                             iconSize: [90, 60],
-                            iconAnchor: [30, 30] // Aligns with the visual union of small and large circles (Swapped)
+                            iconAnchor: [30, 30] // Aligns with the visual union of small and large circles
                         }),
                         interactive: false
                     }).addTo(detailsLayer);
