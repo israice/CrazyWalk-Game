@@ -991,6 +991,7 @@ class LocationPolygonsGenerator:
 
                     # Create virtual blue circles for visible line endpoints that don't have circles
                     # This happens when count == 2 (straight road segment) but we need circles for display
+                    virtual_count = 0
                     for coord_key in visible_blue_coords:
                         if coord_key not in existing_circle_coords:
                             # Create a virtual blue circle for this endpoint
@@ -1008,7 +1009,10 @@ class LocationPolygonsGenerator:
                                 'uid': f"VIRTUAL_BC_{lat}_{lon}"
                             }
                             filtered_blue_circles.append(virtual_circle)
-                            logger.debug(f"Created virtual blue circle at ({lat}, {lon}) for visible line endpoint")
+                            virtual_count += 1
+
+                    if virtual_count > 0:
+                        logger.info(f"Created {virtual_count} virtual blue circles for line endpoints without circles")
 
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
