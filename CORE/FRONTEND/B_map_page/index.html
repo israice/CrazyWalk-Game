@@ -2068,18 +2068,34 @@
                         attachDebugClick(pPromo, promoDebugData, 'Promo Circle');
                     }
 
-                    // Debug Bounding Box
-                    // Must tightly fit both circles in any direction
-                    // Large circle: radius 30px
-                    // Small circle: radius 15px, offset 45px from center
-                    // Furthest point: 45px (offset) + 15px (small radius) = 60px from center
-                    // Box size: 60px radius × 2 = 120px × 120px
+                    // Debug Bounding Box - must tightly wrap both circles
+                    // Calculate bounding box that touches the extremes of both circles
+                    // Large circle: center at (0,0), radius 30px
+                    // Small circle: center at (offsetX, offsetY), radius 15px
+
+                    // Find the extremes in all 4 directions from the large circle's center
+                    const smallCenterX = offsetX;
+                    const smallCenterY = offsetY;
+
+                    // Calculate bounds
+                    const maxX = Math.max(30, smallCenterX + 15); // Right edge
+                    const minX = Math.min(-30, smallCenterX - 15); // Left edge
+                    const maxY = Math.max(30, smallCenterY + 15); // Bottom edge
+                    const minY = Math.min(-30, smallCenterY - 15); // Top edge
+
+                    const boxWidth = maxX - minX;
+                    const boxHeight = maxY - minY;
+
+                    // iconAnchor should be offset from top-left corner to reach the large circle center
+                    const anchorX = -minX;
+                    const anchorY = -minY;
+
                     const pDebugBox = L.marker([centerPos[0], centerPos[1]], {
                         icon: L.divIcon({
                             className: 'debug-boundary-box',
                             html: '',
-                            iconSize: [120, 120], // Tight fit around both circles
-                            iconAnchor: [60, 60] // Center on large circle
+                            iconSize: [boxWidth, boxHeight],
+                            iconAnchor: [anchorX, anchorY]
                         }),
                         interactive: false
                     }).addTo(detailsLayer);
