@@ -902,7 +902,48 @@ class LocationPolygonsGenerator:
             logger.info("========================================")
             logger.info(f"SUCCESS on attempt {attempt}: {len(polygons)} polygons, {len(blue_circles)} circles, {len(white_lines)} lines")
             logger.info("========================================")
-            
+
+            # Filter for initial mode - show only polygons connected to spawn point
+            if mode == 'initial' and green_circles and polygons:
+                # Find nearest green circle to spawn point (lat, lon)
+                min_dist = float('inf')
+                nearest_gc = None
+
+                for gc in green_circles:
+                    dist = ((gc['lat'] - lat) ** 2 + (gc['lon'] - lon) ** 2) ** 0.5
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest_gc = gc
+
+                if nearest_gc and nearest_gc.get('connected_polygon_ids'):
+                    connected_ids = set(nearest_gc['connected_polygon_ids'])
+
+                    # Filter polygons
+                    filtered_polygons = [p for p in polygons if p['id'] in connected_ids]
+
+                    # Collect boundary white line IDs from filtered polygons
+                    visible_line_ids = set()
+                    for poly in filtered_polygons:
+                        if poly.get('boundary_white_lines'):
+                            visible_line_ids.update(poly['boundary_white_lines'])
+
+                    # Filter white lines
+                    filtered_white_lines = [wl for wl in white_lines if wl['id'] in visible_line_ids]
+
+                    # Filter green circles (only those on visible white lines)
+                    line_ids_set = {wl['id'] for wl in filtered_white_lines}
+                    filtered_green_circles = [gc for gc in green_circles if gc.get('line_id') in line_ids_set]
+
+                    logger.info(f"INITIAL MODE FILTER: {len(polygons)} -> {len(filtered_polygons)} polygons, "
+                               f"{len(white_lines)} -> {len(filtered_white_lines)} lines, "
+                               f"{len(green_circles)} -> {len(filtered_green_circles)} green circles")
+                    logger.info(f"Starting green circle: {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
+
+                    # Replace with filtered data
+                    polygons = filtered_polygons
+                    white_lines = filtered_white_lines
+                    green_circles = filtered_green_circles
+
             return {
                 "red_lines": [],
                 "blue_circles": blue_circles,

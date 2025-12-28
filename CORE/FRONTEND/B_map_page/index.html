@@ -1944,68 +1944,12 @@
                 };
 
                 // 2. Polygons (Init State)
+                // Backend now filters data for initial mode, so we can use it directly
                 let localPolys = data.polygons || [];
                 let localGreenCircles = data.green_circles || [];
                 let localWhiteLines = data.white_lines || [];
 
-                // Filter polygons, green circles, and white lines on initial load - only show items connected to starting point
-                if (mode === 'initial' && data.green_circles) {
-                    // Find the starting green circle (nearest to user position)
-                    const currentPos = userMarker.getLatLng();
-
-                    // Find nearest green circle manually (findNearestActiveCircle not yet defined)
-                    let nearestCircle = null;
-                    let minDist = Infinity;
-
-                    for (const gc of data.green_circles) {
-                        const dist = Math.sqrt(
-                            Math.pow(gc.lat - currentPos.lat, 2) +
-                            Math.pow(gc.lon - currentPos.lng, 2)
-                        );
-                        if (dist < minDist) {
-                            minDist = dist;
-                            nearestCircle = gc;
-                        }
-                    }
-
-                    if (nearestCircle && nearestCircle.connected_polygon_ids) {
-                        // Filter to only show connected polygons
-                        const connectedPolyIds = new Set(nearestCircle.connected_polygon_ids);
-                        localPolys = localPolys.filter(poly => connectedPolyIds.has(poly.id));
-
-                        // Build set of boundary white line IDs from filtered polygons
-                        const visibleLineIds = new Set();
-                        localPolys.forEach(poly => {
-                            if (poly.boundary_white_lines) {
-                                poly.boundary_white_lines.forEach(lineId => visibleLineIds.add(lineId));
-                            }
-                        });
-
-                        // Filter white lines to only those on filtered polygon boundaries
-                        localWhiteLines = localWhiteLines.filter(line => visibleLineIds.has(line.id));
-
-                        // Filter green circles to only those on visible white lines
-                        const visibleGreenCircles = new Set();
-                        localWhiteLines.forEach(line => {
-                            // Find green circles on this line
-                            const lineGreenCircles = data.green_circles.filter(gc => gc.line_id === line.id);
-                            lineGreenCircles.forEach(gc => {
-                                const key = `${gc.lat}_${gc.lon}`;
-                                visibleGreenCircles.add(key);
-                            });
-                        });
-
-                        // Filter green circles
-                        localGreenCircles = localGreenCircles.filter(gc => {
-                            const key = `${gc.lat}_${gc.lon}`;
-                            return visibleGreenCircles.has(key);
-                        });
-
-                        console.log(`DEBUG: Initial load filtered - Polygons: ${localPolys.length}, White Lines: ${localWhiteLines.length}, Green Circles: ${localGreenCircles.length}`);
-                        console.log(`DEBUG: Starting circle:`, nearestCircle);
-                        console.log(`DEBUG: Connected polygon IDs:`, nearestCircle.connected_polygon_ids);
-                    }
-                }
+                console.log(`DEBUG: Received from backend - Polygons: ${localPolys.length}, White Lines: ${localWhiteLines.length}, Green Circles: ${localGreenCircles.length}`);
 
                 localPolys.forEach(poly => {
                     // Create Visual
