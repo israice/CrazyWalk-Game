@@ -960,28 +960,23 @@ class LocationPolygonsGenerator:
                         visible_blue_coords.add(start_key)
                         visible_blue_coords.add(end_key)
 
-                    # Filter blue circles - show circles that are endpoints of visible white lines
-                    # Now that ALL vertices have circles, we just filter by visibility
+                    # Filter blue circles - show ONLY circles that are endpoints of visible white lines
+                    # This ensures we only show circles for the filtered polygons
                     filtered_polygon_ids = {p['id'] for p in filtered_polygons}
 
                     filtered_blue_circles = []
                     for bc in blue_circles:
                         bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
 
-                        # Check if this circle is an endpoint of any visible white line
-                        is_visible_endpoint = bc_key in visible_blue_coords
-
-                        # Also check if circle belongs to at least one visible polygon
-                        bc_connected_polys = set(bc.get('connected_polygon_ids', []))
-                        has_visible_polygon = bool(bc_connected_polys & filtered_polygon_ids)
-
-                        if is_visible_endpoint or has_visible_polygon:
+                        # ONLY show circles that are endpoints of visible white lines
+                        if bc_key in visible_blue_coords:
                             # Check if ALL connected polygons are visible
-                            all_connected_visible = bc_connected_polys.issubset(filtered_polygon_ids)
+                            bc_connected_polys = set(bc.get('connected_polygon_ids', []))
+                            all_connected_visible = bc_connected_polys.issubset(filtered_polygon_ids) if bc_connected_polys else True
 
                             # Show circle if:
-                            # 1. Blue (not saturated) - expansion point
-                            # 2. Orange (saturated) but only if ALL its polygons are visible
+                            # 1. Blue (not saturated) - expansion point, OR
+                            # 2. Orange (saturated) AND all its polygons are visible
                             if not bc.get('is_saturated', False) or all_connected_visible:
                                 filtered_blue_circles.append(bc)
 
@@ -1181,16 +1176,14 @@ class LocationPolygonsGenerator:
         blue_circles = []
         relevant_nodes = set()
 
-        # Create blue circles for ALL nodes (polygon vertices), not just intersections
-        # This ensures every polygon vertex has a circle for display and interaction
+        # Create blue circles only for intersections/endpoints (count != 2)
         for node, count in node_counts.items():
-            blue_circles.append({
-                'id': f"{node[0]}_{node[1]}",
-                'lat': node[0], 'lon': node[1],
-                'connections': count
-            })
-            # relevant_nodes only includes non-straight segments for graph purposes
             if count != 2:
+                blue_circles.append({
+                    'id': f"{node[0]}_{node[1]}",
+                    'lat': node[0], 'lon': node[1],
+                    'connections': count
+                })
                 relevant_nodes.add(node)
         
         # Redis Save
