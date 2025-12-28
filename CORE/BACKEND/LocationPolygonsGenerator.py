@@ -82,64 +82,84 @@ class LocationPolygonsGenerator:
     def _calculate_label_position(self, coords, center):
         """
         Calculate the optimal direction for positioning the small circle.
-        Returns the direction angle (in radians) towards the longest edge.
+        Returns the direction angle (in radians) towards the widest part of polygon.
 
         The small circle should be positioned on the circumference of the large circle,
-        in the direction of the polygon's longest edge, maximizing the chance both
-        circles fit inside the polygon.
+        in the direction of the polygon's widest/most spacious part, maximizing the
+        chance both circles fit inside the polygon.
+
+        Strategy: Sample multiple directions from center and find which direction
+        has the maximum distance to polygon boundary.
 
         Args:
             coords: Polygon coordinates in [lat, lon] format
             center: Polygon center as (lat, lon) tuple
 
         Returns:
-            dict with 'angle' (radians) and 'longest_edge_length' (meters)
+            dict with 'angle' (radians) and 'max_distance' (degrees)
         """
         try:
             if not coords or len(coords) < 3:
-                return {'angle': 0, 'longest_edge_length': 0}
+                return {'angle': 0, 'max_distance': 0}
 
-            # Find the longest edge of the polygon
-            max_length = 0
-            longest_edge_midpoint = None
+            # Convert to Shapely polygon for distance calculations
+            shapely_coords = [(c[1], c[0]) for c in coords]  # Swap to (lon, lat)
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
 
-            for i in range(len(coords) - 1):
-                p1 = coords[i]
-                p2 = coords[i + 1]
+            center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
 
-                # Calculate edge length using haversine
-                edge_length = self.haversine_distance(p1, p2)
+            # Sample 16 directions around the center (every 22.5 degrees)
+            num_samples = 16
+            max_distance = 0
+            best_angle = 0
 
-                if edge_length > max_length:
-                    max_length = edge_length
-                    # Calculate midpoint of this edge
-                    longest_edge_midpoint = (
-                        (p1[0] + p2[0]) / 2,
-                        (p1[1] + p2[1]) / 2
-                    )
+            for i in range(num_samples):
+                angle = (i * 2 * math.pi) / num_samples
 
-            if not longest_edge_midpoint:
-                return {'angle': 0, 'longest_edge_length': 0}
+                # Create a ray from center in this direction
+                # Project to a far point
+                far_distance = 0.01  # ~1km in degrees
+                far_point = (
+                    center_point[0] + math.cos(angle) * far_distance,
+                    center_point[1] + math.sin(angle) * far_distance
+                )
 
-            # Calculate direction vector from center to longest edge midpoint
-            dx = longest_edge_midpoint[0] - center[0]
-            dy = longest_edge_midpoint[1] - center[1]
+                # Create line from center to far point
+                from shapely.geometry import LineString, Point
+                ray = LineString([center_point, far_point])
 
-            # Calculate angle (in radians)
-            angle = math.atan2(dy, dx)
+                # Find intersection with polygon boundary
+                boundary = poly.boundary
+                intersection = ray.intersection(boundary)
+
+                # Calculate distance from center to intersection
+                if not intersection.is_empty:
+                    if intersection.geom_type == 'Point':
+                        dist = Point(center_point).distance(intersection)
+                        if dist > max_distance:
+                            max_distance = dist
+                            best_angle = angle
+                    elif intersection.geom_type == 'MultiPoint':
+                        # Take the closest intersection point
+                        min_dist = min(Point(center_point).distance(Point(pt)) for pt in intersection.geoms)
+                        if min_dist > max_distance:
+                            max_distance = min_dist
+                            best_angle = angle
 
             logger.info(f"_calculate_label_position: center=({center[0]:.6f}, {center[1]:.6f}), "
-                       f"longest_edge={max_length:.2f}m, "
-                       f"angle={math.degrees(angle):.1f}°")
+                       f"max_distance={max_distance * 111000:.2f}m, "
+                       f"angle={math.degrees(best_angle):.1f}°")
 
             return {
-                'angle': angle,
-                'longest_edge_length': max_length
+                'angle': best_angle,
+                'max_distance': max_distance
             }
 
         except Exception as e:
             logger.warning(f"_calculate_label_position error: {e}, using default")
-            return {'angle': 0, 'longest_edge_length': 0}
+            return {'angle': 0, 'max_distance': 0}
     
     def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map):
         """
