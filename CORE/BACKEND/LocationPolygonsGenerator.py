@@ -960,21 +960,23 @@ class LocationPolygonsGenerator:
                         visible_blue_coords.add(start_key)
                         visible_blue_coords.add(end_key)
 
-                    # Filter blue circles (only those at visible white line endpoints)
-                    # Keep original saturation logic, but filter out saturated circles that don't have all their polygons visible
+                    # Filter blue circles - show circles that belong to visible polygons
+                    # A circle belongs to a polygon if it's one of the polygon's vertices
                     filtered_polygon_ids = {p['id'] for p in filtered_polygons}
 
                     filtered_blue_circles = []
                     for bc in blue_circles:
-                        bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                        # Check if this circle belongs to at least one visible polygon
+                        bc_connected_polys = set(bc.get('connected_polygon_ids', []))
+                        has_visible_polygon = bool(bc_connected_polys & filtered_polygon_ids)
 
-                        if bc_key in visible_blue_coords:
-                            # Check if this saturated circle has ALL its connected polygons visible
-                            bc_connected_polys = set(bc.get('connected_polygon_ids', []))
+                        if has_visible_polygon:
+                            # Check if ALL connected polygons are visible
                             all_connected_visible = bc_connected_polys.issubset(filtered_polygon_ids)
 
-                            # Don't show saturated (orange) circles if not all their polygons are displayed
-                            # Only show: 1) blue circles (not saturated) OR 2) orange circles with all polygons visible
+                            # Show circle if:
+                            # 1. Blue (not saturated) - expansion point
+                            # 2. Orange (saturated) but only if ALL its polygons are visible
                             if not bc.get('is_saturated', False) or all_connected_visible:
                                 filtered_blue_circles.append(bc)
 
