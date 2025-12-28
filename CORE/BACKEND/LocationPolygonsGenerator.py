@@ -79,6 +79,78 @@ class LocationPolygonsGenerator:
             logger.warning(f"_can_fit_circle error: {e}")
             return True  # Assume fits if check fails
 
+    def _can_fit_debug_box(self, coords, center, label_direction):
+        """
+        Check if the debug box (bounding box of both circles) fits entirely inside the polygon.
+
+        Debug box calculation:
+        - Large circle: 60px diameter (30px radius)
+        - Small circle: 30px diameter (15px radius)
+        - Small circle offset: 45px from center in direction of label_direction angle
+        - Debug box must encompass both circles
+
+        At zoom level ~17-18, approximately:
+        - 120px ≈ 60 meters (worst case)
+
+        Args:
+            coords: Polygon coordinates in [lat, lon] format
+            center: Polygon center as (lat, lon) tuple
+            label_direction: Direction dict with 'angle' in radians
+
+        Returns:
+            bool: True if debug box fits entirely inside polygon
+        """
+        try:
+            from shapely.geometry import box as ShapelyBox
+
+            # Convert to Shapely polygon
+            shapely_coords = [(c[1], c[0]) for c in coords]  # Swap to (lon, lat)
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+
+            center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
+            angle = label_direction.get('angle', 0)
+
+            # Calculate debug box size in degrees
+            # Worst case: box is 120x120px ≈ 60m x 60m
+            # 1 degree ≈ 111km, so 60m ≈ 0.00054 degrees
+            box_half_size = 60 / 111000  # meters to degrees
+
+            # Calculate offset for small circle
+            offset_distance = 45 / 111000  # 45px ≈ 22.5 meters
+            offset_x = math.cos(angle) * offset_distance
+            offset_y = math.sin(angle) * offset_distance
+
+            # Calculate bounds of debug box
+            # We need to encompass both circles in any direction
+            small_center_x = center_point[0] + offset_x
+            small_center_y = center_point[1] + offset_y
+
+            # Find extremes
+            large_radius = 30 / 111000  # 30px radius
+            small_radius = 15 / 111000  # 15px radius
+
+            min_x = min(center_point[0] - large_radius, small_center_x - small_radius)
+            max_x = max(center_point[0] + large_radius, small_center_x + small_radius)
+            min_y = min(center_point[1] - large_radius, small_center_y - small_radius)
+            max_y = max(center_point[1] + large_radius, small_center_y + small_radius)
+
+            # Create debug box rectangle
+            debug_box = ShapelyBox(min_x, min_y, max_x, max_y)
+
+            # Check if debug box is entirely within polygon
+            fits = poly.contains(debug_box)
+
+            logger.info(f"_can_fit_debug_box: center=({center[0]:.6f}, {center[1]:.6f}), "
+                       f"angle={math.degrees(angle):.1f}°, fits={fits}")
+
+            return fits
+
+        except Exception as e:
+            logger.warning(f"_can_fit_debug_box error: {e}")
+            return True  # Assume fits if check fails
+
     def _calculate_label_position(self, coords, center):
         """
         Calculate the optimal direction for positioning the small circle.
@@ -296,13 +368,26 @@ class LocationPolygonsGenerator:
             # For now, we trust the sum but relying on generate_map's recalculation step is safer.
             # Let's just sum for now.
             total_pts = poly_a.get('total_points', 0) + poly_b.get('total_points', 0)
-            
-            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {len(new_coords)} coords, {len(combined_lines)} lines")
-            
+
+            # Calculate new center and label direction for merged polygon
+            new_center = merged_geom.centroid
+            new_center_tuple = (new_center.y, new_center.x)  # Swap back to (lat, lon)
+
+            # Calculate new label direction for the merged polygon
+            new_label_direction = self._calculate_label_position(new_coords, new_center_tuple)
+
+            # Generate new stable ID based on new centroid
+            clat = round(new_center.y, 5)
+            clon = round(new_center.x, 5)
+            new_stable_id = f"poly_{clat}_{clon}".replace('.', '')
+
+            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {new_stable_id}: {len(new_coords)} coords, {len(combined_lines)} lines")
+
             return {
-                'id': poly_a['id'],  # Keep first polygon's ID
+                'id': new_stable_id,  # New ID based on new center
                 'coords': new_coords,
-                'center': largest_original_center,  # Center of largest original polygon
+                'center': new_center_tuple,  # New calculated center
+                'label_direction': new_label_direction,  # New calculated direction
                 'total_points': total_pts,
                 'boundary_white_lines': list(combined_lines),
                 'merge_count': poly_a.get('merge_count', 1) + poly_b.get('merge_count', 1),
@@ -1161,13 +1246,13 @@ class LocationPolygonsGenerator:
             logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
         
         # --- MERGE SMALL POLYGONS ---
-        # User requested to disable grouping of small polygons (2025-12-27)
-        # if polygons_data:
-        #     white_lines_map = {wl['id']: wl for wl in white_lines}
-        #     original_count = len(polygons_data)
-        #     polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
-        #     if len(polygons_data) != original_count:
-        #         logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
+        # Merge polygons where debug box doesn't fit (2025-12-28)
+        if polygons_data:
+            white_lines_map = {wl['id']: wl for wl in white_lines}
+            original_count = len(polygons_data)
+            polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
+            if len(polygons_data) != original_count:
+                logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
             
         # --- ASSIGN PROMO GIFS (PERSISTENT) ---
         # Scan available GIFs
@@ -1208,7 +1293,8 @@ class LocationPolygonsGenerator:
     
     def _merge_small_polygons(self, polygons, white_lines_map, max_iterations=10):
         """
-        Iteratively merge polygons that are too small to fit the white circle label.
+        Iteratively merge polygons that are too small to fit the debug box.
+        Also removes polygons that have no neighbors (border polygons with blue lines).
         Returns the updated list of polygons with small ones merged into neighbors.
         """
         for iteration in range(max_iterations):
@@ -1219,28 +1305,36 @@ class LocationPolygonsGenerator:
                     if line_id not in line_to_polys:
                         line_to_polys[line_id] = []
                     line_to_polys[line_id].append(poly)
-            
-            # Find small polygons
-            small_polys = [p for p in polygons if not self._can_fit_circle(p['coords'])]
-            
+
+            # Find small polygons (debug box doesn't fit)
+            small_polys = []
+            for p in polygons:
+                label_dir = p.get('label_direction', {'angle': 0})
+                if not self._can_fit_debug_box(p['coords'], p['center'], label_dir):
+                    small_polys.append(p)
+
             if not small_polys:
                 logger.info(f"Polygon merging: no small polygons found (iteration {iteration})")
                 break
-            
+
             logger.info(f"Polygon merging iteration {iteration}: found {len(small_polys)} small polygons")
-            
+
             merged_ids = set()
+            removed_ids = set()  # Track polygons removed (no neighbors)
             new_polygons = []
-            
+
             for poly in polygons:
-                if poly['id'] in merged_ids:
+                if poly['id'] in merged_ids or poly['id'] in removed_ids:
                     continue
-                
-                if not self._can_fit_circle(poly['coords']):
+
+                # Check if debug box fits
+                label_dir = poly.get('label_direction', {'angle': 0})
+                if not self._can_fit_debug_box(poly['coords'], poly['center'], label_dir):
                     # This is a small polygon, try to merge
                     neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys)
-                    
-                    if neighbor and neighbor['id'] not in merged_ids:
+
+                    if neighbor and neighbor['id'] not in merged_ids and neighbor['id'] not in removed_ids:
+                        # Merge with neighbor
                         merged = self._merge_two_polygons(poly, neighbor, shared_line, white_lines_map)
                         if merged:
                             merged_ids.add(poly['id'])
@@ -1248,9 +1342,14 @@ class LocationPolygonsGenerator:
                             new_polygons.append(merged)
                             logger.info(f"Merged {poly['id']} + {neighbor['id']} (removed line {shared_line})")
                             continue
-                
+                    else:
+                        # No neighbor found - this is a border polygon, remove it
+                        removed_ids.add(poly['id'])
+                        logger.info(f"Removed polygon {poly['id']} (no neighbor to merge with)")
+                        continue
+
                 # Keep polygon as is
-                if poly['id'] not in merged_ids:
+                if poly['id'] not in merged_ids and poly['id'] not in removed_ids:
                     new_polygons.append(poly)
             
             if not merged_ids:
