@@ -515,6 +515,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             lat = float(params.get('lat', [0])[0])
             lon = float(params.get('lon', [0])[0])
             rebuild_param = params.get('rebuild', ['false'])[0].lower()
+            mode_param = params.get('mode', ['initial'])[0]
             # TEMP: Force rebuild to always be True for debugging polygon merging
             force_rebuild = True  # rebuild_param == 'true'
             
@@ -531,7 +532,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             
             # Generate Data
             generator = LocationPolygonsGenerator.LocationPolygonsGenerator()
-            data = generator.generate_map(lat, lon, force_rebuild=force_rebuild)
+            data = generator.generate_map(lat, lon, force_rebuild=force_rebuild, mode=mode_param)
             
             # Send Response
             self.send_response(200)

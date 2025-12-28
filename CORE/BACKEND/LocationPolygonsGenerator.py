@@ -233,12 +233,14 @@ class LocationPolygonsGenerator:
             logger.error(traceback.format_exc())
             return None
 
-    def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False):
+    def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False, mode='initial'):
         """
         Orchestrates the creation of all game elements.
         Includes automatic retry with increasing region sizes.
+        
+        mode: 'initial' (default) or 'expand'
         """
-        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}")
+        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}, mode={mode}")
         
         # Region sizes: ~166m, ~555m, ~1110m
         REGION_SIZES = [0.0015, 0.005, 0.01]
@@ -250,7 +252,10 @@ class LocationPolygonsGenerator:
             logger.info("========================================")
             
             # 1. Red Lines (Roads)
-            red_segments, red_visual = self._fetch_red_lines(lat, lon, size, reuse_existing=False)
+            # If expanding, we want to fetch new AND merge with existing.
+            # reuse_existing=False usually means "fetch fresh from API".
+            # But in expand mode, we want "fetch fresh API" + "merge with Redis".
+            red_segments, red_visual = self._fetch_red_lines(lat, lon, size, reuse_existing=False, mode=mode)
             
             if not red_visual and not red_segments:
                 logger.warning(f"ATTEMPT {attempt}/3: No roads found for region_size={size}")
@@ -671,14 +676,12 @@ class LocationPolygonsGenerator:
         return {"error": "UNKNOWN", "message": "Generation failed unexpectedly"}
 
 
-    def _fetch_red_lines(self, lat, lon, region_size, reuse_existing):
+    def _fetch_red_lines(self, lat, lon, region_size, reuse_existing, mode='initial'):
         """Step 1: Fetch from Overpass or Redis"""
-        logger.info(f"LocationPolygonsGenerator: Step 1 - Fetching Red Lines for {lat}, {lon}")
+        logger.info(f"LocationPolygonsGenerator: Step 1 - Fetching Red Lines for {lat}, {lon} (mode={mode})")
         
-
-        
-        # Reuse Logic
-        if reuse_existing:
+        # Reuse Logic (Only if NOT expanding and reuse is requested)
+        if mode == 'initial' and reuse_existing:
             meta = load_from_redis(KEY_META)
             if meta and abs(meta.get('lat', 0) - lat) < 0.0005 and abs(meta.get('lon', 0) - lon) < 0.0005:
                 cached_lines = load_from_redis(KEY_RED_LINES)
@@ -729,8 +732,8 @@ class LocationPolygonsGenerator:
 
         # Process
         nodes = {n['id']: (n['lat'], n['lon']) for n in data['elements'] if n['type'] == 'node'}
-        red_visual = []
-        red_segments = []
+        new_red_visual = []
+        new_red_segments = []
         
         for el in data['elements']:
             if el['type'] == 'way':
@@ -741,17 +744,68 @@ class LocationPolygonsGenerator:
                     # SIMPLIFIED: Store only path (list of coordinates)
                     # No street names saved.
                     
-                    red_visual.append(coords)
+                    new_red_visual.append(coords)
                     
                     for i in range(len(coords) - 1):
-                        red_segments.append((coords[i], coords[i+1]))
+                        new_red_segments.append((coords[i], coords[i+1]))
 
+        # MERGING LOGIC
+        final_red_visual = new_red_visual
+        if mode == 'expand':
+            existing_lines = load_from_redis(KEY_RED_LINES) or []
+            logger.info(f"Expansion: Merging {len(new_red_visual)} new lines with {len(existing_lines)} existing lines.")
+            
+            # Simple deduplication strategy: Convert paths to tuples of tuples
+            # Be careful with float precision. Rounding needed?
+            # For now, let's just append and rely on Python's set for exact matches if we normalize.
+            # Actually, `final_red_visual` is a list of lists of lists/tuples.
+            
+            # Normalize for set comparison: tuple of tuples
+            seen_paths = set()
+            
+            # Helper: normalize path
+            def normalize_path(path):
+                # path is list of [lat, lon]
+                # Convert to tuple of tuples for hashing
+                # return tuple((round(p[0], 7), round(p[1], 7)) for p in path)
+                
+                # Actually, simpler: just use string rep or exact tuple if loaded properly.
+                # Redis returns lists.
+                if isinstance(path, dict) and 'path' in path:
+                     path = path['path']
+                return tuple((p[0], p[1]) for p in path)
 
+            combined_visual = []
+            
+            # Add existing
+            for line in existing_lines:
+                try:
+                    norm = normalize_path(line)
+                    if norm not in seen_paths:
+                        seen_paths.add(norm)
+                        combined_visual.append(line)
+                except Exception:
+                    pass
+            
+            # Add new
+            new_added_count = 0
+            for line in new_red_visual:
+                try:
+                    norm = normalize_path(line)
+                    if norm not in seen_paths:
+                        seen_paths.add(norm)
+                        combined_visual.append(line)
+                        new_added_count += 1
+                except Exception:
+                    pass
+            
+            logger.info(f"Expansion Result: {len(combined_visual)} total lines (added {new_added_count} unique new lines).")
+            final_red_visual = combined_visual
 
         save_to_redis(KEY_META, {'lat': lat, 'lon': lon})
-        save_to_redis(KEY_RED_LINES, red_visual)
+        save_to_redis(KEY_RED_LINES, final_red_visual)
         
-        return red_segments, red_visual
+        return new_red_segments, final_red_visual
 
     def _identify_intersections(self):
         """Step 2: Blue Circles"""

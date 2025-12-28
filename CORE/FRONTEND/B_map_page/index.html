@@ -385,6 +385,7 @@
             let savedGpsPosition = null;      // Saved GPS position before switching to fake location
             const gameDataCache = new Map();  // Caches game data per location key
             let savedLocationKey = null;      // Saved location key before switching to GPS
+            const expandedCircles = new Set(); // Track circles that have triggered expansion
 
             // Helper: Generate location key from coordinates (round to ~100m precision)
             const getLocationKey = (lat, lon) => {
@@ -933,9 +934,9 @@
                     .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
             };
 
-            const loadGameData = async (lat, lon, forceRebuild = false) => {
+            const loadGameData = async (lat, lon, forceRebuild = false, mode = 'initial') => {
                 console.log("GPS: ========================================");
-                console.log(`GPS: Starting polygon generation for (${lat.toFixed(6)}, ${lon.toFixed(6)})`);
+                console.log(`GPS: Starting polygon generation for (${lat.toFixed(6)}, ${lon.toFixed(6)}) [Mode: ${mode}]`);
                 console.log(`GPS: Force rebuild: ${forceRebuild}`);
                 console.log("GPS: ========================================");
 
@@ -949,16 +950,28 @@
                 const newLocationKey = getLocationKey(lat, lon);
                 console.log(`DEBUG: Switching location: ${currentLocationKey} -> ${newLocationKey}`);
                 currentLocationKey = newLocationKey;
-                collectedCircles = new Set(); // Reset for new location
+
+                // Only clear collected circles if this is a truly new location context and NOT an expansion
+                if (mode !== 'expand') {
+                    collectedCircles = new Set();
+                } else {
+                    console.log(`DEBUG: Expansion mode - Retaining ${collectedCircles.size} collected circles in memory.`);
+                }
 
                 // Show Loading GIF and dim map (Visual Transition)
-                loadingGif.style.display = 'block';
-                loadingGif.style.opacity = '1';
-                mapElement.style.opacity = '0.3';
-                hasRevealed = false;
+                // DON'T dim if expanding (seamless) - User Request "seamless"
+                if (mode !== 'expand') {
+                    loadingGif.style.display = 'block';
+                    loadingGif.style.opacity = '1';
+                    mapElement.style.opacity = '0.3';
+                    hasRevealed = false;
+                } else {
+                    console.log("GPS: Expansion mode - keeping map visible.");
+                }
 
-                // CHECK CACHE first (unless force rebuild)
-                if (!forceRebuild && gameDataCache.has(newLocationKey)) {
+                // CHECK CACHE first (unless force rebuild OR expansion)
+                // Expansion always fetches fresh data to merge
+                if (mode !== 'expand' && !forceRebuild && gameDataCache.has(newLocationKey)) {
                     console.log(`GPS: Using CACHED data for location ${newLocationKey}`);
                     const cachedData = gameDataCache.get(newLocationKey);
                     renderGameElements(cachedData);
@@ -966,7 +979,7 @@
                     return;
                 }
 
-                const url = `/api/game_data?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&rebuild=${forceRebuild}&_t=${Date.now()}`;
+                const url = `/api/game_data?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&rebuild=${forceRebuild}&mode=${mode}&_t=${Date.now()}`;
                 console.log(`GPS: Fetching from ${url}`);
 
                 fetch(url)
@@ -1956,34 +1969,67 @@
                         const mainColor = isSaturated ? '#ff7b00' : 'blue';       // Orange vs Blue
                         const fillColor = isSaturated ? '#ffa600' : '#00ccff';    // Light Orange vs Light Blue
 
+                        // Check immediate collection state to prevent flicker
+                        const key = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
+                        const isCollected = collectedCircles.has(key);
+
                         const marker = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 8, color: mainColor, fillColor: fillColor, fillOpacity: 0.8
+                            radius: 8,
+                            color: mainColor,
+                            fillColor: fillColor,
+                            fillOpacity: isCollected && !isPostersDebugActive ? 0 : 0.8,
+                            opacity: isCollected && !isPostersDebugActive ? 0 : 1, // Start hidden if collected!
+                            interactive: !isCollected // Disable interaction if collected
                         }).addTo(detailsLayer);
+
+                        // If collected but debug active, style accordingly
+                        if (isCollected && isPostersDebugActive) {
+                            marker.setStyle({ color: '#555', opacity: 0.5 });
+                        }
 
                         // Save connection count for debug restoration
                         marker.connections = circle.connections;
+                        marker.isSaturated = isSaturated; // EXPOSE FOR LOGIC
 
-                        marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
+                        if (!isCollected) {
+                            marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
+                        }
+
                         // Blue circles are large enough, no composite needed yet unless requested
                         addToMap(circle.lat, circle.lon, marker, 'blue');
                         attachDebugClick(marker, circle, 'Blue Circle');
 
                         // Track for polygon debug highlighting
-                        const key = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
-                        blueCircleLayerMap.set(key, marker);
+                        const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
+                        blueCircleLayerMap.set(coordKey, marker);
                     });
                 }
 
                 if (data.green_circles) {
                     data.green_circles.forEach(circle => {
+                        // Check immediate collection state
+                        const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
+                        const isCollected = collectedCircles.has(coordKey);
+
                         // Visual (Small)
                         const visual = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 4, color: 'green', fillColor: '#00ff00', fillOpacity: 1, interactive: false
+                            radius: 4,
+                            color: 'green',
+                            fillColor: '#00ff00',
+                            fillOpacity: isCollected && !isPostersDebugActive ? 0 : 1,
+                            opacity: isCollected && !isPostersDebugActive ? 0 : 1,
+                            interactive: false
                         }).addTo(detailsLayer);
+
+                        // If collected but debug, style
+                        if (isCollected && isPostersDebugActive) {
+                            visual.setStyle({ color: '#555', opacity: 0.5 });
+                        }
 
                         // Hit (Large)
                         const hit = L.circleMarker([circle.lat, circle.lon], {
-                            radius: 12, stroke: false, fillOpacity: 0, interactive: true
+                            radius: 12, stroke: false, fillOpacity: 0,
+                            interactive: !isCollected // Disable hit if collected
                         }).addTo(detailsLayer);
 
                         hit.visualSibling = visual; // Helper for Debug Highlighting
@@ -2047,7 +2093,7 @@
                             // console.log(`DEBUG: Candidate circle at ${cLat},${cLon} dist: ${dist}`);
                             if (dist < minDist) {
                                 minDist = dist;
-                                nearest = { lat: cLat, lon: cLon, dist: dist };
+                                nearest = { lat: cLat, lon: cLon, dist: dist, key: key };
                             }
                         }
                     });
@@ -2074,7 +2120,7 @@
                 }
 
                 controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
-                setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
+                setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
 
                 // RESTORE saved state for this location (async)
                 restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
@@ -2152,6 +2198,10 @@
                 } catch (e) {
                     console.warn("DEBUG: Failed to load server circles:", e);
                 }
+
+                // 3. Include currently verified 'collectedCircles' in memory
+                // This handles the migration case where we expanded (changed Key) but kept memory state.
+                collectedCircles.forEach(k => combinedCircles.add(k));
 
                 if (combinedCircles.size === 0) {
                     console.log("DEBUG: No saved circles to restore for this location");
@@ -2250,7 +2300,7 @@
                 console.log(`DEBUG: Restored ${restoredCount} circles and ${restoredMasksCount} completed polygons`);
             };
 
-            const setupProgressHiding = (layerMap, circleMap, polyState, lineMap) => {
+            const setupProgressHiding = (layerMap, circleMap, polyState, lineMap, blueMap) => {
                 const checkAndHide = () => {
                     const pos = userMarker.getLatLng();
                     const exactKey = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
@@ -2271,9 +2321,11 @@
                     }
 
 
+                    let targetKey = null;
+
                     if (target) {
                         // Re-calculate targetKey (since target might be from fuzzy match)
-                        let targetKey = exactKey;
+                        targetKey = exactKey;
                         // If exact match failed, we need to recover the key from the target... 
                         // Actually, we can just re-run the logic or check if we have the key.
                         // Ideally we should have stored the found key. 
@@ -2322,6 +2374,33 @@
                                     }
                                 });
                             }
+                        }
+                    }
+
+                    // MAP EXPANSION CHECK (Blue Circles)
+                    // This runs for ANY move (GPS or Manual)
+                    // We check if targetKey (exact or fuzzy) is a blue circle
+                    let finalTargetKey = target ? `${userMarker.getLatLng().lat.toFixed(6)},${userMarker.getLatLng().lng.toFixed(6)}` : null;
+                    if (target && target._latlng) {
+                        // Use target's latlng for precision key reconstruction or rely on layerMap keys
+                        // Actually targetKey variable is available in scope above.
+                    }
+
+                    // We use 'targetKey' variable from above scope.
+                    // However, we need to ensure targetKey is valid even if !target (but we only care if target exists?)
+                    // Actually, we care if we reached a blue circle. Blue circles are in layerMap.
+                    // So if (target) is true, we found SOMETHING.
+
+                    if (target && blueMap && blueMap.has(targetKey)) {
+                        // Check if Saturated (Orange) - If so, NO EXPANSION
+                        if (target.isSaturated) {
+                            // console.log(`DEBUG: Reached Saturated Circle ${targetKey} -> No Expansion.`);
+                        }
+                        else if (!expandedCircles.has(targetKey)) {
+                            console.log(`DEBUG: Reached new Blue Circle ${targetKey} -> Triggering Map Expansion...`);
+                            expandedCircles.add(targetKey);
+                            const [latStr, lonStr] = targetKey.split(',');
+                            loadGameData(parseFloat(latStr), parseFloat(lonStr), false, 'expand');
                         }
                     }
                 };
