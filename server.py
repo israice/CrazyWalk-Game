@@ -142,6 +142,13 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             logger.info(f"MATCHED Poster Route: {self.path}")
             self.handle_serve_poster()
             return
+        if self.path.startswith('/GAME_PROMOS/'):
+            logger.info(f"MATCHED Promo Route: {self.path}")
+            self.handle_serve_promo()
+            return
+        if self.path.startswith('/api/promos'):
+            self.handle_get_promos()
+            return
         if self.path.startswith('/README.md'):
             self.handle_serve_readme()
             return
@@ -433,6 +440,63 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(f.read())
         except Exception as e:
             logger.error(f"Error serving poster: {e}")
+            self.send_error(500, str(e))
+
+    def handle_serve_promo(self):
+        """Serve GIFs from CORE/DATA/GAME_PROMOS."""
+        try:
+            # Extract filename and ensure it's safe
+            filename = os.path.basename(self.path)
+            promo_path = os.path.join(os.getcwd(), 'CORE', 'DATA', 'GAME_PROMOS', filename)
+            
+            logger.info(f"Attempting to serve promo: {promo_path}")
+
+            if not os.path.exists(promo_path):
+                logger.error(f"PROMO NOT FOUND on disk: {promo_path}")
+                self.send_error(404, "Promo Not Found")
+                return
+                
+            if not filename.lower().endswith('.gif'):
+                logger.error(f"INVALID PROMO EXTENSION: {filename}")
+                self.send_error(404, "Invalid Extension")
+                return
+                
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/gif')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'public, max-age=86400') # Cache for 1 day
+            self.end_headers()
+            
+            with open(promo_path, 'rb') as f:
+                self.wfile.write(f.read())
+        except Exception as e:
+            logger.error(f"Error serving promo: {e}")
+            self.send_error(500, str(e))
+
+    def handle_get_promos(self):
+        """
+        Handle GET /api/promos
+        Returns list of GIF filenames from CORE/DATA/GAME_PROMOS
+        """
+        try:
+            promos_dir = os.path.join(os.getcwd(), 'CORE', 'DATA', 'GAME_PROMOS')
+            if not os.path.exists(promos_dir):
+                logger.warning(f"Promos directory not found: {promos_dir}")
+                file_list = []
+            else:
+                files = os.listdir(promos_dir)
+                file_list = [f for f in files if f.lower().endswith('.gif')]
+            
+            logger.info(f"Retrieved {len(file_list)} promo GIFs")
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(file_list).encode())
+            
+        except Exception as e:
+            logger.error(f"Get Promos Error: {e}")
             self.send_error(500, str(e))
 
     def handle_serve_readme(self):

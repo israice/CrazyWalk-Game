@@ -136,6 +136,21 @@
             }
         }
 
+
+        /* Debug Boundary Box */
+        .debug-boundary-box {
+            display: none;
+            border: 2px solid red;
+            box-sizing: border-box;
+            background: rgba(255, 0, 0, 0.1);
+            pointer-events: none;
+        }
+
+        /* Show when body has debug-mode class */
+        body.debug-mode .debug-boundary-box {
+            display: block !important;
+        }
+
         /* Label Styles */
         .leaflet-tooltip.circle-label {
             background: transparent;
@@ -1060,7 +1075,7 @@
                 if (mode !== 'expand' && !forceRebuild && gameDataCache.has(newLocationKey)) {
                     console.log(`GPS: Using CACHED data for location ${newLocationKey}`);
                     const cachedData = gameDataCache.get(newLocationKey);
-                    renderGameElements(cachedData, mode);
+                    await renderGameElements(cachedData, mode);
                     revealMap();
                     return;
                 }
@@ -1073,7 +1088,7 @@
                         console.log(`GPS: Response status: ${res.status}`);
                         return res.json();
                     })
-                    .then(data => {
+                    .then(async data => {
                         console.log("GPS: Server response received");
                         console.log("GPS: Response keys:", Object.keys(data));
 
@@ -1105,7 +1120,7 @@
                         gameDataCache.set(newLocationKey, data);
                         console.log(`DEBUG: Cached game data for location ${newLocationKey}`);
 
-                        renderGameElements(data, mode);
+                        await renderGameElements(data, mode); // Changed to await and kept original data/mode
                         revealMap();
                     })
                     .catch(err => {
@@ -1144,7 +1159,7 @@
                 if (gameDataCache.has(targetLocationKey)) {
                     console.log(`GPS: *** USING CACHED DATA for key ${targetLocationKey} ***`);
                     const cachedData = gameDataCache.get(targetLocationKey);
-                    renderGameElements(cachedData);
+                    await renderGameElements(cachedData);
                     revealMap();
                     return;
                 }
@@ -1155,13 +1170,13 @@
 
                 fetch(url)
                     .then(res => res.json())
-                    .then(data => {
+                    .then(async data => {
                         if (data.error || !data.polygons?.length) {
                             showError("Failed to load map data");
                             return;
                         }
                         gameDataCache.set(targetLocationKey, data);
-                        renderGameElements(data);
+                        await renderGameElements(data);
                         revealMap();
                     })
                     .catch(err => {
@@ -1170,7 +1185,7 @@
                     });
             };
 
-            const renderGameElements = (data, mode = 'initial') => {
+            const renderGameElements = async (data, mode = 'initial') => {
 
                 console.log("DEBUG: Starting Render with Progress Tracking...");
 
@@ -1881,6 +1896,37 @@
                     }
                 });
 
+                // PROMO: Fetch list of GIFS
+                let promoGifs = [];
+                try {
+                    const promoRes = await fetch('/api/promos');
+                    if (promoRes.ok) {
+                        promoGifs = await promoRes.json();
+                        console.log(`DEBUG: Loaded ${promoGifs.length} promo GIFs`);
+                    }
+                } catch (e) {
+                    console.warn("DEBUG: Failed to load promo GIFs", e);
+                }
+
+                // Helper to pick random GIF with persistence
+                const getAssignedGif = (polyId) => {
+                    if (promoGifs.length === 0) return null;
+
+                    const storageKey = `promo_gif_${polyId}`;
+                    const savedGif = localStorage.getItem(storageKey);
+
+                    // Verify saved GIF still exists in current list (optional, but good for safety)
+                    if (savedGif && promoGifs.includes(savedGif)) {
+                        return savedGif;
+                    }
+
+                    // Assign new random GIF
+                    const idx = Math.floor(Math.random() * promoGifs.length);
+                    const newGif = promoGifs[idx];
+                    localStorage.setItem(storageKey, newGif);
+                    return newGif;
+                };
+
                 // 2. Polygons (Init State)
                 const localPolys = data.polygons || [];
                 localPolys.forEach(poly => {
@@ -1891,15 +1937,54 @@
 
                     // attachDebugClick(pLayer, poly, 'Polygon'); // Removed per user request
 
+                    // Create Label (Small Percentage Circle)
                     const pLabel = L.marker([poly.center[0], poly.center[1]], {
                         icon: L.divIcon({
                             className: 'poly-label',
                             html: `<div style="background:white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
                             iconSize: [30, 30],
-                            iconAnchor: [15, 15]
+                            iconAnchor: [15, 15] // Centered
                         }),
                         interactive: true // Ensure it captures clicks
                     }).addTo(detailsLayer);
+
+                    // Create Large Promo Circle (Adjacent)
+                    // Offset: We want it to "cling" to the small circle.
+                    // Small R=15px. Large R=30px (Size=60).
+                    // Center-to-Center distance = 15 + 30 = 45px.
+                    // Let's offset it by 45px to the right (X axis).
+                    // Leaflet IconAnchor is relative to the top-left of the icon box.
+                    // To place the marker's "anchor point" (latlng) at a specific spot relative to visual...
+                    // Actually easier: simpler logic is anchor [X, Y].
+                    // Small circle anchor is [15, 15] (Center).
+                    // Large circle: Size [60, 60]. Center is [30, 30].
+                    // If we want it to right of the text label...
+                    // We use the SAME lat/lng anchor for both markers (poly.center).
+                    // For small circle, anchor [15, 15] places center at latlng.
+                    // For large circle, to be 45px to right...
+                    // We shift the anchor point LEFT by 45px.
+                    // Anchor = [-15, 30]. (X=-15 means left edge is 15px to RIGHT of anchor... wait.)
+                    // Icon Anchor [x, y]: The point of the icon which corresponds to marker's location.
+                    // If Anchor is [-15, 30], then the point (-15, 30) of the image is at LatLng.
+                    // This means the image starts 15px to the RIGHT of LatLng.
+                    // Center X of image (30) will be at 30 + 15 = 45px to right. Perfect.
+                    // Y=30 (Center vertical).
+
+                    const gifFile = getAssignedGif(poly.id);
+                    let pPromo = null;
+                    if (gifFile) {
+                        pPromo = L.marker([poly.center[0], poly.center[1]], {
+                            icon: L.divIcon({
+                                className: 'poly-promo',
+                                html: `<div style="background:white; border-radius:50%; width:60px; height:60px; overflow:hidden; border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
+                                        <img src="/GAME_PROMOS/${gifFile}" style="width:100%; height:100%; object-fit:cover;">
+                                      </div>`,
+                                iconSize: [60, 60],
+                                iconAnchor: [-15, 30] // Offset to right
+                            }),
+                            interactive: true
+                        }).addTo(detailsLayer);
+                    }
 
                     // LABEL UID Creation (Specific object for debug)
                     const labelDebugData = {
@@ -1951,6 +2036,30 @@
                     // Attach debug click to the Label as well (shows Label + Polygon Data)
                     attachDebugClick(pLabel, labelDebugData, 'Polygon Label');
 
+                    // Setup Promo Debug Data if exists
+                    if (pPromo) {
+                        const promoDebugData = {
+                            uid: generateUID('LARGE_WHITE_CIRCLE'),
+                            parent_polygon_uid: poly.uid,
+                            gif: gifFile,
+                            // Inherit polygon stats for context
+                            neighbor_polygons_count: poly.neighbor_polygons_count
+                        };
+                        window.allItems.set(promoDebugData.uid, promoDebugData);
+                        attachDebugClick(pPromo, promoDebugData, 'Promo Circle');
+                    }
+
+                    // Debug Bounding Box
+                    const pDebugBox = L.marker([poly.center[0], poly.center[1]], {
+                        icon: L.divIcon({
+                            className: 'debug-boundary-box',
+                            html: '',
+                            iconSize: [90, 60],
+                            iconAnchor: [15, 30] // Aligns with the visual union of small and large circles
+                        }),
+                        interactive: false
+                    }).addTo(detailsLayer);
+
                     const savedCount = parseInt(localStorage.getItem(`poly_${poly.id}`) || '0');
 
                     const pState = {
@@ -1961,6 +2070,8 @@
                         total: poly.total_points,
                         layer: pLayer,
                         label: pLabel,
+                        promo: pPromo, // Track promo for removal
+                        debugBox: pDebugBox, // NEW: Track debug box
                         lines: poly.boundary_white_lines // New UIDs
                     };
 
@@ -1985,6 +2096,12 @@
                         if (pLabel && detailsLayer.hasLayer(pLabel)) {
                             detailsLayer.removeLayer(pLabel);
                         }
+                        // Remove promo from detailsLayer explicitly
+                        if (pPromo && detailsLayer.hasLayer(pPromo)) {
+                            detailsLayer.removeLayer(pPromo);
+                        }
+                        pState.label = null;
+                        pState.promo = null;
                         pState.label = null;
 
                         // Reveal poster part
@@ -2580,6 +2697,14 @@
                     if (state.label && detailsLayer.hasLayer(state.label)) {
                         detailsLayer.removeLayer(state.label);
                         state.label = null;
+                    }
+                    if (state.promo && detailsLayer.hasLayer(state.promo)) {
+                        detailsLayer.removeLayer(state.promo);
+                        state.promo = null;
+                    }
+                    if (state.debugBox && detailsLayer.hasLayer(state.debugBox)) {
+                        detailsLayer.removeLayer(state.debugBox);
+                        state.debugBox = null;
                     }
                     console.log("DEBUG: Polygon Completed! Moving to Persistent Layer.");
 
