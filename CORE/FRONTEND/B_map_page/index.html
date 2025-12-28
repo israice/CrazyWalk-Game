@@ -1945,8 +1945,10 @@
 
                 // 2. Polygons (Init State)
                 let localPolys = data.polygons || [];
+                let localGreenCircles = data.green_circles || [];
+                let localWhiteLines = data.white_lines || [];
 
-                // Filter polygons on initial load - only show polygons connected to starting green circle
+                // Filter polygons, green circles, and white lines on initial load - only show items connected to starting point
                 if (mode === 'initial' && data.green_circles) {
                     // Find the starting green circle (nearest to user position)
                     const currentPos = userMarker.getLatLng();
@@ -1970,7 +1972,36 @@
                         // Filter to only show connected polygons
                         const connectedPolyIds = new Set(nearestCircle.connected_polygon_ids);
                         localPolys = localPolys.filter(poly => connectedPolyIds.has(poly.id));
-                        console.log(`DEBUG: Initial load - showing only ${localPolys.length} polygons connected to starting point`);
+
+                        // Build set of boundary white line IDs from filtered polygons
+                        const visibleLineIds = new Set();
+                        localPolys.forEach(poly => {
+                            if (poly.boundary_white_lines) {
+                                poly.boundary_white_lines.forEach(lineId => visibleLineIds.add(lineId));
+                            }
+                        });
+
+                        // Filter white lines to only those on filtered polygon boundaries
+                        localWhiteLines = localWhiteLines.filter(line => visibleLineIds.has(line.id));
+
+                        // Filter green circles to only those on visible white lines
+                        const visibleGreenCircles = new Set();
+                        localWhiteLines.forEach(line => {
+                            // Find green circles on this line
+                            const lineGreenCircles = data.green_circles.filter(gc => gc.line_id === line.id);
+                            lineGreenCircles.forEach(gc => {
+                                const key = `${gc.lat}_${gc.lon}`;
+                                visibleGreenCircles.add(key);
+                            });
+                        });
+
+                        // Filter green circles
+                        localGreenCircles = localGreenCircles.filter(gc => {
+                            const key = `${gc.lat}_${gc.lon}`;
+                            return visibleGreenCircles.has(key);
+                        });
+
+                        console.log(`DEBUG: Initial load filtered - Polygons: ${localPolys.length}, White Lines: ${localWhiteLines.length}, Green Circles: ${localGreenCircles.length}`);
                         console.log(`DEBUG: Starting circle:`, nearestCircle);
                         console.log(`DEBUG: Connected polygon IDs:`, nearestCircle.connected_polygon_ids);
                     }
@@ -2206,9 +2237,9 @@
                 console.log(`DEBUG: Restored ${restoredMasksCount} poster masks for completed polygons`);
 
                 // 3. White Lines (Index)
-                if (data.white_lines) {
-                    controls.setSnapLines(data.white_lines);
-                    data.white_lines.forEach(line => {
+                if (localWhiteLines && localWhiteLines.length > 0) {
+                    controls.setSnapLines(localWhiteLines);
+                    localWhiteLines.forEach(line => {
                         // Visual Layer (Thin, Dashed, Non-Interactive)
                         const visual = L.polyline(line.path, {
                             color: 'white', weight: 2, dashArray: '5, 5', interactive: false
@@ -2318,8 +2349,8 @@
                     });
                 }
 
-                if (data.green_circles) {
-                    data.green_circles.forEach(circle => {
+                if (localGreenCircles && localGreenCircles.length > 0) {
+                    localGreenCircles.forEach(circle => {
                         // Check immediate collection state
                         const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
                         const isCollected = collectedCircles.has(coordKey);
@@ -2432,7 +2463,7 @@
                     controls.updateUserPosition(userMarker, initialSnap.lat, initialSnap.lon, (isGpsActive && window.loadedQuality !== 'NONE'));
                 }
 
-                controls.updateGraph(data.green_circles, data.blue_circles, data.white_lines);
+                controls.updateGraph(localGreenCircles, data.blue_circles, localWhiteLines);
                 setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
 
                 // --- STATE APPLICATION LOGIC ---
