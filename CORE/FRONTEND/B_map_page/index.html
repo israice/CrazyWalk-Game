@@ -2499,7 +2499,11 @@
                 // Initial mask update (Important for expansion mode when bounds change!)
                 updateMaskPaths();
 
-
+                // Update debug box intersections if debug mode is active
+                if (isDebugActive) {
+                    console.log('DEBUG: renderGameElements complete - updating debug box intersections');
+                    updateDebugBoxIntersections();
+                }
 
                 // Removed: initPosterGrid() call at end (already done at start)
             };
