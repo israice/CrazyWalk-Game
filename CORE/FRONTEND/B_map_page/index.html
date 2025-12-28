@@ -536,16 +536,22 @@
 
             let currentPosterGrid = null; // Store poster grid from server (4 posters)
 
-            const initPosterGrid = (data) => {
-                console.log("DEBUG: Initializing Poster Grid with Bounds Expansion...");
-                if (posterSvgOverlay) {
-                    console.log("DEBUG: Removing existing poster SVG overlay");
-                    posterSvgOverlay.remove();
-                    posterSvgOverlay = null;
-                }
+            const initPosterGrid = (data, mode = 'initial') => {
+                const isExpanding = mode === 'expand';
+                console.log(`DEBUG: Initializing Poster Grid (mode=${mode}, isExpanding=${isExpanding})...`);
 
-                postersLayer.clearLayers();
-                posters.length = 0;
+                // During expansion, preserve existing overlay to prevent flicker
+                if (!isExpanding) {
+                    if (posterSvgOverlay) {
+                        console.log("DEBUG: Removing existing poster SVG overlay");
+                        posterSvgOverlay.remove();
+                        posterSvgOverlay = null;
+                    }
+                    postersLayer.clearLayers();
+                    posters.length = 0;
+                } else {
+                    console.log("DEBUG: Expansion mode - preserving existing poster overlay");
+                }
 
                 if (!currentPosterGrid || currentPosterGrid.length === 0) {
                     console.log("DEBUG: No poster_grid from server");
@@ -585,7 +591,35 @@
 
                 console.log(`DEBUG: SVG Expanded area (with buffer): lat(${minLat.toFixed(5)}, ${maxLat.toFixed(5)}), lon(${minLon.toFixed(5)}, ${maxLon.toFixed(5)})`);
 
-                // Create SVG overlay for posters with mask
+                const svgBounds = L.latLngBounds(
+                    [minLat, minLon],  // Southwest corner
+                    [maxLat, maxLon]   // Northeast corner
+                );
+
+                // EXPANSION MODE: Update existing overlay bounds instead of recreating
+                if (isExpanding && posterSvgOverlay) {
+                    console.log("DEBUG: Expanding existing poster overlay bounds...");
+
+                    // Get current bounds
+                    const currentBounds = posterSvgOverlay.getBounds();
+
+                    // Extend current bounds to include new bounds
+                    const extendedBounds = L.latLngBounds(
+                        [Math.min(currentBounds.getSouth(), minLat), Math.min(currentBounds.getWest(), minLon)],
+                        [Math.max(currentBounds.getNorth(), maxLat), Math.max(currentBounds.getEast(), maxLon)]
+                    );
+
+                    console.log(`DEBUG: Extended bounds: lat(${extendedBounds.getSouth().toFixed(5)}, ${extendedBounds.getNorth().toFixed(5)}), lon(${extendedBounds.getWest().toFixed(5)}, ${extendedBounds.getEast().toFixed(5)})`);
+
+                    // Update overlay bounds (this preserves the mask!)
+                    posterSvgOverlay.setBounds(extendedBounds);
+
+                    // Posters array is already populated - just update the SVG
+                    updatePosterSVG();
+                    return;
+                }
+
+                // INITIAL MODE: Create new SVG overlay
                 const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                 svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
                 svgElement.style.position = "absolute";
@@ -608,16 +642,10 @@
                 <g id="debug-poster-overlay" style="display:none; pointer-events: none;"></g>
             `;
 
-                // Create proper LatLngBounds for the SVG overlay
-                const svgBounds = L.latLngBounds(
-                    [minLat, minLon],  // Southwest corner
-                    [maxLat, maxLon]   // Northeast corner
-                );
-
                 // Add to map pane with correct bounds
                 posterSvgOverlay = L.svgOverlay(svgElement, svgBounds, {
                     interactive: false,
-                    pane: 'postersPane'  // Используем выделенный pane для постеров
+                    pane: 'postersPane'
                 }).addTo(map);
 
                 revealMask = svgElement.querySelector('#mask-paths-container');
@@ -666,9 +694,8 @@
 
                 if (!imagesContainer || !bgContainer || !overlayContainer) return;
 
-                imagesContainer.innerHTML = '';
-                bgContainer.innerHTML = '';
-                overlayContainer.innerHTML = '';
+                // --- DOM RECONCILIATION ---
+                // Do NOT clear innerHTML. Instead, diff and update.
 
                 // Get SVG bounds (geographic coordinates)
                 const svgBounds = posterSvgOverlay.getBounds();
@@ -680,7 +707,11 @@
                 const latRange = svgMaxLat - svgMinLat;
                 const lonRange = svgMaxLon - svgMinLon;
 
+                const activePosterIds = new Set();
+
                 posters.forEach(p => {
+                    activePosterIds.add(p.id);
+
                     const posterMinLat = p.bounds[0][0];
                     const posterMinLon = p.bounds[0][1];
                     const posterMaxLat = p.bounds[1][0];
@@ -692,52 +723,107 @@
                     const height = ((posterMaxLat - posterMinLat) / latRange) * 1000;
 
                     if (width <= 0 || height <= 0) {
-                        console.warn(`Skipping poster ${p.id} - invalid dimensions:`, { width, height });
                         return;
                     }
 
-                    // 1. Background Image (Ghost) - Always opacity 0.4 if visible
-                    const bgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                    bgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
+                    // 1. Background Image (Ghost)
+                    const bgId = `poster-bg-${p.id}`;
+                    let bgImage = bgContainer.querySelector(`#${bgId}`);
+                    if (!bgImage) {
+                        bgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+                        bgImage.setAttribute("id", bgId);
+                        bgImage.setAttribute("preserveAspectRatio", "none");
+                        bgContainer.appendChild(bgImage);
+                    }
+                    // Update attributes (efficiently)
+                    if (bgImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") !== p.imageUrl) {
+                        bgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
+                    }
                     bgImage.setAttribute("x", x);
                     bgImage.setAttribute("y", y);
                     bgImage.setAttribute("width", width);
                     bgImage.setAttribute("height", height);
-                    // Wait, if container has 0.6, child 1.0 = 0.6. 
-                    bgImage.setAttribute("preserveAspectRatio", "none");
-                    bgContainer.appendChild(bgImage);
 
-                    // 2. Main Game Image - Always opacity 1.0 (Masked)
-                    const mainImage = bgImage.cloneNode(true);
-                    mainImage.setAttribute("opacity", "1.0");
-                    imagesContainer.appendChild(mainImage);
+                    // 2. Main Game Image
+                    const imgId = `poster-img-${p.id}`;
+                    let mainImage = imagesContainer.querySelector(`#${imgId}`);
+                    if (!mainImage) {
+                        mainImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+                        mainImage.setAttribute("id", imgId);
+                        mainImage.setAttribute("opacity", "1.0");
+                        mainImage.setAttribute("preserveAspectRatio", "none");
+                        imagesContainer.appendChild(mainImage);
+                    }
+                    if (mainImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") !== p.imageUrl) {
+                        mainImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
+                    }
+                    mainImage.setAttribute("x", x);
+                    mainImage.setAttribute("y", y);
+                    mainImage.setAttribute("width", width);
+                    mainImage.setAttribute("height", height);
 
-                    // 3. Debug Overlay (Borders and Numbers)
+                    // 3. Debug Overlay
                     if (isPostersDebugActive) {
-                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        // For debug overlay, simpler to clear and redraw just for this poster? 
+                        // Or we can group them too. Let's group them by poster ID using a group <g>.
+                        const debugGroupId = `poster-debug-${p.id}`;
+                        let debugGroup = overlayContainer.querySelector(`#${debugGroupId}`);
+
+                        if (!debugGroup) {
+                            debugGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                            debugGroup.setAttribute("id", debugGroupId);
+                            overlayContainer.appendChild(debugGroup);
+
+                            // Contents (created once)
+                            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                            rect.setAttribute("fill", "none");
+                            rect.setAttribute("stroke", "red");
+                            rect.setAttribute("stroke-width", "3");
+                            debugGroup.appendChild(rect);
+
+                            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                            text.setAttribute("fill", "yellow");
+                            text.setAttribute("font-size", "13");
+                            text.setAttribute("font-weight", "bold");
+                            text.setAttribute("text-anchor", "middle");
+                            text.setAttribute("dominant-baseline", "middle");
+                            text.textContent = `#${p.id}`;
+                            debugGroup.appendChild(text);
+                        }
+
+                        // Update Group Contents
+                        const rect = debugGroup.querySelector('rect');
+                        const text = debugGroup.querySelector('text');
+
                         rect.setAttribute("x", x);
                         rect.setAttribute("y", y);
                         rect.setAttribute("width", width);
                         rect.setAttribute("height", height);
-                        rect.setAttribute("fill", "none");
-                        rect.setAttribute("stroke", "red");
-                        rect.setAttribute("stroke-width", "3");
-                        overlayContainer.appendChild(rect);
 
-                        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                         text.setAttribute("x", x + width / 2);
                         text.setAttribute("y", y + height / 2);
-                        text.setAttribute("fill", "yellow");
-                        text.setAttribute("font-size", "13");
-                        text.setAttribute("font-weight", "bold");
-                        text.setAttribute("text-anchor", "middle");
-                        text.setAttribute("dominant-baseline", "middle");
-                        text.textContent = `#${p.id}`;
-                        overlayContainer.appendChild(text);
                     }
                 });
 
-                console.log(`DEBUG: Updated poster layers`);
+                // Cleanup Stale Nodes
+                // Helper to remove stale children
+                const cleanupContainer = (container, prefix) => {
+                    Array.from(container.children).forEach(child => {
+                        const id = child.getAttribute("id");
+                        if (id && id.startsWith(prefix)) {
+                            const posterId = id.replace(prefix, '');
+                            if (!activePosterIds.has(posterId)) {
+                                child.remove();
+                            }
+                        }
+                    });
+                };
+
+                cleanupContainer(bgContainer, 'poster-bg-');
+                cleanupContainer(imagesContainer, 'poster-img-');
+                cleanupContainer(overlayContainer, 'poster-debug-');
+
+                console.log(`DEBUG: Updated poster layers (Diff Update)`);
             };
 
             const updatePostersVisibility = () => {
@@ -974,7 +1060,7 @@
                 if (mode !== 'expand' && !forceRebuild && gameDataCache.has(newLocationKey)) {
                     console.log(`GPS: Using CACHED data for location ${newLocationKey}`);
                     const cachedData = gameDataCache.get(newLocationKey);
-                    renderGameElements(cachedData);
+                    renderGameElements(cachedData, mode);
                     revealMap();
                     return;
                 }
@@ -1019,7 +1105,7 @@
                         gameDataCache.set(newLocationKey, data);
                         console.log(`DEBUG: Cached game data for location ${newLocationKey}`);
 
-                        renderGameElements(data);
+                        renderGameElements(data, mode);
                         revealMap();
                     })
                     .catch(err => {
@@ -1084,7 +1170,7 @@
                     });
             };
 
-            const renderGameElements = (data) => {
+            const renderGameElements = (data, mode = 'initial') => {
 
                 console.log("DEBUG: Starting Render with Progress Tracking...");
 
@@ -1099,7 +1185,7 @@
                 }
 
                 // Initialize poster grid UI and revealMask object
-                initPosterGrid(data);
+                initPosterGrid(data, mode);
 
                 groupsLayer.clearLayers();
                 detailsLayer.clearLayers();
@@ -2123,10 +2209,15 @@
                 setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
 
                 // RESTORE saved state for this location (async)
-                restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap);
+                restoreSavedCircles(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap)
+                    .then(() => {
+                        console.log("DEBUG: State restoration complete. Updating mask.");
+                        updateMaskPaths();
+                    });
+
 
                 // Hook into map movements to refresh the mask
-                map.on('viewreset move zoom', () => {
+                const updateMaskPaths = () => {
                     if (!revealMask || !posterSvgOverlay) return;
 
                     const svgBounds = posterSvgOverlay.getBounds();
@@ -2161,7 +2252,12 @@
                             }
                         }
                     });
-                });
+                };
+
+                map.on('viewreset move zoom', updateMaskPaths);
+
+                // Initial mask update (Important for expansion mode when bounds change!)
+                updateMaskPaths();
 
 
 
