@@ -1947,25 +1947,32 @@
                 let localPolys = data.polygons || [];
 
                 // Filter polygons on initial load - only show polygons connected to starting green circle
-                if (mode === 'initial') {
-                    // Find the starting green circle (nearest to initial position)
+                if (mode === 'initial' && data.green_circles) {
+                    // Find the starting green circle (nearest to user position)
                     const currentPos = userMarker.getLatLng();
-                    const startingCircle = window.findNearestActiveCircle(currentPos.lat, currentPos.lng);
 
-                    if (startingCircle && data.green_circles) {
-                        // Find the green circle data
-                        const startGreenCircle = data.green_circles.find(gc =>
-                            Math.abs(gc.lat - startingCircle.lat) < 0.000001 &&
-                            Math.abs(gc.lon - startingCircle.lon) < 0.000001
+                    // Find nearest green circle manually (findNearestActiveCircle not yet defined)
+                    let nearestCircle = null;
+                    let minDist = Infinity;
+
+                    for (const gc of data.green_circles) {
+                        const dist = Math.sqrt(
+                            Math.pow(gc.lat - currentPos.lat, 2) +
+                            Math.pow(gc.lon - currentPos.lng, 2)
                         );
-
-                        if (startGreenCircle && startGreenCircle.connected_polygon_ids) {
-                            // Filter to only show connected polygons
-                            const connectedPolyIds = new Set(startGreenCircle.connected_polygon_ids);
-                            localPolys = localPolys.filter(poly => connectedPolyIds.has(poly.id));
-                            console.log(`DEBUG: Initial load - showing only ${localPolys.length} polygons connected to starting point`);
-                            console.log(`DEBUG: Connected polygon IDs:`, startGreenCircle.connected_polygon_ids);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearestCircle = gc;
                         }
+                    }
+
+                    if (nearestCircle && nearestCircle.connected_polygon_ids) {
+                        // Filter to only show connected polygons
+                        const connectedPolyIds = new Set(nearestCircle.connected_polygon_ids);
+                        localPolys = localPolys.filter(poly => connectedPolyIds.has(poly.id));
+                        console.log(`DEBUG: Initial load - showing only ${localPolys.length} polygons connected to starting point`);
+                        console.log(`DEBUG: Starting circle:`, nearestCircle);
+                        console.log(`DEBUG: Connected polygon IDs:`, nearestCircle.connected_polygon_ids);
                     }
                 }
 
