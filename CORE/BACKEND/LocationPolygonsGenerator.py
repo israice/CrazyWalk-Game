@@ -960,17 +960,22 @@ class LocationPolygonsGenerator:
                         visible_blue_coords.add(start_key)
                         visible_blue_coords.add(end_key)
 
-                    # Filter blue circles - show circles that belong to visible polygons
-                    # A circle belongs to a polygon if it's one of the polygon's vertices
+                    # Filter blue circles - show circles that are endpoints of visible white lines
+                    # This ensures both endpoints of visible lines are shown, even if one leads to hidden polygon
                     filtered_polygon_ids = {p['id'] for p in filtered_polygons}
 
                     filtered_blue_circles = []
                     for bc in blue_circles:
-                        # Check if this circle belongs to at least one visible polygon
+                        bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+
+                        # Check if this circle is an endpoint of any visible white line
+                        is_visible_endpoint = bc_key in visible_blue_coords
+
+                        # Also check if circle belongs to at least one visible polygon
                         bc_connected_polys = set(bc.get('connected_polygon_ids', []))
                         has_visible_polygon = bool(bc_connected_polys & filtered_polygon_ids)
 
-                        if has_visible_polygon:
+                        if is_visible_endpoint or has_visible_polygon:
                             # Check if ALL connected polygons are visible
                             all_connected_visible = bc_connected_polys.issubset(filtered_polygon_ids)
 
