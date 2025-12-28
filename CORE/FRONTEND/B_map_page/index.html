@@ -2796,9 +2796,10 @@
 
             // Function to check if a line segment intersects with a rectangle (debug box)
             const lineIntersectsRect = (lineStart, lineEnd, rectBounds) => {
+                // lineStart, lineEnd = [lat, lng]
                 // rectBounds = { north, south, east, west }
-                // Check if line segment intersects with any of the 4 rectangle edges
 
+                // Rectangle corners
                 const rectCorners = [
                     [rectBounds.north, rectBounds.west],  // Top-left
                     [rectBounds.north, rectBounds.east],  // Top-right
@@ -2819,16 +2820,26 @@
                 const p2Inside = lineEnd[0] >= rectBounds.south && lineEnd[0] <= rectBounds.north &&
                                 lineEnd[1] >= rectBounds.west && lineEnd[1] <= rectBounds.east;
 
-                if (p1Inside || p2Inside) return true;
+                if (p1Inside || p2Inside) {
+                    console.log(`  Point inside: p1=${p1Inside}, p2=${p2Inside}`);
+                    return true;
+                }
 
                 // Check line-line intersection for each rectangle edge
                 const doSegmentsIntersect = (p1, p2, p3, p4) => {
-                    const ccw = (A, B, C) => (C[1]-A[1])*(B[0]-A[0]) > (B[1]-A[1])*(C[0]-A[0]);
-                    return ccw(p1,p3,p4) !== ccw(p2,p3,p4) && ccw(p1,p2,p3) !== ccw(p1,p2,p4);
+                    // p1,p2 = line segment, p3,p4 = rectangle edge
+                    // Using CCW algorithm
+                    const ccw = (A, B, C) => {
+                        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0]);
+                    };
+                    const result = ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+                    return result;
                 };
 
-                for (const edge of rectEdges) {
+                for (let i = 0; i < rectEdges.length; i++) {
+                    const edge = rectEdges[i];
                     if (doSegmentsIntersect(lineStart, lineEnd, edge[0], edge[1])) {
+                        console.log(`  Intersects edge ${i}: ${edge[0]} -> ${edge[1]}`);
                         return true;
                     }
                 }
@@ -2845,21 +2856,45 @@
                 _polygonState.forEach(state => {
                     if (!state.debugBox || !state.lines) return;
 
-                    // Get debug box bounds in lat/lng
-                    const boxBounds = state.debugBox.getElement().getBoundingClientRect();
                     const map = state.debugBox._map;
                     if (!map) return;
 
-                    // Convert pixel bounds to lat/lng bounds
-                    const topLeft = map.containerPointToLatLng([boxBounds.left, boxBounds.top]);
-                    const bottomRight = map.containerPointToLatLng([boxBounds.right, boxBounds.bottom]);
+                    // Get debug box center (polygon center) and icon properties
+                    const boxCenter = state.debugBox.getLatLng();
+                    const icon = state.debugBox.options.icon;
+                    const iconSize = icon.options.iconSize; // [width, height]
+                    const iconAnchor = icon.options.iconAnchor; // [x, y] from top-left to center point
+
+                    // Calculate the four corners of the debug box in lat/lng
+                    // iconAnchor tells us where the center point is within the icon
+                    // So the box extends from center - anchor to center + (size - anchor)
+
+                    const centerPoint = map.latLngToLayerPoint(boxCenter);
+
+                    // Calculate pixel bounds
+                    const topLeftPx = {
+                        x: centerPoint.x - iconAnchor[0],
+                        y: centerPoint.y - iconAnchor[1]
+                    };
+                    const bottomRightPx = {
+                        x: topLeftPx.x + iconSize[0],
+                        y: topLeftPx.y + iconSize[1]
+                    };
+
+                    // Convert to lat/lng
+                    const topLeft = map.layerPointToLatLng([topLeftPx.x, topLeftPx.y]);
+                    const bottomRight = map.layerPointToLatLng([bottomRightPx.x, bottomRightPx.y]);
+                    const topRight = map.layerPointToLatLng([bottomRightPx.x, topLeftPx.y]);
+                    const bottomLeft = map.layerPointToLatLng([topLeftPx.x, bottomRightPx.y]);
 
                     const rectBounds = {
-                        north: topLeft.lat,
-                        south: bottomRight.lat,
-                        east: bottomRight.lng,
-                        west: topLeft.lng
+                        north: Math.max(topLeft.lat, topRight.lat, bottomLeft.lat, bottomRight.lat),
+                        south: Math.min(topLeft.lat, topRight.lat, bottomLeft.lat, bottomRight.lat),
+                        east: Math.max(topLeft.lng, topRight.lng, bottomLeft.lng, bottomRight.lng),
+                        west: Math.min(topLeft.lng, topRight.lng, bottomLeft.lng, bottomRight.lng)
                     };
+
+                    console.log(`DEBUG: Box bounds for polygon at (${boxCenter.lat}, ${boxCenter.lng}):`, rectBounds);
 
                     // Check each boundary line
                     state.lines.forEach(lineId => {
@@ -2876,6 +2911,7 @@
 
                             if (lineIntersectsRect(start, end, rectBounds)) {
                                 intersects = true;
+                                console.log(`DEBUG: Line segment [${start}] -> [${end}] intersects box`);
                                 break;
                             }
                         }
