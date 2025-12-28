@@ -1320,13 +1320,13 @@ class LocationPolygonsGenerator:
             logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
         
         # --- MERGE SMALL POLYGONS ---
-        # Merge polygons where debug box doesn't fit (2025-12-28)
-        if polygons_data:
-            white_lines_map = {wl['id']: wl for wl in white_lines}
-            original_count = len(polygons_data)
-            polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
-            if len(polygons_data) != original_count:
-                logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
+        # DISABLED: Polygon merging disabled (2025-12-28)
+        # if polygons_data:
+        #     white_lines_map = {wl['id']: wl for wl in white_lines}
+        #     original_count = len(polygons_data)
+        #     polygons_data = self._merge_small_polygons(polygons_data, white_lines_map)
+        #     if len(polygons_data) != original_count:
+        #         logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
             
         # --- ASSIGN PROMO GIFS (PERSISTENT) ---
         # Scan available GIFs
