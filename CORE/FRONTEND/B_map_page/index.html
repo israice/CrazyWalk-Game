@@ -1959,7 +1959,7 @@
                             className: 'poly-label',
                             html: `<div style="background:white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
                             iconSize: [30, 30],
-                            iconAnchor: [15, 15] // Centered
+                            iconAnchor: [-30, 15] // Offset to right (Swapped)
                         }),
                         interactive: true // Ensure it captures clicks
                     }).addTo(detailsLayer);
@@ -1998,7 +1998,7 @@
                                         <img src="/GAME_PROMOS/${gifFile}" style="width:100%; height:100%; object-fit:cover;">
                                       </div>`,
                                 iconSize: [60, 60],
-                                iconAnchor: [-15, 30] // Offset to right
+                                iconAnchor: [30, 30] // Centered (Swapped)
                             }),
                             interactive: true
                         }).addTo(detailsLayer);
@@ -2073,7 +2073,7 @@
                             className: 'debug-boundary-box',
                             html: '',
                             iconSize: [90, 60],
-                            iconAnchor: [15, 30] // Aligns with the visual union of small and large circles
+                            iconAnchor: [30, 30] // Aligns with the visual union of small and large circles (Swapped)
                         }),
                         interactive: false
                     }).addTo(detailsLayer);
