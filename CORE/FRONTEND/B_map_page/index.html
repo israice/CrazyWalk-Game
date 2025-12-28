@@ -401,6 +401,8 @@
             const gameDataCache = new Map();  // Caches game data per location key
             let savedLocationKey = null;      // Saved location key before switching to GPS
             const expandedCircles = new Set(); // Track circles that have triggered expansion
+            // PROMO GIF Global Cache
+            let promoGifCache = []; // Loaded once on startup
 
             // Helper: Generate location key from coordinates (round to ~100m precision)
             const getLocationKey = (lat, lon) => {
@@ -439,6 +441,20 @@
                     return new Set();
                 }
             };
+
+            // Global helper to load promo GIFs once
+            const loadPromoGifs = async () => {
+                try {
+                    const res = await fetch('/api/promos');
+                    if (res.ok) {
+                        promoGifCache = await res.json();
+                        console.log(`DEBUG: Loaded ${promoGifCache.length} promo GIFs globally`);
+                    }
+                } catch (e) {
+                    console.warn("DEBUG: Failed to load promo GIFs", e);
+                }
+            };
+            loadPromoGifs(); // Trigger load immediately
 
             // Initialize Map via MapControls (Centralized Logic)
             const controls = new MapControls('map', [DEFAULT_LAT, DEFAULT_LON], {
@@ -1897,33 +1913,33 @@
                 });
 
                 // PROMO: Fetch list of GIFS
-                let promoGifs = [];
-                try {
-                    const promoRes = await fetch('/api/promos');
-                    if (promoRes.ok) {
-                        promoGifs = await promoRes.json();
-                        console.log(`DEBUG: Loaded ${promoGifs.length} promo GIFs`);
-                    }
-                } catch (e) {
-                    console.warn("DEBUG: Failed to load promo GIFs", e);
-                }
+                // PROMO: Fetch list of GIFS (Removed: Now using global promoGifCache)
+                // We rely on promoGifCache being populated.
 
                 // Helper to pick random GIF with persistence
+                // Helper to pick random GIF with persistence
                 const getAssignedGif = (polyId) => {
-                    if (promoGifs.length === 0) return null;
+                    if (promoGifCache.length === 0) return null;
+
+                    if (!polyId) {
+                        console.warn("DEBUG: getAssignedGif called with Falsy PolyId:", polyId);
+                        return null;
+                    }
 
                     const storageKey = `promo_gif_${polyId}`;
                     const savedGif = localStorage.getItem(storageKey);
 
-                    // Verify saved GIF still exists in current list (optional, but good for safety)
-                    if (savedGif && promoGifs.includes(savedGif)) {
+                    // TRUST LOCAL STORAGE
+                    if (savedGif) {
+                        // console.log(`DEBUG: Found saved GIF for ${polyId}: ${savedGif}`);
                         return savedGif;
                     }
 
                     // Assign new random GIF
-                    const idx = Math.floor(Math.random() * promoGifs.length);
-                    const newGif = promoGifs[idx];
+                    const idx = Math.floor(Math.random() * promoGifCache.length);
+                    const newGif = promoGifCache[idx];
                     localStorage.setItem(storageKey, newGif);
+                    console.log(`DEBUG: Assigned NEW GIF for ${polyId}: ${newGif}`);
                     return newGif;
                 };
 
@@ -1970,7 +1986,9 @@
                     // Center X of image (30) will be at 30 + 15 = 45px to right. Perfect.
                     // Y=30 (Center vertical).
 
-                    const gifFile = getAssignedGif(poly.id);
+
+                    // Use Backend-assigned GIF
+                    const gifFile = poly.promo_gif;
                     let pPromo = null;
                     if (gifFile) {
                         pPromo = L.marker([poly.center[0], poly.center[1]], {

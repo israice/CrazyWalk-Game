@@ -1046,8 +1046,21 @@ class LocationPolygonsGenerator:
                     poly = poly.buffer(0)
                 center = poly.centroid
                 
+                # STABLE ID GENERATION (2025-12-28)
+                # Use hash of centroid coordinates (rounded) to ensure ID persists across rebuilds/expansions.
+                # Format: poly_LAT_LON
+                # Rounding to 5 decimal places (~1.1 meter precision) to handle minor drift during regeneration
+                clat = round(center.x, 5) 
+                clon = round(center.y, 5)
+                
+                # Use simple coordinate string as ID to be readable and unique
+                stable_id = f"poly_{clat}_{clon}".replace('.', '')
+                
+                # Debug log for ID generation
+                # logger.info(f"Generated Stable ID: {stable_id} for centroid ({center.x}, {center.y})")
+                
                 polygons_data.append({
-                    'id': f"poly_{len(polygons_data)}",
+                    'id': stable_id,
                     'coords': coords,
                     'center': (center.x, center.y),
                     'total_points': total_pts,
@@ -1069,6 +1082,35 @@ class LocationPolygonsGenerator:
         #     if len(polygons_data) != original_count:
         #         logger.info(f"Polygon merging: {original_count} -> {len(polygons_data)} polygons")
             
+        # --- ASSIGN PROMO GIFS (PERSISTENT) ---
+        # Scan available GIFs
+        promos_dir = os.path.join(self.data_dir, '..', 'DATA', 'GAME_PROMOS')
+        promo_gifs = []
+        if os.path.exists(promos_dir):
+            promo_gifs = [f for f in os.listdir(promos_dir) if f.lower().endswith('.gif')]
+            
+        if promo_gifs:
+            import random
+            for poly in polygons_data:
+                # Use stable ID for persistence
+                poly_id = poly['id']
+                redis_key = f"game:promo_assignment:{poly_id}"
+                
+                # Check Redis
+                assigned_gif = load_from_redis(redis_key)
+                
+                if not assigned_gif:
+                    # Pick new random
+                    assigned_gif = random.choice(promo_gifs)
+                    save_to_redis(redis_key, assigned_gif)
+                    # logger.info(f"Assigned NEW Promo GIF {assigned_gif} to {poly_id}")
+                # else:
+                    # logger.info(f"Reusing Promo GIF {assigned_gif} for {poly_id}")
+                    
+                poly['promo_gif'] = assigned_gif
+        else:
+            logger.warning("No Promo GIFs found in CORE/DATA/GAME_PROMOS")
+
         save_to_redis(KEY_POLYGONS, polygons_data)
         
         used_ids = set()
