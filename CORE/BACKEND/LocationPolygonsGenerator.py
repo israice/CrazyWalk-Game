@@ -81,22 +81,23 @@ class LocationPolygonsGenerator:
 
     def _calculate_label_position(self, coords, center):
         """
-        Calculate the optimal position for the white circle label.
-        Places it on a radius from center towards the longest edge of the polygon.
+        Calculate the optimal direction for positioning the small circle.
+        Returns the direction angle (in radians) towards the longest edge.
 
-        This ensures the small circle is positioned in the direction of the largest
-        segment, maximizing the chance it fits inside the polygon.
+        The small circle should be positioned on the circumference of the large circle,
+        in the direction of the polygon's longest edge, maximizing the chance both
+        circles fit inside the polygon.
 
         Args:
             coords: Polygon coordinates in [lat, lon] format
             center: Polygon center as (lat, lon) tuple
 
         Returns:
-            (lat, lon) tuple for the label position
+            dict with 'angle' (radians) and 'longest_edge_length' (meters)
         """
         try:
             if not coords or len(coords) < 3:
-                return center
+                return {'angle': 0, 'longest_edge_length': 0}
 
             # Find the longest edge of the polygon
             max_length = 0
@@ -118,39 +119,27 @@ class LocationPolygonsGenerator:
                     )
 
             if not longest_edge_midpoint:
-                return center
+                return {'angle': 0, 'longest_edge_length': 0}
 
             # Calculate direction vector from center to longest edge midpoint
             dx = longest_edge_midpoint[0] - center[0]
             dy = longest_edge_midpoint[1] - center[1]
 
-            # Normalize the direction
-            length = math.sqrt(dx*dx + dy*dy)
-            if length == 0:
-                return center
-
-            dx_norm = dx / length
-            dy_norm = dy / length
-
-            # Calculate radius in degrees
-            # We want the small circle (15px radius ≈ 7-8 meters at zoom 18)
-            # to be offset from center towards the largest segment
-            # Using a small offset: ~0.00003 degrees ≈ 3-4 meters
-            radius_deg = 0.00003
-
-            # Calculate new position
-            new_lat = center[0] + dx_norm * radius_deg
-            new_lon = center[1] + dy_norm * radius_deg
+            # Calculate angle (in radians)
+            angle = math.atan2(dy, dx)
 
             logger.info(f"_calculate_label_position: center=({center[0]:.6f}, {center[1]:.6f}), "
                        f"longest_edge={max_length:.2f}m, "
-                       f"new_pos=({new_lat:.6f}, {new_lon:.6f})")
+                       f"angle={math.degrees(angle):.1f}°")
 
-            return (new_lat, new_lon)
+            return {
+                'angle': angle,
+                'longest_edge_length': max_length
+            }
 
         except Exception as e:
-            logger.warning(f"_calculate_label_position error: {e}, using center")
-            return center
+            logger.warning(f"_calculate_label_position error: {e}, using default")
+            return {'angle': 0, 'longest_edge_length': 0}
     
     def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map):
         """
@@ -1132,15 +1121,15 @@ class LocationPolygonsGenerator:
                 # Debug log for ID generation
                 # logger.info(f"Generated Stable ID: {stable_id} for centroid ({center.x}, {center.y})")
 
-                # Calculate optimal label position (towards longest edge)
+                # Calculate optimal label direction (towards longest edge)
                 center_tuple = (center.x, center.y)
-                label_position = self._calculate_label_position(coords, center_tuple)
+                label_direction = self._calculate_label_position(coords, center_tuple)
 
                 polygons_data.append({
                     'id': stable_id,
                     'coords': coords,
                     'center': center_tuple,
-                    'label_position': label_position,  # NEW: Optimized position for white circle
+                    'label_direction': label_direction,  # NEW: Direction info for small circle positioning
                     'total_points': total_pts,
                     'boundary_white_lines': list(b_ids),
                     'merge_count': 1

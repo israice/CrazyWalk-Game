@@ -1953,42 +1953,55 @@
 
                     // attachDebugClick(pLayer, poly, 'Polygon'); // Removed per user request
 
-                    // Create Label (Small Percentage Circle)
-                    // Use optimized label_position (towards longest edge) if available, otherwise fall back to center
-                    const labelPos = poly.label_position || poly.center;
-                    const pLabel = L.marker([labelPos[0], labelPos[1]], {
-                        icon: L.divIcon({
-                            className: 'poly-label',
-                            html: `<div style="background:white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
-                            iconSize: [30, 30],
-                            iconAnchor: [-30, 15] // Offset to right to make space for promo circle
-                        }),
-                        interactive: true // Ensure it captures clicks
-                    }).addTo(detailsLayer);
+                    // Calculate positions for both circles
+                    // Large circle stays at polygon center
+                    // Small circle is positioned on the circumference of large circle, towards longest edge
 
-                    // Create Large Promo Circle (Adjacent to small circle)
-                    // Both circles share the same lat/lng position but use different iconAnchors
-                    // Small circle: radius=15px, iconAnchor=[-30, 15] places it 30px LEFT of position
-                    // Large circle: radius=30px, iconAnchor=[30, 30] places it centered at position
-                    // This makes small circle cling to the left edge of large circle
-                    // Total width: 30px (small) + 60px (large) = 90px
+                    const centerPos = poly.center;
+                    const direction = poly.label_direction || { angle: 0 };
 
-                    // Use Backend-assigned GIF
+                    // Large circle radius in pixels = 30px
+                    // Small circle should be positioned at distance = 30px + 15px = 45px from center
+                    // Using iconAnchor offset to position small circle relative to large circle's center
+
+                    // Calculate pixel offset for small circle based on angle
+                    // radius = 45px (30px large radius + 15px small radius)
+                    const radius_px = 45;
+                    const angle = direction.angle || 0;
+
+                    // Calculate offset in pixels
+                    // Note: In screen coordinates, Y increases downward
+                    const offsetX = Math.cos(angle) * radius_px;
+                    const offsetY = -Math.sin(angle) * radius_px; // Negative because screen Y is inverted
+
+                    // Create Large Promo Circle at polygon center
                     const gifFile = poly.promo_gif;
                     let pPromo = null;
                     if (gifFile) {
-                        pPromo = L.marker([labelPos[0], labelPos[1]], {
+                        pPromo = L.marker([centerPos[0], centerPos[1]], {
                             icon: L.divIcon({
                                 className: 'poly-promo',
                                 html: `<div style="background:white; border-radius:50%; width:60px; height:60px; overflow:hidden; border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
                                         <img src="/GAME_PROMOS/${gifFile}" style="width:100%; height:100%; object-fit:cover;">
                                       </div>`,
                                 iconSize: [60, 60],
-                                iconAnchor: [30, 30] // Centered at position
+                                iconAnchor: [30, 30] // Centered at polygon center
                             }),
                             interactive: true
                         }).addTo(detailsLayer);
                     }
+
+                    // Create Small Percentage Circle on circumference of large circle
+                    // Position at same lat/lng but use iconAnchor to offset it
+                    const pLabel = L.marker([centerPos[0], centerPos[1]], {
+                        icon: L.divIcon({
+                            className: 'poly-label',
+                            html: `<div style="background:white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; color:black; font-size:10px; opacity: 0.8; font-weight:bold; pointer-events: auto;">0%</div>`,
+                            iconSize: [30, 30],
+                            iconAnchor: [15 - offsetX, 15 - offsetY] // Offset to position on circle edge
+                        }),
+                        interactive: true
+                    }).addTo(detailsLayer);
 
                     // LABEL UID Creation (Specific object for debug)
                     const labelDebugData = {
@@ -1996,7 +2009,8 @@
                         parent_polygon_uid: poly.uid,
                         boundary_white_lines: poly.boundary_white_lines,
                         center: poly.center,
-                        label_position: labelPos,  // NEW: Optimized position for label
+                        label_direction: direction,  // Direction info
+                        label_angle_degrees: direction.angle ? (direction.angle * 180 / Math.PI) : 0,
                         coords: poly.coords,
                         total_points: poly.total_points,
                         blue_circles_count: poly.blue_circles_count || 0,
@@ -2055,13 +2069,13 @@
                     }
 
                     // Debug Bounding Box
-                    // Position at labelPos to align with both circles
-                    const pDebugBox = L.marker([labelPos[0], labelPos[1]], {
+                    // Position at polygon center (same as large circle)
+                    const pDebugBox = L.marker([centerPos[0], centerPos[1]], {
                         icon: L.divIcon({
                             className: 'debug-boundary-box',
                             html: '',
                             iconSize: [90, 60],
-                            iconAnchor: [30, 30] // Aligns with the visual union of small and large circles
+                            iconAnchor: [30, 30] // Centered on large circle
                         }),
                         interactive: false
                     }).addTo(detailsLayer);
