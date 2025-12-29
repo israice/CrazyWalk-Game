@@ -41,61 +41,289 @@ class LocationPolygonsGenerator:
         Check if a circle with given radius can fit entirely inside the polygon.
         The white circle label is approximately 30x30 pixels, which at typical zoom
         translates to roughly 15 meters radius.
-        
+
         Coords are in [lat, lon] format, but Shapely needs (x, y) = (lon, lat).
         """
         try:
             # Swap from [lat, lon] to (lon, lat) for Shapely
             shapely_coords = [(c[1], c[0]) for c in coords]
-            
+
             poly = Polygon(shapely_coords)
             if not poly.is_valid:
                 poly = poly.buffer(0)
             if poly.is_empty or poly.area == 0:
                 logger.info(f"_can_fit_circle: empty/zero area polygon")
                 return False
-            
+
             centroid = poly.centroid
-            
+
             # Check if centroid is inside polygon
             if not poly.contains(centroid):
                 logger.info(f"_can_fit_circle: centroid outside polygon")
                 return False
-            
+
             # Calculate minimum distance from centroid to polygon boundary
             boundary = poly.exterior
             min_distance_deg = centroid.distance(boundary)
-            
+
             # Convert to meters (approximate: 1 degree ≈ 111km at equator)
             min_distance_meters = min_distance_deg * 111000
-            
+
             fits = min_distance_meters >= radius_meters
-            
+
             # Always log for debugging
             logger.info(f"_can_fit_circle: min_dist={min_distance_meters:.2f}m, radius={radius_meters}m, fits={fits}")
-            
+
             return fits
         except Exception as e:
             logger.warning(f"_can_fit_circle error: {e}")
             return True  # Assume fits if check fails
+
+    def _get_blue_lines(self, coords, center, label_direction, boundary_white_lines):
+        """
+        Get list of white lines that the debug box touches (blue lines).
+
+        Returns:
+            set: Set of line IDs that intersect with debug box
+        """
+        try:
+            from shapely.geometry import box as ShapelyBox, LineString
+
+            # Convert to Shapely polygon
+            shapely_coords = [(c[1], c[0]) for c in coords]  # Swap to (lon, lat)
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+
+            center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
+            angle = label_direction.get('angle', 0)
+
+            # Calculate offset for small circle
+            offset_distance = 45 / 111000  # 45px ≈ 22.5 meters
+            offset_x = math.cos(angle) * offset_distance
+            offset_y = math.sin(angle) * offset_distance
+
+            # Calculate bounds of debug box
+            small_center_x = center_point[0] + offset_x
+            small_center_y = center_point[1] + offset_y
+
+            # Find extremes
+            large_radius = 30 / 111000  # 30px radius
+            small_radius = 15 / 111000  # 15px radius
+
+            min_x = min(center_point[0] - large_radius, small_center_x - small_radius)
+            max_x = max(center_point[0] + large_radius, small_center_x + small_radius)
+            min_y = min(center_point[1] - large_radius, small_center_y - small_radius)
+            max_y = max(center_point[1] + large_radius, small_center_y + small_radius)
+
+            # Create debug box rectangle
+            debug_box = ShapelyBox(min_x, min_y, max_x, max_y)
+
+            # Check which boundary lines intersect with debug box edges
+            blue_lines = set()
+            debug_box_boundary = debug_box.boundary
+
+            # Check each white line on polygon boundary
+            for line_id in boundary_white_lines:
+                # We need to check if this line intersects debug box boundary
+                # For now, mark as blue if debug box extends outside polygon
+                # This is approximation - in practice frontend does precise check
+                pass
+
+            # Simple check: if debug box doesn't fit, all lines are potentially blue
+            if not poly.contains(debug_box):
+                blue_lines = set(boundary_white_lines)
+
+            return blue_lines
+
+        except Exception as e:
+            logger.warning(f"_get_blue_lines error: {e}")
+            return set()
+
+    def _can_fit_debug_box(self, coords, center, label_direction):
+        """
+        Check if the debug box (bounding box of both circles) fits entirely inside the polygon.
+
+        Debug box calculation:
+        - Large circle: 60px diameter (30px radius)
+        - Small circle: 30px diameter (15px radius)
+        - Small circle offset: 45px from center in direction of label_direction angle
+        - Debug box must encompass both circles
+
+        At zoom level ~17-18, approximately:
+        - 120px ≈ 60 meters (worst case)
+
+        Args:
+            coords: Polygon coordinates in [lat, lon] format
+            center: Polygon center as (lat, lon) tuple
+            label_direction: Direction dict with 'angle' in radians
+
+        Returns:
+            bool: True if debug box fits entirely inside polygon
+        """
+        try:
+            from shapely.geometry import box as ShapelyBox
+
+            # Convert to Shapely polygon
+            shapely_coords = [(c[1], c[0]) for c in coords]  # Swap to (lon, lat)
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+
+            center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
+            angle = label_direction.get('angle', 0)
+
+            # Calculate debug box size in degrees
+            # Worst case: box is 120x120px ≈ 60m x 60m
+            # 1 degree ≈ 111km, so 60m ≈ 0.00054 degrees
+            box_half_size = 60 / 111000  # meters to degrees
+
+            # Calculate offset for small circle
+            offset_distance = 45 / 111000  # 45px ≈ 22.5 meters
+            offset_x = math.cos(angle) * offset_distance
+            offset_y = math.sin(angle) * offset_distance
+
+            # Calculate bounds of debug box
+            # We need to encompass both circles in any direction
+            small_center_x = center_point[0] + offset_x
+            small_center_y = center_point[1] + offset_y
+
+            # Find extremes
+            large_radius = 30 / 111000  # 30px radius
+            small_radius = 15 / 111000  # 15px radius
+
+            min_x = min(center_point[0] - large_radius, small_center_x - small_radius)
+            max_x = max(center_point[0] + large_radius, small_center_x + small_radius)
+            min_y = min(center_point[1] - large_radius, small_center_y - small_radius)
+            max_y = max(center_point[1] + large_radius, small_center_y + small_radius)
+
+            # Create debug box rectangle
+            debug_box = ShapelyBox(min_x, min_y, max_x, max_y)
+
+            # Check if debug box is entirely within polygon
+            fits = poly.contains(debug_box)
+
+            logger.info(f"_can_fit_debug_box: center=({center[0]:.6f}, {center[1]:.6f}), "
+                       f"angle={math.degrees(angle):.1f}°, fits={fits}")
+
+            return fits
+
+        except Exception as e:
+            logger.warning(f"_can_fit_debug_box error: {e}")
+            return True  # Assume fits if check fails
+
+    def _calculate_label_position(self, coords, center):
+        """
+        Calculate the optimal direction for positioning the small circle.
+        Returns the direction angle (in radians) towards the widest part of polygon.
+
+        The small circle should be positioned on the circumference of the large circle,
+        in the direction of the polygon's widest/most spacious part, maximizing the
+        chance both circles fit inside the polygon.
+
+        Strategy: Sample multiple directions from center and find which direction
+        has the maximum distance to polygon boundary.
+
+        Args:
+            coords: Polygon coordinates in [lat, lon] format
+            center: Polygon center as (lat, lon) tuple
+
+        Returns:
+            dict with 'angle' (radians) and 'max_distance' (degrees)
+        """
+        try:
+            if not coords or len(coords) < 3:
+                return {'angle': 0, 'max_distance': 0}
+
+            # Convert to Shapely polygon for distance calculations
+            shapely_coords = [(c[1], c[0]) for c in coords]  # Swap to (lon, lat)
+            poly = Polygon(shapely_coords)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+
+            center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
+
+            # Sample 16 directions around the center (every 22.5 degrees)
+            num_samples = 16
+            max_distance = 0
+            best_angle = 0
+
+            for i in range(num_samples):
+                angle = (i * 2 * math.pi) / num_samples
+
+                # Create a ray from center in this direction
+                # Project to a far point
+                far_distance = 0.01  # ~1km in degrees
+                far_point = (
+                    center_point[0] + math.cos(angle) * far_distance,
+                    center_point[1] + math.sin(angle) * far_distance
+                )
+
+                # Create line from center to far point
+                from shapely.geometry import LineString, Point
+                ray = LineString([center_point, far_point])
+
+                # Find intersection with polygon boundary
+                boundary = poly.boundary
+                intersection = ray.intersection(boundary)
+
+                # Calculate distance from center to intersection
+                if not intersection.is_empty:
+                    if intersection.geom_type == 'Point':
+                        dist = Point(center_point).distance(intersection)
+                        if dist > max_distance:
+                            max_distance = dist
+                            best_angle = angle
+                    elif intersection.geom_type == 'MultiPoint':
+                        # Take the closest intersection point
+                        min_dist = min(Point(center_point).distance(Point(pt)) for pt in intersection.geoms)
+                        if min_dist > max_distance:
+                            max_distance = min_dist
+                            best_angle = angle
+
+            logger.info(f"_calculate_label_position: center=({center[0]:.6f}, {center[1]:.6f}), "
+                       f"max_distance={max_distance * 111000:.2f}m, "
+                       f"angle={math.degrees(best_angle):.1f}°")
+
+            return {
+                'angle': best_angle,
+                'max_distance': max_distance
+            }
+
+        except Exception as e:
+            logger.warning(f"_calculate_label_position error: {e}, using default")
+            return {'angle': 0, 'max_distance': 0}
     
-    def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map):
+    def _find_merge_candidate(self, small_poly, all_polys, line_to_polys_map, blue_lines):
         """
-        Find a neighboring polygon that shares a boundary white line with small_poly.
-        Returns (neighbor_poly, shared_line_id) or (None, None).
+        Find a neighboring polygon that shares a BLUE LINE (line touched by debug box) with small_poly.
+        Only merge through blue lines - lines that the debug box touches.
+
+        Args:
+            small_poly: The small polygon to find neighbor for
+            all_polys: All polygons
+            line_to_polys_map: Map of line_id -> [polygons]
+            blue_lines: Set of line IDs that are blue (touched by debug box)
+
+        Returns:
+            (neighbor_poly, shared_line_id) or (None, None)
         """
-        small_lines = set(small_poly.get('boundary_white_lines', []))
-        
+        small_blue_lines = blue_lines.get(small_poly['id'], set())
+
+        # Only consider blue lines (lines touched by debug box)
+        if not small_blue_lines:
+            return None, None
+
         # Sort for deterministic merging order
-        sorted_lines = sorted(list(small_lines))
-        
+        sorted_lines = sorted(list(small_blue_lines))
+
         for line_id in sorted_lines:
-            # Find all polygons that share this line
+            # Find all polygons that share this blue line
             sharing_polys = line_to_polys_map.get(line_id, [])
             for candidate in sharing_polys:
                 if candidate['id'] != small_poly['id']:
                     return candidate, line_id
-        
+
         return None, None
     
     def _merge_two_polygons(self, poly_a, poly_b, shared_line_id, white_lines_map):
@@ -214,13 +442,26 @@ class LocationPolygonsGenerator:
             # For now, we trust the sum but relying on generate_map's recalculation step is safer.
             # Let's just sum for now.
             total_pts = poly_a.get('total_points', 0) + poly_b.get('total_points', 0)
-            
-            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {len(new_coords)} coords, {len(combined_lines)} lines")
-            
+
+            # Calculate new center and label direction for merged polygon
+            new_center = merged_geom.centroid
+            new_center_tuple = (new_center.y, new_center.x)  # Swap back to (lat, lon)
+
+            # Calculate new label direction for the merged polygon
+            new_label_direction = self._calculate_label_position(new_coords, new_center_tuple)
+
+            # Generate new stable ID based on new centroid
+            clat = round(new_center.y, 5)
+            clon = round(new_center.x, 5)
+            new_stable_id = f"poly_{clat}_{clon}".replace('.', '')
+
+            logger.info(f"_merge_two_polygons: SUCCESS - {poly_a['id']} + {poly_b['id']} -> {new_stable_id}: {len(new_coords)} coords, {len(combined_lines)} lines")
+
             return {
-                'id': poly_a['id'],  # Keep first polygon's ID
+                'id': new_stable_id,  # New ID based on new center
                 'coords': new_coords,
-                'center': largest_original_center,  # Center of largest original polygon
+                'center': new_center_tuple,  # New calculated center
+                'label_direction': new_label_direction,  # New calculated direction
                 'total_points': total_pts,
                 'boundary_white_lines': list(combined_lines),
                 'merge_count': poly_a.get('merge_count', 1) + poly_b.get('merge_count', 1),
@@ -233,16 +474,19 @@ class LocationPolygonsGenerator:
             logger.error(traceback.format_exc())
             return None
 
-    def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False, mode='initial'):
+    def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False, mode='initial', restored_polygon_ids=None):
         """
         Orchestrates the creation of all game elements.
         Includes automatic retry with increasing region sizes.
-        
+
         mode: 'initial' (default) or 'expand'
+        restored_polygon_ids: List of polygon IDs to restore (for page reload)
         """
-        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}, mode={mode}")
-        
+        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}, mode={mode}, restored_ids={len(restored_polygon_ids) if restored_polygon_ids else 0}")
+
         # Region sizes: ~166m, ~555m, ~1110m
+        # NOTE: We use normal region size even when restoring. Polygons outside the region
+        # won't be restored, but user can re-expand them. Large regions are too slow.
         REGION_SIZES = [0.0015, 0.005, 0.01]
         
         for attempt, size in enumerate(REGION_SIZES, 1):
@@ -661,7 +905,163 @@ class LocationPolygonsGenerator:
             logger.info("========================================")
             logger.info(f"SUCCESS on attempt {attempt}: {len(polygons)} polygons, {len(blue_circles)} circles, {len(white_lines)} lines")
             logger.info("========================================")
-            
+
+            # Filter for initial mode - show only polygons connected to spawn point
+            # Filter for expand mode - show only polygons connected to clicked blue circle
+            if mode in ['initial', 'expand'] and polygons:
+                connected_poly_ids = None
+
+                if mode == 'initial':
+                    # Check if we're restoring previously visible polygons
+                    if restored_polygon_ids and len(restored_polygon_ids) > 0:
+                        # Restore all previously visible polygons
+                        connected_poly_ids = set(restored_polygon_ids)
+                        logger.info(f"Initial mode (RESTORE): Restoring {len(restored_polygon_ids)} previously visible polygons: {restored_polygon_ids}")
+                    else:
+                        # Find nearest green circle to spawn point (lat, lon)
+                        min_dist = float('inf')
+                        nearest_gc = None
+
+                        for gc in green_circles:
+                            dist = ((gc['lat'] - lat) ** 2 + (gc['lon'] - lon) ** 2) ** 0.5
+                            if dist < min_dist:
+                                min_dist = dist
+                                nearest_gc = gc
+
+                        if nearest_gc and nearest_gc.get('connected_polygon_ids'):
+                            connected_poly_ids = set(nearest_gc['connected_polygon_ids'])
+                            logger.info(f"Initial mode: Starting green circle {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
+
+                elif mode == 'expand':
+                    # Find nearest blue circle to clicked point (lat, lon)
+                    min_dist = float('inf')
+                    nearest_bc = None
+
+                    for bc in blue_circles:
+                        dist = ((bc['lat'] - lat) ** 2 + (bc['lon'] - lon) ** 2) ** 0.5
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_bc = bc
+
+                    if nearest_bc and nearest_bc.get('connected_polygon_ids'):
+                        connected_poly_ids = set(nearest_bc['connected_polygon_ids'])
+                        logger.info(f"Expand mode: Clicked blue circle {nearest_bc['id']}, connected polygons: {nearest_bc['connected_polygon_ids']}")
+
+                if connected_poly_ids:
+                    # Filter polygons
+                    filtered_polygons = [p for p in polygons if p['id'] in connected_poly_ids]
+
+                    # Collect boundary white line IDs from filtered polygons
+                    visible_line_ids = set()
+                    for poly in filtered_polygons:
+                        if poly.get('boundary_white_lines'):
+                            visible_line_ids.update(poly['boundary_white_lines'])
+
+                    # Filter white lines
+                    filtered_white_lines = [wl for wl in white_lines if wl['id'] in visible_line_ids]
+
+                    # Collect blue circle coordinates from endpoints of visible white lines
+                    # IMPORTANT: Normalize white line endpoint coordinates to match blue circles
+                    visible_blue_coords = set()
+                    for wl in filtered_white_lines:
+                        # White line endpoints are [lat, lon] - normalize and replace with new lists
+                        wl['start'] = [round(wl['start'][0], 7), round(wl['start'][1], 7)]
+                        wl['end'] = [round(wl['end'][0], 7), round(wl['end'][1], 7)]
+
+                        start_key = (wl['start'][0], wl['start'][1])
+                        end_key = (wl['end'][0], wl['end'][1])
+                        visible_blue_coords.add(start_key)
+                        visible_blue_coords.add(end_key)
+
+                    # Filter blue circles - show ONLY circles that are endpoints of visible white lines
+                    # This ensures we only show circles for the filtered polygons
+                    filtered_polygon_ids = {p['id'] for p in filtered_polygons}
+
+                    # First, collect existing circles at visible endpoints
+                    existing_coords = {}  # coord_key -> blue_circle
+                    filtered_blue_circles = []
+
+                    for bc in blue_circles:
+                        # Normalize coordinates to 7 decimals to match white line endpoints
+                        bc['lat'] = round(bc['lat'], 7)
+                        bc['lon'] = round(bc['lon'], 7)
+                        bc_key = (bc['lat'], bc['lon'])
+                        existing_coords[bc_key] = bc
+
+                        # ONLY show circles that are endpoints of visible white lines
+                        if bc_key in visible_blue_coords:
+                            # If circle is at endpoint of visible line, ALWAYS show it
+                            # Recalculate is_saturated: orange ONLY if connections == visible polygon count
+                            total_connections = bc.get('connections', 0)
+                            visible_polygon_count = len([pid for pid in bc.get('connected_polygon_ids', []) if pid in filtered_polygon_ids])
+
+                            # Update connected_polygons_count to reflect only VISIBLE polygons
+                            bc['connected_polygons_count'] = visible_polygon_count
+
+                            # Circle is saturated (orange) ONLY if ALL its lines belong to visible polygons
+                            # If connections != visible_polygon_count, it has lines to hidden polygons (blue - expansion point)
+                            bc['is_saturated'] = (total_connections == visible_polygon_count)
+
+                            # Debug logging for first few circles
+                            if len(filtered_blue_circles) < 3:
+                                logger.info(f"Circle {bc['id']}: connections={total_connections}, visible_polys={visible_polygon_count}, is_saturated={bc['is_saturated']}")
+
+                            filtered_blue_circles.append(bc)
+
+                    # Create missing circles for visible line endpoints (where count == 2 globally)
+                    # These are needed for complete polygon display
+                    logger.info(f"Checking {len(visible_blue_coords)} visible endpoints against {len(existing_coords)} existing circles")
+
+                    created_count = 0
+                    missing_coords = []
+                    for coord_key in visible_blue_coords:
+                        if coord_key not in existing_coords:
+                            missing_coords.append(coord_key)
+                            lat, lon = coord_key
+                            # Create a simple blue circle for this endpoint
+                            new_circle = {
+                                'id': f"BC_{lat}_{lon}",
+                                'lat': lat,
+                                'lon': lon,
+                                'connections': 2,  # Assumed straight segment
+                                'active_connections': 2,
+                                'connected_white_lines': [],
+                                'connected_polygon_ids': [],
+                                'connected_polygons_count': 0,
+                                'is_saturated': False,  # Always blue (not saturated)
+                                'uid': f"BLUE_CIRCLE_{lat}_{lon}".replace('.', '_').replace('-', 'm')
+                            }
+                            filtered_blue_circles.append(new_circle)
+                            created_count += 1
+
+                    if created_count > 0:
+                        logger.info(f"Created {created_count} blue circles for missing endpoints: {missing_coords[:3]}...")
+
+                    logger.info(f"Total filtered blue circles: {len(filtered_blue_circles)}")
+
+                    # Debug: Log coordinate matching for verification
+                    if filtered_white_lines:
+                        sample_line = filtered_white_lines[0]
+                        logger.info(f"Sample line endpoints (normalized): start={sample_line['start']}, end={sample_line['end']}")
+                    if filtered_blue_circles:
+                        sample_circle = filtered_blue_circles[0]
+                        logger.info(f"Sample circle coords (normalized): lat={sample_circle['lat']}, lon={sample_circle['lon']}")
+
+                    # Filter green circles (only those on visible white lines)
+                    line_ids_set = {wl['id'] for wl in filtered_white_lines}
+                    filtered_green_circles = [gc for gc in green_circles if gc.get('line_id') in line_ids_set]
+
+                    logger.info(f"{mode.upper()} MODE FILTER: {len(polygons)} -> {len(filtered_polygons)} polygons, "
+                               f"{len(white_lines)} -> {len(filtered_white_lines)} lines, "
+                               f"{len(blue_circles)} -> {len(filtered_blue_circles)} blue circles, "
+                               f"{len(green_circles)} -> {len(filtered_green_circles)} green circles")
+
+                    # Replace with filtered data
+                    polygons = filtered_polygons
+                    white_lines = filtered_white_lines
+                    blue_circles = filtered_blue_circles
+                    green_circles = filtered_green_circles
+
             return {
                 "red_lines": [],
                 "blue_circles": blue_circles,
@@ -842,7 +1242,8 @@ class LocationPolygonsGenerator:
             
         blue_circles = []
         relevant_nodes = set()
-        
+
+        # Create blue circles only for intersections/endpoints (count != 2)
         for node, count in node_counts.items():
             if count != 2:
                 blue_circles.append({
@@ -1045,24 +1446,29 @@ class LocationPolygonsGenerator:
                 if not poly.is_valid:
                     poly = poly.buffer(0)
                 center = poly.centroid
-                
+
                 # STABLE ID GENERATION (2025-12-28)
                 # Use hash of centroid coordinates (rounded) to ensure ID persists across rebuilds/expansions.
                 # Format: poly_LAT_LON
                 # Rounding to 5 decimal places (~1.1 meter precision) to handle minor drift during regeneration
-                clat = round(center.x, 5) 
+                clat = round(center.x, 5)
                 clon = round(center.y, 5)
-                
+
                 # Use simple coordinate string as ID to be readable and unique
                 stable_id = f"poly_{clat}_{clon}".replace('.', '')
-                
+
                 # Debug log for ID generation
                 # logger.info(f"Generated Stable ID: {stable_id} for centroid ({center.x}, {center.y})")
-                
+
+                # Calculate optimal label direction (towards longest edge)
+                center_tuple = (center.x, center.y)
+                label_direction = self._calculate_label_position(coords, center_tuple)
+
                 polygons_data.append({
                     'id': stable_id,
                     'coords': coords,
-                    'center': (center.x, center.y),
+                    'center': center_tuple,
+                    'label_direction': label_direction,  # NEW: Direction info for small circle positioning
                     'total_points': total_pts,
                     'boundary_white_lines': list(b_ids),
                     'merge_count': 1
@@ -1074,7 +1480,7 @@ class LocationPolygonsGenerator:
             logger.error(f"LocationPolygonsGenerator: Polygon error: {e}")
         
         # --- MERGE SMALL POLYGONS ---
-        # User requested to disable grouping of small polygons (2025-12-27)
+        # DISABLED: Polygon merging disabled (2025-12-28)
         # if polygons_data:
         #     white_lines_map = {wl['id']: wl for wl in white_lines}
         #     original_count = len(polygons_data)
@@ -1121,7 +1527,9 @@ class LocationPolygonsGenerator:
     
     def _merge_small_polygons(self, polygons, white_lines_map, max_iterations=10):
         """
-        Iteratively merge polygons that are too small to fit the white circle label.
+        Iteratively merge polygons through blue lines (lines touched by debug box).
+        Only merges if two polygons share a blue line.
+        Also removes polygons that have no neighbors through blue lines.
         Returns the updated list of polygons with small ones merged into neighbors.
         """
         for iteration in range(max_iterations):
@@ -1132,38 +1540,60 @@ class LocationPolygonsGenerator:
                     if line_id not in line_to_polys:
                         line_to_polys[line_id] = []
                     line_to_polys[line_id].append(poly)
-            
-            # Find small polygons
-            small_polys = [p for p in polygons if not self._can_fit_circle(p['coords'])]
-            
-            if not small_polys:
-                logger.info(f"Polygon merging: no small polygons found (iteration {iteration})")
+
+            # Calculate blue lines for each polygon (lines touched by debug box)
+            blue_lines = {}  # poly_id -> set of blue line IDs
+            for p in polygons:
+                label_dir = p.get('label_direction', {'angle': 0})
+                poly_blue_lines = self._get_blue_lines(
+                    p['coords'],
+                    p['center'],
+                    label_dir,
+                    p.get('boundary_white_lines', [])
+                )
+                if poly_blue_lines:
+                    blue_lines[p['id']] = poly_blue_lines
+                    logger.info(f"Polygon {p['id']} has {len(poly_blue_lines)} blue lines")
+
+            # Find polygons with blue lines
+            polys_with_blue_lines = [p for p in polygons if p['id'] in blue_lines]
+
+            if not polys_with_blue_lines:
+                logger.info(f"Polygon merging: no polygons with blue lines (iteration {iteration})")
                 break
-            
-            logger.info(f"Polygon merging iteration {iteration}: found {len(small_polys)} small polygons")
-            
+
+            logger.info(f"Polygon merging iteration {iteration}: found {len(polys_with_blue_lines)} polygons with blue lines")
+
             merged_ids = set()
+            removed_ids = set()  # Track polygons removed (no neighbors)
             new_polygons = []
-            
+
             for poly in polygons:
-                if poly['id'] in merged_ids:
+                if poly['id'] in merged_ids or poly['id'] in removed_ids:
                     continue
-                
-                if not self._can_fit_circle(poly['coords']):
-                    # This is a small polygon, try to merge
-                    neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys)
-                    
-                    if neighbor and neighbor['id'] not in merged_ids:
+
+                # Check if this polygon has blue lines
+                if poly['id'] in blue_lines:
+                    # This polygon has blue lines, try to merge through blue line
+                    neighbor, shared_line = self._find_merge_candidate(poly, polygons, line_to_polys, blue_lines)
+
+                    if neighbor and neighbor['id'] not in merged_ids and neighbor['id'] not in removed_ids:
+                        # Merge with neighbor through blue line
                         merged = self._merge_two_polygons(poly, neighbor, shared_line, white_lines_map)
                         if merged:
                             merged_ids.add(poly['id'])
                             merged_ids.add(neighbor['id'])
                             new_polygons.append(merged)
-                            logger.info(f"Merged {poly['id']} + {neighbor['id']} (removed line {shared_line})")
+                            logger.info(f"Merged {poly['id']} + {neighbor['id']} (removed BLUE line {shared_line})")
                             continue
-                
-                # Keep polygon as is
-                if poly['id'] not in merged_ids:
+                    else:
+                        # No neighbor found through blue lines - this is a border polygon, remove it
+                        removed_ids.add(poly['id'])
+                        logger.info(f"Removed polygon {poly['id']} (no neighbor through blue lines)")
+                        continue
+
+                # Keep polygon as is (no blue lines)
+                if poly['id'] not in merged_ids and poly['id'] not in removed_ids:
                     new_polygons.append(poly)
             
             if not merged_ids:
