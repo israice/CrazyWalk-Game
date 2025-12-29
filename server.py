@@ -8,6 +8,8 @@ import logging
 import urllib.request
 import urllib.parse
 import json
+import uuid
+import time
 from typing import Any
 
 # Configure logging
@@ -80,6 +82,13 @@ logger.info(f"Full Serving Path: {full_path}")
 if not os.path.exists(full_path):
     logger.error(f"CRITICAL: Serving directory does not exist: {full_path}")
 
+# Generate unique session ID on server startup
+# This allows frontend to detect server restarts and clear localStorage
+SERVER_SESSION_ID = str(uuid.uuid4())
+SERVER_START_TIME = int(time.time())
+logger.info(f"Server Session ID: {SERVER_SESSION_ID}")
+logger.info(f"Server Start Time: {SERVER_START_TIME}")
+
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
     """Custom handler to filter out known noise and improve logging."""
     
@@ -123,6 +132,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         """Shared routing for GET and HEAD."""
         logger.info(f"INCOMING {self.command} REQUEST: {self.path}")
         
+        if self.path.startswith('/api/session'):
+            self.handle_get_session()
+            return
         if self.path.startswith('/api/ip_locate'):
             self.handle_ip_locate()
             return
@@ -164,6 +176,29 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_save_location_state()
             return
         self.send_error(404, "Not Found")
+
+    def handle_get_session(self):
+        """
+        Returns server session information.
+        This allows frontend to detect server restarts and clear localStorage.
+        Returns: { 'session_id': 'uuid', 'start_time': timestamp }
+        """
+        try:
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            response = {
+                'session_id': SERVER_SESSION_ID,
+                'start_time': SERVER_START_TIME
+            }
+
+            self.wfile.write(json.dumps(response).encode())
+            logger.info(f"Session info sent: {SERVER_SESSION_ID}")
+        except Exception as e:
+            logger.error(f"Error handling session request: {e}")
+            self.send_error(500, f"Server Error: {str(e)}")
 
     def handle_locate(self):
         """
@@ -329,43 +364,62 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def handle_save_location_state(self):
         """
         Handle POST /api/location_state
-        Saves collected circles for a location to Redis.
-        Body: { "location_key": "lat_lon", "collected_circles": ["lat,lon", ...] }
+        Saves complete game state for a location to Redis.
+        Body: {
+            "location_key": "lat_lon",
+            "collected_circles": ["lat,lon", ...],
+            "visible_polygon_ids": ["POLYGON_xxx", ...],
+            "expanded_circles": ["lat,lon", ...]
+        }
         """
         try:
             from CORE.BACKEND.redis_tools import get_redis_client
-            
+
             # Read POST body
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
             data = json.loads(body.decode())
-            
+
             location_key = data.get('location_key')
             collected_circles = data.get('collected_circles', [])
-            
+            visible_polygon_ids = data.get('visible_polygon_ids', [])
+            expanded_circles = data.get('expanded_circles', [])
+
             if not location_key:
                 self.send_error(400, "Missing location_key")
                 return
-            
-            # Save to Redis with 7-day TTL
-            redis_key = f"location:{location_key}:collected"
+
+            # Save COMPLETE STATE to Redis with 7-day TTL
+            redis_key = f"location:{location_key}:state"
             r = get_redis_client()
-            
-            if collected_circles:
-                r.set(redis_key, json.dumps(collected_circles))
+
+            # Save complete state as JSON
+            complete_state = {
+                'collected_circles': collected_circles,
+                'visible_polygon_ids': visible_polygon_ids,
+                'expanded_circles': expanded_circles
+            }
+
+            if collected_circles or visible_polygon_ids or expanded_circles:
+                r.set(redis_key, json.dumps(complete_state))
                 r.expire(redis_key, 60 * 60 * 24 * 7)  # 7 days
-                logger.info(f"Saved {len(collected_circles)} collected circles for location {location_key}")
+                logger.info(f"Saved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons, {len(expanded_circles)} expanded")
             else:
                 # Clear if empty
                 r.delete(redis_key)
-                logger.info(f"Cleared collected circles for location {location_key}")
-            
+                logger.info(f"Cleared state for location {location_key}")
+
             # Send response
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok", "saved": len(collected_circles)}).encode())
+            self.wfile.write(json.dumps({
+                "status": "ok",
+                "saved_circles": len(collected_circles),
+                "saved_polygons": len(visible_polygon_ids),
+                "saved_expanded": len(expanded_circles)
+            }).encode())
             
         except Exception as e:
             logger.error(f"Save Location State Error: {e}")
@@ -374,28 +428,39 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def handle_get_location_state(self):
         """
         Handle GET /api/location_state?location_key=lat_lon
-        Returns saved collected circles for a location.
+        Returns saved complete game state for a location.
         """
         try:
             from CORE.BACKEND.redis_tools import get_redis_client
-            
+
             # Parse query params
             parsed_path = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_path.query)
             location_key = params.get('location_key', [None])[0]
-            
+
             if not location_key:
                 self.send_error(400, "Missing location_key parameter")
                 return
-            
-            # Get from Redis
-            redis_key = f"location:{location_key}:collected"
+
+            # Get from Redis (NEW KEY: :state instead of :collected)
+            redis_key = f"location:{location_key}:state"
             r = get_redis_client()
             data = r.get(redis_key)
-            
-            collected_circles = json.loads(data) if data else []
-            logger.info(f"Retrieved {len(collected_circles)} collected circles for location {location_key}")
-            
+
+            if data:
+                # Load complete state
+                state = json.loads(data)
+                collected_circles = state.get('collected_circles', [])
+                visible_polygon_ids = state.get('visible_polygon_ids', [])
+                expanded_circles = state.get('expanded_circles', [])
+                logger.info(f"Retrieved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons, {len(expanded_circles)} expanded")
+            else:
+                # No state found
+                collected_circles = []
+                visible_polygon_ids = []
+                expanded_circles = []
+                logger.info(f"No state found for location {location_key}")
+
             # Send response
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -403,7 +468,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({
                 "location_key": location_key,
-                "collected_circles": collected_circles
+                "collected_circles": collected_circles,
+                "visible_polygon_ids": visible_polygon_ids,
+                "expanded_circles": expanded_circles
             }).encode())
             
         except Exception as e:
@@ -580,9 +647,17 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             lon = float(params.get('lon', [0])[0])
             rebuild_param = params.get('rebuild', ['false'])[0].lower()
             mode_param = params.get('mode', ['initial'])[0]
+            restored_polygon_ids_param = params.get('restored_polygon_ids', [None])[0]
+
+            # Parse restored polygon IDs if provided
+            restored_polygon_ids = None
+            if restored_polygon_ids_param:
+                restored_polygon_ids = [pid.strip() for pid in restored_polygon_ids_param.split(',') if pid.strip()]
+                logger.info(f"Restoring {len(restored_polygon_ids)} previously visible polygons")
+
             # TEMP: Force rebuild to always be True for debugging polygon merging
             force_rebuild = True  # rebuild_param == 'true'
-            
+
             if not lat or not lon:
                 self.send_error(400, "Missing lat/lon")
                 return
@@ -590,13 +665,13 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             # Import and Reload to ensure fresh code
             import importlib
             from CORE.BACKEND import LocationPolygonsGenerator
-            
+
             # Force reload of dependencies in order
             importlib.reload(LocationPolygonsGenerator)
-            
+
             # Generate Data
             generator = LocationPolygonsGenerator.LocationPolygonsGenerator()
-            data = generator.generate_map(lat, lon, force_rebuild=force_rebuild, mode=mode_param)
+            data = generator.generate_map(lat, lon, force_rebuild=force_rebuild, mode=mode_param, restored_polygon_ids=restored_polygon_ids)
             
             # Send Response
             self.send_response(200)

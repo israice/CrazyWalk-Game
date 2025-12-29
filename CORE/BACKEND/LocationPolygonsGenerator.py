@@ -474,16 +474,19 @@ class LocationPolygonsGenerator:
             logger.error(traceback.format_exc())
             return None
 
-    def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False, mode='initial'):
+    def generate_map(self, lat, lon, region_size=0.0015, force_rebuild=False, mode='initial', restored_polygon_ids=None):
         """
         Orchestrates the creation of all game elements.
         Includes automatic retry with increasing region sizes.
-        
+
         mode: 'initial' (default) or 'expand'
+        restored_polygon_ids: List of polygon IDs to restore (for page reload)
         """
-        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}, mode={mode}")
-        
+        logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}, mode={mode}, restored_ids={len(restored_polygon_ids) if restored_polygon_ids else 0}")
+
         # Region sizes: ~166m, ~555m, ~1110m
+        # NOTE: We use normal region size even when restoring. Polygons outside the region
+        # won't be restored, but user can re-expand them. Large regions are too slow.
         REGION_SIZES = [0.0015, 0.005, 0.01]
         
         for attempt, size in enumerate(REGION_SIZES, 1):
@@ -909,19 +912,25 @@ class LocationPolygonsGenerator:
                 connected_poly_ids = None
 
                 if mode == 'initial':
-                    # Find nearest green circle to spawn point (lat, lon)
-                    min_dist = float('inf')
-                    nearest_gc = None
+                    # Check if we're restoring previously visible polygons
+                    if restored_polygon_ids and len(restored_polygon_ids) > 0:
+                        # Restore all previously visible polygons
+                        connected_poly_ids = set(restored_polygon_ids)
+                        logger.info(f"Initial mode (RESTORE): Restoring {len(restored_polygon_ids)} previously visible polygons: {restored_polygon_ids}")
+                    else:
+                        # Find nearest green circle to spawn point (lat, lon)
+                        min_dist = float('inf')
+                        nearest_gc = None
 
-                    for gc in green_circles:
-                        dist = ((gc['lat'] - lat) ** 2 + (gc['lon'] - lon) ** 2) ** 0.5
-                        if dist < min_dist:
-                            min_dist = dist
-                            nearest_gc = gc
+                        for gc in green_circles:
+                            dist = ((gc['lat'] - lat) ** 2 + (gc['lon'] - lon) ** 2) ** 0.5
+                            if dist < min_dist:
+                                min_dist = dist
+                                nearest_gc = gc
 
-                    if nearest_gc and nearest_gc.get('connected_polygon_ids'):
-                        connected_poly_ids = set(nearest_gc['connected_polygon_ids'])
-                        logger.info(f"Initial mode: Starting green circle {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
+                        if nearest_gc and nearest_gc.get('connected_polygon_ids'):
+                            connected_poly_ids = set(nearest_gc['connected_polygon_ids'])
+                            logger.info(f"Initial mode: Starting green circle {nearest_gc['id']}, connected polygons: {nearest_gc['connected_polygon_ids']}")
 
                 elif mode == 'expand':
                     # Find nearest blue circle to clicked point (lat, lon)
@@ -952,11 +961,15 @@ class LocationPolygonsGenerator:
                     filtered_white_lines = [wl for wl in white_lines if wl['id'] in visible_line_ids]
 
                     # Collect blue circle coordinates from endpoints of visible white lines
+                    # IMPORTANT: Normalize white line endpoint coordinates to match blue circles
                     visible_blue_coords = set()
                     for wl in filtered_white_lines:
-                        # White line endpoints are [lat, lon]
-                        start_key = (round(wl['start'][0], 7), round(wl['start'][1], 7))
-                        end_key = (round(wl['end'][0], 7), round(wl['end'][1], 7))
+                        # White line endpoints are [lat, lon] - normalize and replace with new lists
+                        wl['start'] = [round(wl['start'][0], 7), round(wl['start'][1], 7)]
+                        wl['end'] = [round(wl['end'][0], 7), round(wl['end'][1], 7)]
+
+                        start_key = (wl['start'][0], wl['start'][1])
+                        end_key = (wl['end'][0], wl['end'][1])
                         visible_blue_coords.add(start_key)
                         visible_blue_coords.add(end_key)
 
@@ -969,20 +982,31 @@ class LocationPolygonsGenerator:
                     filtered_blue_circles = []
 
                     for bc in blue_circles:
-                        bc_key = (round(bc['lat'], 7), round(bc['lon'], 7))
+                        # Normalize coordinates to 7 decimals to match white line endpoints
+                        bc['lat'] = round(bc['lat'], 7)
+                        bc['lon'] = round(bc['lon'], 7)
+                        bc_key = (bc['lat'], bc['lon'])
                         existing_coords[bc_key] = bc
 
                         # ONLY show circles that are endpoints of visible white lines
                         if bc_key in visible_blue_coords:
-                            # Check if ALL connected polygons are visible
-                            bc_connected_polys = set(bc.get('connected_polygon_ids', []))
-                            all_connected_visible = bc_connected_polys.issubset(filtered_polygon_ids) if bc_connected_polys else True
+                            # If circle is at endpoint of visible line, ALWAYS show it
+                            # Recalculate is_saturated: orange ONLY if connections == visible polygon count
+                            total_connections = bc.get('connections', 0)
+                            visible_polygon_count = len([pid for pid in bc.get('connected_polygon_ids', []) if pid in filtered_polygon_ids])
 
-                            # Show circle if:
-                            # 1. Blue (not saturated) - expansion point, OR
-                            # 2. Orange (saturated) AND all its polygons are visible
-                            if not bc.get('is_saturated', False) or all_connected_visible:
-                                filtered_blue_circles.append(bc)
+                            # Update connected_polygons_count to reflect only VISIBLE polygons
+                            bc['connected_polygons_count'] = visible_polygon_count
+
+                            # Circle is saturated (orange) ONLY if ALL its lines belong to visible polygons
+                            # If connections != visible_polygon_count, it has lines to hidden polygons (blue - expansion point)
+                            bc['is_saturated'] = (total_connections == visible_polygon_count)
+
+                            # Debug logging for first few circles
+                            if len(filtered_blue_circles) < 3:
+                                logger.info(f"Circle {bc['id']}: connections={total_connections}, visible_polys={visible_polygon_count}, is_saturated={bc['is_saturated']}")
+
+                            filtered_blue_circles.append(bc)
 
                     # Create missing circles for visible line endpoints (where count == 2 globally)
                     # These are needed for complete polygon display
@@ -1014,6 +1038,14 @@ class LocationPolygonsGenerator:
                         logger.info(f"Created {created_count} blue circles for missing endpoints: {missing_coords[:3]}...")
 
                     logger.info(f"Total filtered blue circles: {len(filtered_blue_circles)}")
+
+                    # Debug: Log coordinate matching for verification
+                    if filtered_white_lines:
+                        sample_line = filtered_white_lines[0]
+                        logger.info(f"Sample line endpoints (normalized): start={sample_line['start']}, end={sample_line['end']}")
+                    if filtered_blue_circles:
+                        sample_circle = filtered_blue_circles[0]
+                        logger.info(f"Sample circle coords (normalized): lat={sample_circle['lat']}, lon={sample_circle['lon']}")
 
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
