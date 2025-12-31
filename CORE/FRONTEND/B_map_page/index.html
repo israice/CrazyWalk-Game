@@ -1784,49 +1784,15 @@
                     });
                 }
 
-                // H. Calculate neighbor polygons for each polygon (through shared white lines)
-                // Build white line data map for quick lookup
-                const whiteLineDataMap = new Map(); // line_id -> { connected_polygons_count, connected_polygon_ids }
-                if (data.white_lines) {
-                    data.white_lines.forEach(wl => {
-                        whiteLineDataMap.set(wl.id, {
-                            id: wl.id,
-                            connected_polygons_count: wl.connected_polygons_count || 0,
-                            connected_polygon_ids: wl.connected_polygon_ids || []
-                        });
-                    });
-                }
+                // H. Calculate neighbor polygons for each polygon - MOVED TO SERVER
+                // White Line Data Map is no longer strictly needed for this, but might be useful for other lookups if kept.
 
-                if (data.polygons && data.white_lines) {
+                // (Client-side calculation removed to use server-provided data)
+                if (data.polygons) {
+                    // Ensure arrays exist if server didn't send them (backwards compat)
                     data.polygons.forEach(poly => {
-                        const neighborPolygonIds = new Set();
-                        let missingPolygons = 0;
-
-                        // Check each white line on this polygon's boundary
-                        if (poly.boundary_white_lines) {
-                            poly.boundary_white_lines.forEach(lineId => {
-                                const wlData = whiteLineDataMap.get(lineId);
-                                if (wlData) {
-                                    // If white line only connects to 1 polygon, no neighbor on that side
-                                    if (wlData.connected_polygons_count === 1) {
-                                        missingPolygons++;
-                                    }
-
-                                    // Find neighbor polygons (excluding current polygon)
-                                    if (wlData.connected_polygon_ids) {
-                                        wlData.connected_polygon_ids.forEach(pid => {
-                                            if (pid !== poly.id && pid !== poly.uid) {
-                                                neighborPolygonIds.add(pid);
-                                            }
-                                        });
-                                    }
-                                }
-                            });
-                        }
-
-                        poly.neighbor_polygon_ids = Array.from(neighborPolygonIds);
-                        poly.neighbor_polygons_count = neighborPolygonIds.size;
-                        poly.missing_polygons = missingPolygons;
+                        if (!poly.neighbor_polygon_ids) poly.neighbor_polygon_ids = [];
+                        // We trust server values for counts
                     });
                 }
 
@@ -2072,6 +2038,46 @@
                         let prettyJSON = JSON.stringify(contentObj, null, 2);
                         const idDisplay = contentObj.uid ? `<b>ID:</b> ${contentObj.uid}<br>` : (contentObj.id ? `<b>ID:</b> ${contentObj.id}<br>` : '');
 
+                        // CHECK TRUE VISIBILITY STATUS FROM GAME STATE (not current opacity)
+                        // This accounts for debug mode making hidden elements visible temporarily
+                        let status = 'Visible';
+
+                        if (type.includes('Green Circle') || type.includes('Blue Circle')) {
+                            // Check if this circle's coordinates are in collectedCircles
+                            const lat = data.lat || (data.center && data.center[0]);
+                            const lon = data.lon || (data.center && data.center[1]);
+                            if (lat !== undefined && lon !== undefined) {
+                                const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+                                if (collectedCircles && collectedCircles.has(key)) {
+                                    status = 'Collected';
+                                }
+                            }
+                        } else if (type === 'Polygon Label' || type === 'Polygon') {
+                            // Check if polygon is completed
+                            const polyId = data.parent_polygon_uid || data.uid || data.id;
+                            const pState = polygonState.get(polyId);
+                            if (pState && pState.current >= pState.total) {
+                                status = 'Completed';
+                            }
+                        } else if (type === 'White Line') {
+                            // White lines are hidden when ALL connected polygons are completed
+                            const connectedPolys = data.connected_polygon_ids || [];
+                            let allCompleted = connectedPolys.length > 0;
+                            for (const polyId of connectedPolys) {
+                                const pState = polygonState.get(polyId);
+                                if (!pState || pState.current < pState.total) {
+                                    allCompleted = false;
+                                    break;
+                                }
+                            }
+                            if (allCompleted && connectedPolys.length > 0) {
+                                status = 'Hidden (all polys completed)';
+                            }
+                        }
+
+                        const statusColor = status === 'Visible' ? 'green' : 'orange';
+                        const statusHtml = `<br>Status: <b style="color:${statusColor}">${status}</b>`;
+
                         // CALCULATE STATS FOR POLYGONS
                         let statsHtml = '';
                         if (type === 'Polygon Label' || type === 'Polygon') {
@@ -2109,17 +2115,19 @@
                             }
 
                             const posterInfo = intersectingPosters.length > 0
-                                ? `🖼️ Posters: <b>${intersectingPosters.length}</b> (IDs: ${intersectingPosters.join(', ')})<br>`
+                                ? `🖼️ Posters: <b>${intersectingPosters.length}</b> <br>`
                                 : '';
 
                             // Neighbor polygon info
-                            const neighborCount = data.neighbor_polygons_count || 0;
-                            const missingPolygons = data.missing_polygons || 0;
-                            const neighborInfo = neighborCount > 0 || missingPolygons > 0
+                            // Use server-provided line-based stats
+                            const connectedLines = data.stats_connected_lines || 0;
+                            const missingLines = data.stats_missing_lines || 0; // "Missing Polygons" as per user def
+
+                            const neighborInfo = (connectedLines > 0 || missingLines > 0)
                                 ? `<div style="margin-top:4px; padding:4px; background:#fff3e6; border-radius:4px; border:1px solid #ffd591;">
                                     <b>🏘️ Neighbors:</b><br>
-                                    Adjacent Polygons: <b>${neighborCount}</b><br>
-                                    ⚠️ Missing Polygons: <b style="color:${missingPolygons > 0 ? '#ff4d4f' : '#52c41a'}">${missingPolygons}</b>
+                                    ✅ Connected Polygons: <b>${connectedLines}</b><br>
+                                    ⚠️ Missing Polygons: <b style="color:${missingLines > 0 ? '#ff4d4f' : '#52c41a'}">${missingLines}</b>
                                    </div>`
                                 : '';
 
@@ -2127,8 +2135,9 @@
                             if (data.neighbor_polygon_ids && data.neighbor_polygon_ids.length > 0) {
                                 contentObj.neighbor_polygon_ids = data.neighbor_polygon_ids;
                             }
-                            contentObj.neighbor_polygons_count = neighborCount;
-                            contentObj.missing_polygons = missingPolygons;
+                            // Keep raw counts for JSON view if needed
+                            contentObj.stats_connected_lines = connectedLines;
+                            contentObj.stats_missing_lines = missingLines;
 
                             // Regenerate prettyJSON with new fields
                             prettyJSON = JSON.stringify(contentObj, null, 2);
@@ -2143,6 +2152,7 @@
                                     ${posterInfo}
                                     --------------------------<br>
                                     ∑ Total Circles: <b>${totalPoints}</b>
+                                    ${statusHtml}
                                 </div>
                                 ${neighborInfo}
                             `;
@@ -2156,15 +2166,20 @@
                             const connectedPolyCount = data.connected_polygons_count || 0;
                             const connectedPolyIds = data.connected_polygon_ids ? data.connected_polygon_ids.join(', ') : 'None';
 
+                            const notConnVal = data.stats_not_connected_polygons !== undefined ? data.stats_not_connected_polygons : (2 - connectedPolyCount);
+                            const notConnHtml = notConnVal > 0 ? `Not Connected Polygons: <b>${notConnVal}</b><br>` : '';
+
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#fff7e6; border-radius:4px; border:1px solid #ffd591;">
                                     <b>Line Stats:</b><br>
                                     📏 Length: <b>${lineLength}m</b><br>
                                     🔵 Blue Endpoints: <b>${blueEndpoints}</b><br>
                                     🟢 Green Circles: <b>${greenCount}</b><br>
-                                    🔗 Polygons: <b>${connectedPolyCount}</b><br>
+                                    Connected Polygons: <b>${data.stats_connected_polygons || connectedPolyCount}</b><br>
+                                    ${notConnHtml}
                                     --------------------------<br>
                                     ∑ Total Circles: <b>${totalCircles}</b>
+                                    ${statusHtml}
                                 </div>
                             `;
                         }
@@ -2173,24 +2188,49 @@
                             const connectedCount = data.connected_polygons_count || 0;
                             const connectedIds = data.connected_polygon_ids ? data.connected_polygon_ids.join(', ') : 'None';
 
-                            statsHtml = `
+                            // 2. BLUE CIRCLE
+                            // Check if detailed stats are available (server-side calc)
+                            if (data.stats_connected_lines !== undefined) {
+                                const notConnPolys = data.stats_not_connected_polygons;
+                                const notConnPolysHtml = notConnPolys > 0 ? `Not Connected Polygons: <b>${notConnPolys}</b>` : '';
+
+                                statsHtml = `
+                                <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
+                                    <b>Blue Circle Stats:</b><br>
+                                    Connected lines: <b>${data.stats_connected_lines}</b><br>
+                                    Not Connected lines: <b>${data.stats_not_connected_lines}</b><br>
+                                    Connected Polygons: <b>${data.stats_connected_polygons}</b><br>
+                                    ${notConnPolysHtml}
+                                    ${statusHtml}
+                                </div>
+                                `;
+                            } else {
+                                // Fallback
+                                statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
                                     <b>Blue Circle Stats:</b><br>
                                     Connections: <b>${data.connections || '?'}</b><br>
                                     🔗 Polygons: <b>${connectedCount}</b>
+                                    ${statusHtml}
                                 </div>
-                            `;
+                                `;
+                            }
                         }
                         // STATS FOR GREEN CIRCLES
                         else if (type.includes('Green Circle')) {
                             const connectedCount = data.connected_polygons_count || 0;
                             const lineId = data.line_id || '?';
 
+                            const notConnVal = data.stats_not_connected_polygons !== undefined ? data.stats_not_connected_polygons : (2 - connectedCount);
+                            const notConnHtml = notConnVal > 0 ? `Not Connected Polygons: <b>${notConnVal}</b>` : '';
+
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6ffe6; border-radius:4px; border:1px solid #91ff91;">
                                     <b>Green Circle Stats:</b><br>
                                     📍 Line ID: <b style="font-size:10px;">${lineId}</b><br>
-                                    🔗 Polygons: <b>${connectedCount}</b>
+                                    Connected Polygons: <b>${data.stats_connected_polygons || connectedCount}</b><br>
+                                    ${notConnHtml}
+                                    ${statusHtml}
                                 </div>
                             `;
                         }
@@ -2556,12 +2596,14 @@
 
                         // Visual Layer (Thin, Dashed, Non-Interactive)
                         const visual = L.polyline(line.path, {
-                            color: 'white', weight: 2, dashArray: '5, 5', interactive: false
+                            color: 'white', weight: 2, dashArray: '5, 5', interactive: false,
+                            pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
 
                         // Hit Layer (Thick, Solid, Transparent, Interactive)
                         const hit = L.polyline(line.path, {
-                            color: 'white', weight: 15, opacity: 0, interactive: true
+                            color: 'white', weight: 15, opacity: 0, interactive: true,
+                            pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
 
                         attachDebugClick(hit, line, 'White Line');
@@ -2730,7 +2772,8 @@
                             fillColor: '#00ff00',
                             fillOpacity: isCollected && !isPostersDebugActive ? 0 : 1,
                             opacity: isCollected && !isPostersDebugActive ? 0 : 1,
-                            interactive: false
+                            interactive: false,
+                            pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
 
                         // If collected but debug, style
@@ -2741,7 +2784,8 @@
                         // Hit (Large)
                         const hit = L.circleMarker([circle.lat, circle.lon], {
                             radius: 12, stroke: false, fillOpacity: 0,
-                            interactive: !isCollected // Disable hit if collected
+                            interactive: !isCollected, // Disable hit if collected
+                            pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
 
                         hit.visualSibling = visual; // Helper for Debug Highlighting
@@ -2917,8 +2961,11 @@
                     console.log(`DEBUG: Restoring saved user position: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
                     userMarker.setLatLng([currentUserPosition.lat, currentUserPosition.lon]);
                     updateAndSaveUserPosition(userMarker, currentUserPosition.lat, currentUserPosition.lon, false);
-                } else {
-                    // No saved position - snap to nearest active circle
+                }
+
+                // ALWAYS snap to nearest active circle on initial load (force centering)
+                // This ensures the "collection" logic triggers correctly
+                if (mode === 'initial') {
                     const currentPos = userMarker.getLatLng();
                     const initialSnap = window.findNearestActiveCircle(currentPos.lat, currentPos.lng);
                     if (initialSnap) {
@@ -2930,7 +2977,7 @@
                 }
 
                 controls.updateGraph(localGreenCircles, localBlueCircles, localWhiteLines);
-                setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
+                // setupProgressHiding moved to after state application
 
                 // --- STATE APPLICATION LOGIC ---
                 // Helper to apply a set of collected keys to the map state
@@ -2999,6 +3046,11 @@
                     // Even if empty, update mask (it might be empty)
                     updateMaskPaths();
                 }
+
+                // MOVED FROM ABOVE: Setup hiding logic (and run initial check)
+                // We do this AFTER state application so that the initial check (which might collect a new circle)
+                // adds to the already-restored count, rather than being wiped by the reset loop.
+                setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
 
                 // 2. ASYNC FETCH: Fetch from server/localstorage to catch up anything missing
                 fetchSavedCircles(currentLocationKey)
@@ -3712,8 +3764,19 @@
                     if (serverStateData.visible_polygon_ids && serverStateData.visible_polygon_ids.length > 0) {
                         console.log(`DEBUG: ✓ Server has saved state for ${defaultKey}: ${serverStateData.visible_polygon_ids.length} polygons, ${serverStateData.collected_circles.length} circles`);
                         // Server has data for this location, use it
-                        restoredFromLocalStorage = false; // Actually restored from server
-                        console.log(`DEBUG: ✓ Will restore from server location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
+
+                        // PARSE USER POSITION FROM SERVER STATE
+                        // This allows exact restoration of the last snapped position
+                        if (serverStateData.user_position && serverStateData.user_position.lat !== undefined) {
+                            console.log(`DEBUG: ✓ Found saved USER POSITION in server state: ${serverStateData.user_position.lat}, ${serverStateData.user_position.lon}`);
+                            initialLat = serverStateData.user_position.lat;
+                            initialLon = serverStateData.user_position.lon;
+                            currentUserPosition = serverStateData.user_position;
+                            userMarker.setLatLng([initialLat, initialLon]);
+                            restoredFromLocalStorage = true; // Use this flag to trigger map centering below
+                        } else {
+                            console.log(`DEBUG: No specific user_position in state, using default/key center.`);
+                        }
                     } else {
                         console.log(`DEBUG: No saved state found on server either, will use default location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
                     }
@@ -3723,11 +3786,12 @@
 
                 console.log(`DEBUG: Loading game with coordinates: ${initialLat}, ${initialLon} (restored: ${restoredFromLocalStorage})`);
 
-                // If we restored from localStorage, update user marker position and center map
+                // If we restored from server state (flag is reused), update user marker position and center map
                 if (restoredFromLocalStorage) {
                     console.log(`DEBUG: Centering map on restored location: ${initialLat}, ${initialLon}`);
                     userMarker.setLatLng([initialLat, initialLon]);
                     controls.resetView(initialLat, initialLon);
+                    updateAndSaveUserPosition(userMarker, initialLat, initialLon, false); // Initialize global pos variable
                 }
 
                 loadGameData(initialLat, initialLon);

@@ -700,6 +700,31 @@ class LocationPolygonsGenerator:
                 bc['connected_polygon_ids'] = connected_polys
                 bc['connected_polygons_count'] = len(connected_polys)
                 
+                # --- STATS CALCULATION (User Request) ---
+                # "Connected Lines" = Lines forming valid polygons (2 lines per polygon corner)
+                # "Not Connected Lines" = Total - Connected
+                # "Connected Polygons" = Polygon Count
+                # "Not Connected Polygons" = Unused lines (Dead ends or missing sectors)
+                
+                stats_connected_lines = bc['connected_polygons_count'] * 2
+                # Clamp in case of weird geometry (e.g. 1-line loop?), but usually 2.
+                if stats_connected_lines > bc['connections']:
+                     # Should not happen unless `connections` is under-reported or poly loop is 1 line
+                     stats_connected_lines = bc['connections']
+                     
+                stats_not_connected_lines = bc['connections'] - stats_connected_lines
+                if stats_not_connected_lines < 0: stats_not_connected_lines = 0
+                
+                bc['stats_connected_lines'] = stats_connected_lines
+                bc['stats_not_connected_lines'] = stats_not_connected_lines
+                bc['stats_connected_polygons'] = bc['connected_polygons_count']
+                
+                # CORRECT LOGIC: Number of sectors = Number of lines.
+                # Missing Polygons = Total Sectors (Lines) - Filled Sectors (Polygons)
+                bc['stats_not_connected_polygons'] = bc['connections'] - bc['connected_polygons_count']
+                if bc['stats_not_connected_polygons'] < 0:
+                     bc['stats_not_connected_polygons'] = 0
+                
                 # Check for saturation: connections (roads) == connected polygons (loops)
                 # If equal, it means every road connected to this intersection is part of a polygon value.
                 if bc['connections'] == bc['connected_polygons_count'] and bc['connections'] > 0:
@@ -724,6 +749,14 @@ class LocationPolygonsGenerator:
                 connected_polys = list(wl_poly_map.get(wl['id'], []))
                 wl['connected_polygon_ids'] = connected_polys
                 wl['connected_polygons_count'] = len(connected_polys)
+                
+                # --- STATS CALCULATION (User Request) ---
+                # A Line separates 2 regions (max 2 polygons).
+                wl['stats_connected_polygons'] = len(connected_polys)
+                wl['stats_not_connected_polygons'] = 2 - len(connected_polys)
+                if wl['stats_not_connected_polygons'] < 0:
+                     wl['stats_not_connected_polygons'] = 0
+                wl['connected_polygons_count'] = len(connected_polys)
 
             # --- CALCULATE POLYGON CONNECTIONS FOR GREEN CIRCLES ---
             # Green circles inherit polygon connections from their parent white line
@@ -733,9 +766,112 @@ class LocationPolygonsGenerator:
                     connected_polys = list(wl_poly_map[parent_line_id])
                     gc['connected_polygon_ids'] = connected_polys
                     gc['connected_polygons_count'] = len(connected_polys)
+                    
+                    # --- STATS FOR GREEN CIRCLE ---
+                    # Inherit from line: Max 2 polygons
+                    gc['stats_connected_polygons'] = len(connected_polys)
+                    gc['stats_not_connected_polygons'] = 2 - len(connected_polys)
+                    if gc['stats_not_connected_polygons'] < 0: gc['stats_not_connected_polygons'] = 0
                 else:
                     gc['connected_polygon_ids'] = []
-                    gc['connected_polygons_count'] = 0
+                    gc['stats_connected_polygons'] = 0
+                    gc['stats_not_connected_polygons'] = 2 # Worst case (isolated line)
+            # --- VALIDATE AND SANITIZE CONNECTIONS ---
+            # Ensure no "ghost" polygons are referenced in connected_polygon_ids
+            # This fixes the issue where White Lines claim to connect to polygons that were not returned/generated
+            
+            valid_polygon_ids = set(p['id'] for p in polygons)
+            
+            # Sanitize White Lines
+            for wl in white_lines:
+                if 'connected_polygon_ids' in wl:
+                    original_ids = wl['connected_polygon_ids']
+                    # Filter to only include IDs that are in the polygons list
+                    wl['connected_polygon_ids'] = [pid for pid in original_ids if pid in valid_polygon_ids]
+                    wl['connected_polygons_count'] = len(wl['connected_polygon_ids'])
+                    
+                    if len(original_ids) != len(wl['connected_polygon_ids']):
+                         logger.warning(f"Sanitized White Line {wl['id']}: Removed {len(original_ids) - len(wl['connected_polygon_ids'])} ghost polygon refs")
+
+            # Sanitize Green Circles
+            for gc in green_circles:
+                 if 'connected_polygon_ids' in gc:
+                    # Rerfresh from parent white line to be safe (since WL was just sanitized)
+                    parent_line_id = gc.get('line_id')
+                    if parent_line_id and parent_line_id in wl_poly_map:
+                         # Get the SANITIZED list from the white line object directly if possible, or re-filter
+                         # The wl_poly_map might still have ghosts? Yes, wl_poly_map was built earlier.
+                         # Safer to re-filter the existing list
+                         original_ids = gc['connected_polygon_ids']
+                         gc['connected_polygon_ids'] = [pid for pid in original_ids if pid in valid_polygon_ids]
+                         gc['connected_polygons_count'] = len(gc['connected_polygon_ids'])
+
+            # Sanitize Blue Circles
+            for bc in blue_circles:
+                if 'connected_polygon_ids' in bc:
+                    original_ids = bc['connected_polygon_ids']
+                    bc['connected_polygon_ids'] = [pid for pid in original_ids if pid in valid_polygon_ids]
+                    bc['connected_polygons_count'] = len(bc['connected_polygon_ids'])
+
+            # --- CALCULATE NEIGHBOR POLYGONS (Server-Side) ---
+            # Now that connections are sanitized, we calculate neighbors here.
+            # This replaces client-side calculation in index.html
+            
+            # map for fast lookup - REVERT TO RAW KEYS (Blue Circle Logic uses raw keys and works)
+            wl_map_raw = {wl['id']: wl for wl in white_lines}
+            
+            for poly in polygons:
+                neighbor_ids = set()
+                fully_connected_lines = 0
+                missing_lines = 0
+                
+                # Debug specific polygon if needed
+                debug_this = False # (poly['id'] == 'some_id')
+                
+                for line_id in poly.get('boundary_white_lines', []):
+                    # Direct lookup (Int matching Int)
+                    wl = wl_map_raw.get(line_id)
+                    if not wl: 
+                        # LOGGING: Why is it missing?
+                        if debug_this or (missing_lines + fully_connected_lines == 0):
+                             # Only log first few failures per polygon to avoid spam
+                             s_line_id = str(line_id)
+                             logger.warning(f"STATS DEBUG: Poly {poly['id']} missing line {line_id} (type {type(line_id)}). Map keys sample: {list(wl_map_raw.keys())[:3]}")
+                        continue
+                        
+                    connections = wl.get('connected_polygon_ids', [])
+                    conn_count = len(connections)
+                    
+                    # LOGGING: Trace values
+                    # if debug_this:
+                    #    logger.info(f"Poly {poly['id']} Line {line_id}: Connections={conn_count} {connections}")
+
+                    # Logic based on user definition
+                    if conn_count >= 2:
+                        fully_connected_lines += 1
+                    else:
+                        missing_lines += 1
+                        
+                    for pid in connections:
+                        # Don't list self as neighbor
+                        if pid != poly['id']:
+                            neighbor_ids.add(pid)
+                            
+                poly['neighbor_polygon_ids'] = list(neighbor_ids)
+                poly['neighbor_polygons_count'] = len(neighbor_ids) # Actual unique neighbor count (for internal logic)
+                
+                # Store the requested display stats
+                poly['stats_connected_lines'] = fully_connected_lines
+                poly['stats_missing_lines'] = missing_lines
+                
+                # LOG VALIDATION FAILURE
+                # If we have neighbors but 0 stats, log it!
+                if len(neighbor_ids) > 0 and (fully_connected_lines + missing_lines) == 0:
+                     logger.error(f"STATS PARADOX Poly {poly['id']}: Neighbors={len(neighbor_ids)} but Stats=0/0. BoundaryLines={len(poly.get('boundary_white_lines', []))}")
+
+            # --- LOGGING FINAL POLYGONS ---
+            poly_ids = [p['id'] for p in polygons]
+            logger.info(f"FINAL POLYGONS ({len(poly_ids)}): {poly_ids}")
 
             
             # --- CALCULATE POSTER GRID (3x3 = 9 POSTERS) ---
@@ -972,6 +1108,23 @@ class LocationPolygonsGenerator:
                         end_key = (wl['end'][0], wl['end'][1])
                         visible_blue_coords.add(start_key)
                         visible_blue_coords.add(end_key)
+                        
+                        # --- SANITIZE CONNECTIONS FOR FILTERED MODE (Fix for White Line Stats) ---
+                        # Only keep connections to filtered_polygons
+                        filtered_polygon_ids = {p['id'] for p in filtered_polygons}
+                        original_connections = wl.get('connected_polygon_ids', [])
+                        visible_connections = [pid for pid in original_connections if pid in filtered_polygon_ids]
+                        
+                        wl['connected_polygon_ids'] = visible_connections
+                        wl['connected_polygons_count'] = len(visible_connections)
+                        
+                        # Recalculate Stats if they exist
+                        if 'stats_connected_polygons' in wl:
+                             wl['stats_connected_polygons'] = len(visible_connections)
+                             # Not connected = 2 - Connected (clamped)
+                             wl['stats_not_connected_polygons'] = 2 - len(visible_connections)
+                             if wl['stats_not_connected_polygons'] < 0:
+                                  wl['stats_not_connected_polygons'] = 0
 
                     # Filter blue circles - show ONLY circles that are endpoints of visible white lines
                     # This ensures we only show circles for the filtered polygons
@@ -997,6 +1150,22 @@ class LocationPolygonsGenerator:
 
                             # Update connected_polygons_count to reflect only VISIBLE polygons
                             bc['connected_polygons_count'] = visible_polygon_count
+                            
+                            # --- RECALCULATE STATS FOR INITIAL FILTER MODE ---
+                            # Only update if stats were previously calculated
+                            if 'stats_connected_polygons' in bc:
+                                bc['stats_connected_polygons'] = visible_polygon_count
+                                # Re-derive line stats
+                                bc['stats_connected_lines'] = visible_polygon_count * 2
+                                if bc['stats_connected_lines'] > total_connections:
+                                    bc['stats_connected_lines'] = total_connections
+                                    
+                                bc['stats_not_connected_lines'] = total_connections - bc['stats_connected_lines']
+                                if bc['stats_not_connected_lines'] < 0: bc['stats_not_connected_lines'] = 0
+                                
+                                # Re-derive missing sectors
+                                bc['stats_not_connected_polygons'] = total_connections - visible_polygon_count
+                                if bc['stats_not_connected_polygons'] < 0: bc['stats_not_connected_polygons'] = 0
 
                             # Circle is saturated (orange) ONLY if ALL its lines belong to visible polygons
                             # If connections != visible_polygon_count, it has lines to hidden polygons (blue - expansion point)
@@ -1050,6 +1219,22 @@ class LocationPolygonsGenerator:
                     # Filter green circles (only those on visible white lines)
                     line_ids_set = {wl['id'] for wl in filtered_white_lines}
                     filtered_green_circles = [gc for gc in green_circles if gc.get('line_id') in line_ids_set]
+                    for gc in filtered_green_circles:
+                        # --- SANITIZE CONNECTIONS FOR FILTERED MODE (Fix for Green Circle Stats) ---
+                        filtered_polygon_ids = {p['id'] for p in filtered_polygons}
+                        original_connections = gc.get('connected_polygon_ids', [])
+                        visible_connections = [pid for pid in original_connections if pid in filtered_polygon_ids]
+                        
+                        gc['connected_polygon_ids'] = visible_connections
+                        gc['connected_polygons_count'] = len(visible_connections)
+                        
+                        # Recalculate Stats if they exist
+                        if 'stats_connected_polygons' in gc:
+                             gc['stats_connected_polygons'] = len(visible_connections)
+                             # Not connected = 2 - Connected (clamped)
+                             gc['stats_not_connected_polygons'] = 2 - len(visible_connections)
+                             if gc['stats_not_connected_polygons'] < 0:
+                                  gc['stats_not_connected_polygons'] = 0
 
                     logger.info(f"{mode.upper()} MODE FILTER: {len(polygons)} -> {len(filtered_polygons)} polygons, "
                                f"{len(white_lines)} -> {len(filtered_white_lines)} lines, "
@@ -1456,6 +1641,25 @@ class LocationPolygonsGenerator:
 
                 # Use simple coordinate string as ID to be readable and unique
                 stable_id = f"poly_{clat}_{clon}".replace('.', '')
+                
+                # --- AREA FILTER (2025-12-31) ---
+                # discard sliver/invisible polygons (< ~50m^2)
+                # 1 degree ~ 111,000m. 
+                # 1 m^2 ~ (1/111000)^2 ~ 8e-11 deg^2
+                # Threshold 2e-9 deg^2 is roughly 25-50 m^2.
+                # LOGGING: Trace area
+                # logger.info(f"Poly Candidate: area={poly.area:.2e} (~{poly.area/8e-11:.1f} m2)")
+                
+                if poly.area < 2e-9:
+                     # logger.warning(f"Discarding sliver polygon. Area={poly.area:.2e}")
+                     continue
+                
+                # Check for Massive Polygons (Ghosts?)
+                # Threshold: 1e-4 deg^2 (approx 1.2M m2 -> 1km x 1km box)
+                if poly.area > 1e-4:
+                     logger.warning(f"GHOST DETECTED? Massive Polygon {stable_id}: Area={poly.area:.2e} (~{poly.area/8e-11:.0f} m2)")
+                     # Optional: Filter it?
+                     # continue
 
                 # Debug log for ID generation
                 # logger.info(f"Generated Stable ID: {stable_id} for centroid ({center.x}, {center.y})")
