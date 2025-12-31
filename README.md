@@ -201,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard acae9b2
+  git reset --hard 10e4fb1
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -320,7 +320,12 @@
     - added information in polygon popup about near polygons
     - removed logic of combine polygons with smalls polygons 
   - [x] v0.0.28 - added polygons expend logic when player on blue circle
-    - 
+    - fixed polygons image when expending polygons
+    - fixed images of extended polygons 
+    - added promo gif inside polygons 
+    - fixed gif randomizer only on start not after expend
+  - [x] v0.0.29 - fixed large white circle, now it is the circle in the middle of polygon
+  - [x] v0.0.30 - fixed as redis only 
 
 
   - ### Next Tasks
@@ -341,7 +346,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.28 - added polygons expend logic when player on blue circle"
+  git commit -m "v0.0.30 - fixed as redis only"
   git push
   ```
 

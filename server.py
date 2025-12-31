@@ -384,6 +384,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             collected_circles = data.get('collected_circles', [])
             visible_polygon_ids = data.get('visible_polygon_ids', [])
             expanded_circles = data.get('expanded_circles', [])
+            blue_circles = data.get('blue_circles', [])
+            user_position = data.get('user_position', None)
+            promo_gif_map = data.get('promo_gif_map', {})
 
             if not location_key:
                 self.send_error(400, "Missing location_key")
@@ -397,13 +400,16 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             complete_state = {
                 'collected_circles': collected_circles,
                 'visible_polygon_ids': visible_polygon_ids,
-                'expanded_circles': expanded_circles
+                'expanded_circles': expanded_circles,
+                'blue_circles': blue_circles,
+                'user_position': user_position,
+                'promo_gif_map': promo_gif_map
             }
 
-            if collected_circles or visible_polygon_ids or expanded_circles:
+            if collected_circles or visible_polygon_ids or expanded_circles or blue_circles or promo_gif_map:
                 r.set(redis_key, json.dumps(complete_state))
                 r.expire(redis_key, 60 * 60 * 24 * 7)  # 7 days
-                logger.info(f"Saved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons, {len(expanded_circles)} expanded")
+                logger.info(f"Saved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons, {len(expanded_circles)} expanded, {len(blue_circles)} blue circles")
             else:
                 # Clear if empty
                 r.delete(redis_key)
@@ -453,12 +459,18 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                 collected_circles = state.get('collected_circles', [])
                 visible_polygon_ids = state.get('visible_polygon_ids', [])
                 expanded_circles = state.get('expanded_circles', [])
-                logger.info(f"Retrieved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons, {len(expanded_circles)} expanded")
+                blue_circles = state.get('blue_circles', [])
+                user_position = state.get('user_position', None)
+                promo_gif_map = state.get('promo_gif_map', {})
+                logger.info(f"Retrieved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons")
             else:
                 # No state found
                 collected_circles = []
                 visible_polygon_ids = []
                 expanded_circles = []
+                blue_circles = []
+                user_position = None
+                promo_gif_map = {}
                 logger.info(f"No state found for location {location_key}")
 
             # Send response
@@ -470,7 +482,10 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                 "location_key": location_key,
                 "collected_circles": collected_circles,
                 "visible_polygon_ids": visible_polygon_ids,
-                "expanded_circles": expanded_circles
+                "expanded_circles": expanded_circles,
+                "blue_circles": blue_circles,
+                "user_position": user_position,
+                "promo_gif_map": promo_gif_map
             }).encode())
             
         except Exception as e:

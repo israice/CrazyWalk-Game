@@ -207,14 +207,10 @@ class MapControls {
         });
     }
 
-    updateUserPosition(marker, lat, lon, isGpsActive) {
+    updateUserPosition(marker, lat, lon) {
         const snappedPos = this.getSnappedPosition(lat, lon);
         marker.setLatLng(snappedPos);
-
-        if (isGpsActive) {
-            this.map.setView(snappedPos, this.config.defaultZoom);
-        }
-
+        // GPS Active logic removed
         this.lastPosition = snappedPos;
     }
 

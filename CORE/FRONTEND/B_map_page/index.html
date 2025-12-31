@@ -2,22 +2,16 @@
 <html lang="en">
 
 <head>
-    <script>
-        // CLEANUP: Force clear all local domain data on entry
-        try {
-            // localStorage.clear(); // MODIFIED: Logic removed to allow persistence of Green Polygons
-            // sessionStorage.clear(); // Optional: We can keep session clear if we want fresh session but persisted progress.
-            // Let's keep data for now as user wants "existing" green polygons.
-            if ('caches' in window) {
-                caches.keys().then(names => {
-                    for (let name of names) caches.delete(name);
-                });
-            }
-            console.log("Domain storage cleanup skipped (Persistence enabled).");
-        } catch (e) {
-            console.warn("Storage cleanup failed:", e);
-        }
-    </script>
+    // CLEANUP: LocalStorage is no longer used for game state.
+    // We strictly relay on Server (Redis) for persistence.
+    try {
+    if (localStorage.length > 0) {
+    console.log("Legacy localStorage data found. Clearing...");
+    localStorage.clear();
+    }
+    } catch (e) {
+    console.warn("Storage cleanup failed:", e);
+    }
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -340,7 +334,6 @@
     <script>
         // Version Badge Loader - Fetches version from README.md
         (async function loadVersionBadge() {
-            const STORAGE_KEY = 'crazywalk_version';
             const versionBadge = document.getElementById('version-badge');
 
             try {
@@ -355,25 +348,10 @@
                 if (!match) throw new Error('Version not found in README.md');
 
                 const currentVersion = match[1];
-                const savedVersion = localStorage.getItem(STORAGE_KEY);
 
                 // Update badge text
                 versionBadge.textContent = currentVersion;
-
-                // Check if version changed
-                if (savedVersion && savedVersion !== currentVersion) {
-                    console.log(`DEBUG: Version updated: ${savedVersion} → ${currentVersion}`);
-                    versionBadge.classList.add('updated');
-                    // Remove animation class after 3 seconds
-                    setTimeout(() => versionBadge.classList.remove('updated'), 3000);
-                }
-
-                // Save current version
-                localStorage.setItem(STORAGE_KEY, currentVersion);
-
-                // Show badge
                 versionBadge.style.opacity = '1';
-                console.log(`DEBUG: Version badge loaded: ${currentVersion}`);
 
             } catch (err) {
                 console.warn('DEBUG: Failed to load version badge:', err.message);
@@ -397,25 +375,24 @@
             // Location State Persistence
             let collectedCircles = new Set(); // Tracks hidden circle keys: "lat,lon"
             let currentLocationKey = null;    // Current location rounded key: "lat_lon"
-            let savedGpsPosition = null;      // Saved GPS position before switching to fake location
             const gameDataCache = new Map();  // Caches game data per location key
-            let savedLocationKey = null;      // Saved location key before switching to GPS
             let currentUserPosition = null;   // Current user position {lat, lon}
             const expandedCircles = new Set(); // Track circles that have triggered expansion
             let isRestoringState = false;     // Flag to prevent saving during restoration
             let restoredBlueCircles = [];     // Restored blue circles from saved state
+
             // PROMO GIF Global Cache
             let promoGifCache = []; // Loaded once on startup
+            let promoGifAssignments = new Map(); // PolyID -> GifFilename (Synced with Server)
 
             // Helper: Generate location key from coordinates (round to ~100m precision)
             const getLocationKey = (lat, lon) => {
                 return `${lat.toFixed(3)}_${lon.toFixed(3)}`;
             };
 
-            // Helper: Update user position and save to state
-            const updateAndSaveUserPosition = (marker, lat, lon, isGpsActive) => {
+            const updateAndSaveUserPosition = (marker, lat, lon) => {
                 // Update position via controls
-                controls.updateUserPosition(marker, lat, lon, isGpsActive);
+                controls.updateUserPosition(marker, lat, lon);
 
                 // Save current position to state
                 currentUserPosition = { lat, lon };
@@ -449,7 +426,8 @@
                     visible_polygon_ids: Array.from(visiblePolygonIds),
                     expanded_circles: Array.from(expandedCircles),
                     blue_circles: blueCirclesData,  // Save all blue circles
-                    user_position: currentUserPosition  // Save current user position
+                    user_position: currentUserPosition,  // Save current user position
+                    promo_gif_map: Object.fromEntries(promoGifAssignments) // Convert Map to Object for JSON
                 };
 
                 try {
@@ -459,16 +437,9 @@
                         body: JSON.stringify(state)
                     });
                     const data = await response.json();
-                    console.log(`DEBUG: Saved state for ${currentLocationKey}: ${state.collected_circles.length} circles, ${state.visible_polygon_ids.length} polygons, ${state.blue_circles.length} blue circles, user_pos: ${state.user_position ? `${state.user_position.lat},${state.user_position.lon}` : 'null'}`);
+                    console.log(`DEBUG: Saved state for ${currentLocationKey}: ${state.collected_circles.length} circles, ${state.visible_polygon_ids.length} polygons, ${state.blue_circles.length} blue circles, GIFs: ${promoGifAssignments.size}`);
                 } catch (err) {
                     console.error('DEBUG: Failed to save location state:', err);
-                }
-
-                // Also save to localStorage as backup
-                try {
-                    localStorage.setItem(`state_${currentLocationKey}`, JSON.stringify(state));
-                } catch (err) {
-                    console.error('DEBUG: Failed to save to localStorage:', err);
                 }
             };
 
@@ -476,29 +447,22 @@
             const loadLocationState = async (locationKey) => {
                 let state = null;
 
-                // Try server first
+                // Try server ONLY
                 try {
                     const response = await fetch(`/api/location_state?location_key=${encodeURIComponent(locationKey)}`);
                     const data = await response.json();
                     if (data.collected_circles && data.collected_circles.length > 0) {
                         state = data;
-                        console.log(`DEBUG: Loaded from server for ${locationKey}: ${data.collected_circles.length} circles, ${data.visible_polygon_ids?.length || 0} polygons`);
+                        console.log(`DEBUG: Loaded from server for ${locationKey}: ${data.collected_circles.length} circles`);
+
+                        // Restore GIF Assignments
+                        if (data.promo_gif_map) {
+                            promoGifAssignments = new Map(Object.entries(data.promo_gif_map));
+                            console.log(`DEBUG: Restored ${promoGifAssignments.size} GIF assignments from server`);
+                        }
                     }
                 } catch (err) {
                     console.error('DEBUG: Failed to load from server:', err);
-                }
-
-                // Fallback to localStorage
-                if (!state) {
-                    try {
-                        const cached = localStorage.getItem(`state_${locationKey}`);
-                        if (cached) {
-                            state = JSON.parse(cached);
-                            console.log(`DEBUG: Loaded from localStorage for ${locationKey}: ${state.collected_circles?.length || 0} circles`);
-                        }
-                    } catch (err) {
-                        console.error('DEBUG: Failed to load from localStorage:', err);
-                    }
                 }
 
                 return state || {
@@ -529,7 +493,6 @@
                 maxZoom: 18  // Max Zoom In
             });
             const map = controls.getMap();
-            let gpsWatchId = null;
 
             // Create dedicated pane for posters (не затрагивается debug фильтрами)
             map.createPane('postersPane');
@@ -1092,41 +1055,12 @@
                 }
 
                 // Use Controls to update position (Enforces map follow rules)
-                updateAndSaveUserPosition(userMarker, lat, lon, isGpsActive);
+                updateAndSaveUserPosition(userMarker, lat, lon);
 
                 // Quality State: 'NONE', 'LOW', 'HIGH'
                 // Allows upgrading to High Accuracy if Low was loaded first.
                 if (!window.loadedQuality) window.loadedQuality = 'NONE';
 
-                if (isGpsActive) {
-                    // Log GPS accuracy status
-                    if (accuracy > 200) {
-                        console.warn(`GPS: Signal weak (${Math.round(accuracy)}m accuracy)`);
-                    } else {
-                        console.log(`GPS: Good signal (${Math.round(accuracy)}m accuracy)`);
-                    }
-
-                    // Trigger Data Load Logic
-                    // 1. If nothing loaded yet -> Load
-                    // 2. If 'LOW' loaded and we now have 'HIGH' -> Load (Upgrade)
-                    // 3. If 'HIGH' loaded -> Do nothing (Stable)
-
-                    const shouldLoad =
-                        (window.loadedQuality === 'NONE') ||
-                        (window.loadedQuality === 'LOW' && label === 'HIGH_ACCURACY');
-
-                    if (shouldLoad) {
-                        console.log(`GPS: Triggering data load (Quality: ${label}, Previous: ${window.loadedQuality})`);
-
-                        // Update State
-                        window.loadedQuality = label === 'HIGH_ACCURACY' ? 'HIGH' : 'LOW';
-
-                        // Force Rebuild - backend handles retry logic
-                        loadGameData(lat, lon, true);
-                    } else {
-                        console.log(`GPS: Skipping data load (Quality: ${label}, Already loaded: ${window.loadedQuality})`);
-                    }
-                }
 
 
 
@@ -2313,27 +2247,23 @@
 
                 // Helper to pick random GIF with persistence
                 // Helper to pick random GIF with persistence
+                // Helper to pick random GIF with persistence (REDIS Version)
                 const getAssignedGif = (polyId) => {
                     if (promoGifCache.length === 0) return null;
 
-                    if (!polyId) {
-                        console.warn("DEBUG: getAssignedGif called with Falsy PolyId:", polyId);
-                        return null;
-                    }
+                    if (!polyId) return null;
 
-                    const storageKey = `promo_gif_${polyId}`;
-                    const savedGif = localStorage.getItem(storageKey);
-
-                    // TRUST LOCAL STORAGE
-                    if (savedGif) {
-                        // console.log(`DEBUG: Found saved GIF for ${polyId}: ${savedGif}`);
-                        return savedGif;
+                    // Use Global Map (Synced with Redis)
+                    if (promoGifAssignments.has(String(polyId))) {
+                        return promoGifAssignments.get(String(polyId));
                     }
 
                     // Assign new random GIF
                     const idx = Math.floor(Math.random() * promoGifCache.length);
                     const newGif = promoGifCache[idx];
-                    localStorage.setItem(storageKey, newGif);
+
+                    // Save to Map (will be pushed to server on next Save)
+                    promoGifAssignments.set(String(polyId), newGif);
                     console.log(`DEBUG: Assigned NEW GIF for ${polyId}: ${newGif}`);
                     return newGif;
                 };
@@ -2394,7 +2324,14 @@
                     const offsetY = -Math.sin(angle) * radius_px; // Negative because screen Y is inverted
 
                     // Check if polygon is already completed (all circles collected)
-                    const savedCount = parseInt(localStorage.getItem(`poly_${poly.id}`) || '0');
+                    // DYNAMIC CALCULATION: Count how many poly coordinates are in collectedCircles
+                    let savedCount = 0;
+                    if (poly.coords && poly.coords.length > 0) {
+                        savedCount = poly.coords.filter(c => {
+                            const key = `${c[0].toFixed(6)},${c[1].toFixed(6)}`;
+                            return collectedCircles.has(key);
+                        }).length;
+                    }
                     const isCompleted = savedCount >= poly.total_points;
 
                     // Create Large Promo Circle at polygon center (ONLY if not completed OR in debug mode)
@@ -3525,7 +3462,7 @@
 
                 // Move marker
                 userMarker.setLatLng([lat, lon]);
-                updateAndSaveUserPosition(userMarker, lat, lon, isGpsActive);
+                updateAndSaveUserPosition(userMarker, lat, lon);
 
                 // Ensure map centers on it
                 map.panTo([lat, lon]);
@@ -3553,9 +3490,9 @@
 
                 // Check if line endpoints are inside rectangle
                 const p1Inside = lineStart[0] >= rectBounds.south && lineStart[0] <= rectBounds.north &&
-                                lineStart[1] >= rectBounds.west && lineStart[1] <= rectBounds.east;
+                    lineStart[1] >= rectBounds.west && lineStart[1] <= rectBounds.east;
                 const p2Inside = lineEnd[0] >= rectBounds.south && lineEnd[0] <= rectBounds.north &&
-                                lineEnd[1] >= rectBounds.west && lineEnd[1] <= rectBounds.east;
+                    lineEnd[1] >= rectBounds.west && lineEnd[1] <= rectBounds.east;
 
                 if (p1Inside || p2Inside) {
                     console.log(`  Point inside: p1=${p1Inside}, p2=${p2Inside}`);
@@ -3730,43 +3667,7 @@
                 }
             };
 
-            const startLocationWatch = () => {
-                console.log("DEBUG: [Map Page] Starting GPS Watch...");
 
-                if (!("geolocation" in navigator)) {
-                    alert("Geolocation not supported by this browser.");
-                    revealMap();
-                    return;
-                }
-
-                // Clear any existing watch
-                if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
-
-                // Use High Accuracy Watch
-                gpsWatchId = navigator.geolocation.watchPosition(
-                    (pos) => {
-                        console.log("DEBUG: GPS Watch Update:", pos.coords);
-                        processCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, 'GPS_WATCH');
-                    },
-                    (err) => {
-                        console.error("DEBUG: GPS Watch Error:", err);
-                        // Optional: Handle timeout by keeping last known position or retrying
-                        if (err.code === 1) { // PERMISSION_DENIED
-                            stopLocationWatch();
-                            alert("Location access denied.");
-                        }
-                    },
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-                );
-            };
-
-            const stopLocationWatch = () => {
-                if (gpsWatchId !== null) {
-                    navigator.geolocation.clearWatch(gpsWatchId);
-                    gpsWatchId = null;
-                    console.log("DEBUG: GPS Watch Stopped.");
-                }
-            };
 
             // Navigation / Top Bar Logic (with cache-busting)
             fetch(`/B_map_page/components/top_bar.html?v=${Date.now()}`)
@@ -3778,113 +3679,46 @@
                 .catch(err => console.error('Error loading top bar:', err));
 
             // Initial Auto-Start
-            isGpsActive = false;
+            // isGpsActive = false; // REMOVED
 
-            // CRITICAL: Check server session ID to detect restarts
-            // If server restarted, clear localStorage and start fresh
+            // CRITICAL: Check server session ID to detect restarts - logic simplified for Cloud/Redis
             const initializeGame = async () => {
                 let initialLat = DEFAULT_LAT;
                 let initialLon = DEFAULT_LON;
-                let restoredFromLocalStorage = false;
+                let restoredFromLocalStorage = false; // Kept flag for compatibility, always false now
 
                 try {
-                    console.log(`DEBUG: === INITIAL PAGE LOAD - Checking server session ===`);
+                    console.log(`DEBUG: === INITIAL PAGE LOAD - Redis Migration Mode ===`);
 
-                    // Check server session ID
-                    const sessionResponse = await fetch('/api/session');
-                    const sessionData = await sessionResponse.json();
-                    const serverSessionId = sessionData.session_id;
-                    const serverStartTime = sessionData.start_time;
+                    // STEP 2: Check server (Redis) for last saved location logic
+                    // We assume user is at default unless server says otherwise (fetched via loadLocationState later)
+                    // BUT: We need to know WHICH location key to load? 
+                    // Since we removed local storage, we depend on the user starting fresh relative to URL params 
+                    // or we could ask server "where was I last?" - adding that feature would be better 
+                    // but for now we follow the existing flow: Start at Default -> Load Data for Default.
 
-                    console.log(`DEBUG: Server session ID: ${serverSessionId}`);
-                    console.log(`DEBUG: Server start time: ${serverStartTime}`);
+                    // Note: If you want Start-Where-Left-Off without LocalStorage, the server needs an API like
+                    // GET /api/user_last_position. 
+                    // Current implementation: Stored 'user_position' in state. 
+                    // Problem: We need the location KEY to fetch the state. 
+                    // Solution: We will rely on the default lat/lon OR url params initially. 
 
-                    // Get stored session ID from localStorage
-                    const storedSessionId = localStorage.getItem('server_session_id');
-                    console.log(`DEBUG: Stored session ID: ${storedSessionId}`);
+                    console.log(`DEBUG: Starting at default/url location (Server-side last pos not yet implemented)`);
 
-                    // If session IDs don't match, server was restarted - clear localStorage for NEW session
-                    if (storedSessionId && storedSessionId !== serverSessionId) {
-                        console.log(`DEBUG: ⚠️ SERVER RESTARTED DETECTED! New session - clearing localStorage...`);
-                        console.log(`DEBUG: Old session: ${storedSessionId}`);
-                        console.log(`DEBUG: New session: ${serverSessionId}`);
+                    // (Old session storage check removed - Redis is single source of truth)
+                    const serverStateResponse = await fetch(`/api/location_state?location_key=${defaultKey}`);
+                    const serverStateData = await serverStateResponse.json();
 
-                        // Clear all game state from localStorage
-                        const keysToRemove = [];
-                        for (let i = 0; i < localStorage.length; i++) {
-                            const key = localStorage.key(i);
-                            if (key && (key.startsWith('state_') || key.startsWith('collected_') || key.startsWith('poly_'))) {
-                                keysToRemove.push(key);
-                            }
-                        }
-
-                        keysToRemove.forEach(key => {
-                            console.log(`DEBUG: Removing ${key}`);
-                            localStorage.removeItem(key);
-                        });
-
-                        console.log(`DEBUG: ✓ Cleared ${keysToRemove.length} old state entries - starting fresh`);
+                    if (serverStateData.visible_polygon_ids && serverStateData.visible_polygon_ids.length > 0) {
+                        console.log(`DEBUG: ✓ Server has saved state for ${defaultKey}: ${serverStateData.visible_polygon_ids.length} polygons, ${serverStateData.collected_circles.length} circles`);
+                        // Server has data for this location, use it
+                        restoredFromLocalStorage = false; // Actually restored from server
+                        console.log(`DEBUG: ✓ Will restore from server location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
                     } else {
-                        console.log(`DEBUG: ✓ Server session matches - localStorage is valid`);
-                    }
-
-                    // Store current session ID
-                    localStorage.setItem('server_session_id', serverSessionId);
-
-                    // Now try to restore state (check BOTH localStorage AND server)
-                    console.log(`DEBUG: === Checking for saved state ===`);
-
-                    // STEP 1: Check localStorage
-                    const stateKeys = [];
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        if (key && key.startsWith('state_')) {
-                            stateKeys.push(key);
-                        }
-                    }
-
-                    console.log(`DEBUG: Found ${stateKeys.length} saved state keys in localStorage:`, stateKeys);
-
-                    // If we have saved states in localStorage, use the first one
-                    if (stateKeys.length > 0) {
-                        const stateKey = stateKeys[0]; // e.g., "state_32.057_34.769"
-                        const locationKey = stateKey.replace('state_', ''); // "32.057_34.769"
-
-                        console.log(`DEBUG: Found saved state in localStorage: ${stateKey}, location key: ${locationKey}`);
-
-                        // Parse location key back to coordinates
-                        const [latStr, lonStr] = locationKey.split('_');
-                        if (latStr && lonStr) {
-                            initialLat = parseFloat(latStr);
-                            initialLon = parseFloat(lonStr);
-                            restoredFromLocalStorage = true;
-                            console.log(`DEBUG: ✓ Will restore from localStorage location: ${initialLat}, ${initialLon}`);
-                        }
-                    } else {
-                        // STEP 2: localStorage is empty, check server (Redis) for last saved location
-                        console.log(`DEBUG: localStorage empty, checking server for last saved location...`);
-
-                        try {
-                            // Try to load state from default location to see if server has data
-                            const defaultKey = getLocationKey(DEFAULT_LAT, DEFAULT_LON);
-                            const serverStateResponse = await fetch(`/api/location_state?location_key=${defaultKey}`);
-                            const serverStateData = await serverStateResponse.json();
-
-                            if (serverStateData.visible_polygon_ids && serverStateData.visible_polygon_ids.length > 0) {
-                                console.log(`DEBUG: ✓ Server has saved state for ${defaultKey}: ${serverStateData.visible_polygon_ids.length} polygons, ${serverStateData.collected_circles.length} circles`);
-                                // Server has data for this location, use it
-                                restoredFromLocalStorage = false; // Actually restored from server
-                                console.log(`DEBUG: ✓ Will restore from server location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
-                            } else {
-                                console.log(`DEBUG: No saved state found on server either, will use default location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
-                            }
-                        } catch (e) {
-                            console.warn(`DEBUG: Failed to check server for saved state:`, e);
-                        }
+                        console.log(`DEBUG: No saved state found on server either, will use default location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
                     }
                 } catch (e) {
-                    console.error(`DEBUG: Error checking server session or saved state:`, e);
-                    // Fall back to defaults
+                    console.warn(`DEBUG: Failed to check server for saved state:`, e);
                 }
 
                 console.log(`DEBUG: Loading game with coordinates: ${initialLat}, ${initialLon} (restored: ${restoredFromLocalStorage})`);
@@ -3904,7 +3738,7 @@
             initializeGame();
 
             const initTopBarEvents = () => {
-                const gpsBtn = document.getElementById('gps-btn');
+                // const gpsBtn = document.getElementById('gps-btn'); // REMOVED
                 const debugBtn = document.getElementById('debug-btn');
                 const menuBtn = document.getElementById('menu-btn');
                 const topBar = document.getElementById('top-bar');
@@ -3950,56 +3784,10 @@
                     });
                 }
 
-                if (gpsBtn) {
-                    gpsBtn.addEventListener('click', () => {
-                        isGpsActive = !isGpsActive;
-
-                        if (isGpsActive) {
-
-                            // SAVE current position and location key before switching to GPS
-                            const currentPos = userMarker.getLatLng();
-                            savedGpsPosition = { lat: currentPos.lat, lon: currentPos.lng };
-                            savedLocationKey = currentLocationKey; // Save exact key
-                            console.log(`DEBUG: Saving Manual Pos: ${savedGpsPosition.lat}, ${savedGpsPosition.lon} Key: ${savedLocationKey}`);
-
-                            console.log("DEBUG: GPS Toggled ON");
-                            gpsBtn.classList.add('active');
-
-                            if (loadingGif) {
-                                loadingGif.style.display = 'block';
-                                loadingGif.style.opacity = '1';
-                            }
-                            if (mapElement) mapElement.style.opacity = '0.3';
-                            if (topBarContainer) topBarContainer.style.opacity = '0';
-                            hasRevealed = false;
-
-                            startLocationWatch();
-
-                        } else {
-                            console.log("DEBUG: GPS Toggled OFF");
-                            gpsBtn.classList.remove('active');
-
-                            stopLocationWatch();
-
-                            // RESTORE Manual Position
-                            if (savedGpsPosition) {
-                                console.log(`DEBUG: Restoring Manual Pos: ${savedGpsPosition.lat}, ${savedGpsPosition.lon}`);
-
-                                hasPreciseFix = false;
-                                window.loadedQuality = 'NONE';
-
-                                // Move User
-                                userMarker.setLatLng([savedGpsPosition.lat, savedGpsPosition.lon]);
-                                controls.resetView(savedGpsPosition.lat, savedGpsPosition.lon);
-
-                                // Reload Data for that location
-                                loadGameDataWithKey(savedGpsPosition.lat, savedGpsPosition.lon, savedLocationKey);
-                            }
-                        }
-                    });
 
 
-                }
+
+
 
                 if (menuBtn && topBar) {
                     menuBtn.addEventListener('click', (e) => {
