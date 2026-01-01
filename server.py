@@ -83,7 +83,7 @@ if not os.path.exists(full_path):
     logger.error(f"CRITICAL: Serving directory does not exist: {full_path}")
 
 # Generate unique session ID on server startup
-# This allows frontend to detect server restarts and clear localStorage
+# This allows frontend to detect server restarts and reset in-memory state
 SERVER_SESSION_ID = str(uuid.uuid4())
 SERVER_START_TIME = int(time.time())
 logger.info(f"Server Session ID: {SERVER_SESSION_ID}")
@@ -144,6 +144,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith('/api/reverse') or self.path.startswith('/api/search'):
             self.proxy_nominatim()
             return
+        if self.path.startswith('/api/game_state'):
+            self.handle_get_game_state()
+            return
         if self.path.startswith('/api/game_data'):
             self.handle_game_data()
             return
@@ -172,6 +175,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests."""
+        if self.path.startswith('/api/game_state'):
+            self.handle_save_game_state()
+            return
         if self.path.startswith('/api/location_state'):
             self.handle_save_location_state()
             return
@@ -180,7 +186,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def handle_get_session(self):
         """
         Returns server session information.
-        This allows frontend to detect server restarts and clear localStorage.
+        This allows frontend to detect server restarts and reset in-memory state.
         Returns: { 'session_id': 'uuid', 'start_time': timestamp }
         """
         try:
@@ -492,6 +498,105 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             logger.error(f"Get Location State Error: {e}")
             self.send_error(500, str(e))
 
+    def handle_get_game_state(self):
+        """
+        Handle GET /api/game_state
+        Returns COMPLETE game state from Redis including all geometry.
+        If no state exists, returns empty response (signals fresh start).
+        """
+        try:
+            from CORE.BACKEND.redis_tools import get_redis_client, KEY_GAME_STATE
+
+            r = get_redis_client()
+            data = r.get(KEY_GAME_STATE)
+
+            if data:
+                state = json.loads(data)
+                polygon_count = len(state.get('polygons', []))
+                logger.info(f"Retrieved global game state: {polygon_count} polygons")
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(data.encode())
+            else:
+                logger.info("No global game state found - signaling fresh start")
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"empty": True}).encode())
+
+        except Exception as e:
+            logger.error(f"Get Game State Error: {e}")
+            self.send_error(500, str(e))
+
+    def handle_save_game_state(self):
+        """
+        Handle POST /api/game_state
+        Saves COMPLETE game state including ALL geometry to Redis.
+        Body: {
+            "polygons": [...],           # Full geometry
+            "white_lines": [...],        # Full geometry  
+            "green_circles": [...],      # Full data
+            "blue_circles": [...],       # Full data
+            "collected_circles": [...],  # Progress
+            "visible_polygon_ids": [...], # Progress
+            "expanded_circles": [...],   # Progress
+            "user_position": {...},       # Last position
+            "current_circle_uid": "...",  # Current circle UID for marker
+            "promo_gif_map": {...},       # GIF assignments
+            "poster_grid": [...]          # Poster data
+        }
+        """
+        try:
+            from CORE.BACKEND.redis_tools import get_redis_client, KEY_GAME_STATE
+
+            # Read POST body
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            state = json.loads(body.decode())
+
+            r = get_redis_client()
+
+            # Validate we have some data
+            polygons = state.get('polygons', [])
+            if not polygons:
+                logger.warning("Attempted to save empty game state - ignoring")
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ignored", "reason": "no polygons"}).encode())
+                return
+
+            # Save complete state with 7-day TTL
+            r.set(KEY_GAME_STATE, json.dumps(state))
+            r.expire(KEY_GAME_STATE, 60 * 60 * 24 * 7)  # 7 days
+
+            logger.info(f"Saved global game state: {len(polygons)} polygons, "
+                       f"{len(state.get('white_lines', []))} lines, "
+                       f"{len(state.get('collected_circles', []))} collected, "
+                       f"circle_uid={state.get('current_circle_uid', 'none')}")
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "status": "ok",
+                "saved_polygons": len(polygons),
+                "saved_lines": len(state.get('white_lines', [])),
+                "saved_circles": len(state.get('collected_circles', []))
+            }).encode())
+
+        except Exception as e:
+            logger.error(f"Save Game State Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.send_error(500, str(e))
+
 
     def handle_serve_poster(self):
         """Serve images from CORE/DATA/GAME_POSTERS."""
@@ -670,8 +775,8 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                 restored_polygon_ids = [pid.strip() for pid in restored_polygon_ids_param.split(',') if pid.strip()]
                 logger.info(f"Restoring {len(restored_polygon_ids)} previously visible polygons")
 
-            # TEMP: Force rebuild to always be True for debugging polygon merging
-            force_rebuild = True  # rebuild_param == 'true'
+            # Use rebuild param from request (default false = use Redis cache if available)
+            force_rebuild = rebuild_param == 'true'
 
             if not lat or not lon:
                 self.send_error(400, "Missing lat/lon")

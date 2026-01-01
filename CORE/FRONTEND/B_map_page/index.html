@@ -2,17 +2,9 @@
 <html lang="en">
 
 <head>
-    // CLEANUP: LocalStorage is no longer used for game state.
-    // We strictly relay on Server (Redis) for persistence.
-    try {
-    if (localStorage.length > 0) {
-    console.log("Legacy localStorage data found. Clearing...");
-    localStorage.clear();
-    }
-    } catch (e) {
-    console.warn("Storage cleanup failed:", e);
-    }
+    <!-- Game state is persisted exclusively via Redis (server-side). No client-side storage used. -->
     <meta charset="UTF-8">
+
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -385,6 +377,10 @@
             let promoGifCache = []; // Loaded once on startup
             let promoGifAssignments = new Map(); // PolyID -> GifFilename (Synced with Server)
 
+            // Global Game State (for Redis persistence)
+            let currentCircleUid = null;  // UID of circle where player marker is currently positioned
+            let cachedGameData = null;    // Complete game data for saving to Redis (accumulated)
+
             // Helper: Generate location key from coordinates (round to ~100m precision)
             const getLocationKey = (lat, lon) => {
                 return `${lat.toFixed(3)}_${lon.toFixed(3)}`;
@@ -400,47 +396,12 @@
             };
 
             // Helper: Save current location state to server
+            // Helper: Save current location state to server
+            // REFACTORED: Now delegates to saveGlobalState for unified persistence (Single Redis Key)
             const saveLocationState = async () => {
-                if (!currentLocationKey) return;
-
-                // Extract blue circles from window.allItems
-                const blueCirclesData = [];
-                if (window.allItems) {
-                    for (const [uid, item] of window.allItems.entries()) {
-                        if (uid.startsWith('BLUE_CIRCLE_') && item.lat !== undefined && item.lon !== undefined) {
-                            blueCirclesData.push({
-                                lat: item.lat,
-                                lon: item.lon,
-                                id: item.id,
-                                connections: item.connections,
-                                connected_polygon_ids: item.connected_polygon_ids || []
-                            });
-                        }
-                    }
-                }
-
-                // Prepare complete state
-                const state = {
-                    location_key: currentLocationKey,
-                    collected_circles: Array.from(collectedCircles),
-                    visible_polygon_ids: Array.from(visiblePolygonIds),
-                    expanded_circles: Array.from(expandedCircles),
-                    blue_circles: blueCirclesData,  // Save all blue circles
-                    user_position: currentUserPosition,  // Save current user position
-                    promo_gif_map: Object.fromEntries(promoGifAssignments) // Convert Map to Object for JSON
-                };
-
-                try {
-                    const response = await fetch('/api/location_state', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(state)
-                    });
-                    const data = await response.json();
-                    console.log(`DEBUG: Saved state for ${currentLocationKey}: ${state.collected_circles.length} circles, ${state.visible_polygon_ids.length} polygons, ${state.blue_circles.length} blue circles, GIFs: ${promoGifAssignments.size}`);
-                } catch (err) {
-                    console.error('DEBUG: Failed to save location state:', err);
-                }
+                // Determine if we should log verbose or just do it silently
+                // console.log("DEBUG: Legacy saveLocationState called -> Redirecting to Global Save");
+                await saveGlobalState();
             };
 
             // Helper: Load saved state for a location from server
@@ -485,6 +446,152 @@
                 }
             };
             loadPromoGifs(); // Trigger load immediately
+
+            // ========== GLOBAL STATE FUNCTIONS ==========
+
+            // Load complete game state from Redis (all geometry + progress)
+            const loadGlobalState = async () => {
+                try {
+                    console.log('GLOBAL_STATE: Checking Redis for saved state...');
+                    const response = await fetch('/api/game_state');
+                    const state = await response.json();
+
+                    if (state && !state.empty && state.polygons && state.polygons.length > 0) {
+                        console.log(`GLOBAL_STATE: Found saved state - ${state.polygons.length} polygons`);
+                        return state;
+                    }
+
+                    console.log('GLOBAL_STATE: No saved state found - fresh start');
+                    return null;
+                } catch (err) {
+                    console.error('GLOBAL_STATE: Failed to load:', err);
+                    return null;
+                }
+            };
+
+            // Save complete game state to Redis (all geometry + progress)
+            const saveGlobalState = async () => {
+                if (!cachedGameData || !cachedGameData.polygons || cachedGameData.polygons.length === 0) {
+                    console.log('GLOBAL_STATE: No data to save (empty cachedGameData)');
+                    return;
+                }
+
+                // Build complete state
+                const state = {
+                    // Geometry (accumulated from cachedGameData)
+                    polygons: cachedGameData.polygons || [],
+                    white_lines: cachedGameData.white_lines || [],
+                    green_circles: cachedGameData.green_circles || [],
+                    blue_circles: cachedGameData.blue_circles || [],
+                    poster_grid: cachedGameData.poster_grid || currentPosterGrid || [],
+                    groups: cachedGameData.groups || [],
+
+                    // Progress
+                    collected_circles: Array.from(collectedCircles),
+                    visible_polygon_ids: Array.from(visiblePolygonIds),
+                    expanded_circles: Array.from(expandedCircles),
+
+                    // Position
+                    user_position: currentUserPosition,
+                    current_circle_uid: currentCircleUid,
+
+                    // GIF assignments
+                    promo_gif_map: Object.fromEntries(promoGifAssignments)
+                };
+
+                try {
+                    const response = await fetch('/api/game_state', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(state)
+                    });
+                    const result = await response.json();
+                    console.log(`GLOBAL_STATE: Saved - ${result.saved_polygons} polygons, ${result.saved_lines} lines, circle_uid=${currentCircleUid}`);
+                } catch (err) {
+                    console.error('GLOBAL_STATE: Failed to save:', err);
+                }
+            };
+
+            // Render game from saved state (without regeneration)
+            const renderFromSavedState = async (state) => {
+                console.log('GLOBAL_STATE: Rendering from saved state...');
+
+                // Restore progress Sets
+                collectedCircles.clear();
+                (state.collected_circles || []).forEach(c => collectedCircles.add(c));
+
+                visiblePolygonIds.clear();
+                (state.visible_polygon_ids || []).forEach(id => visiblePolygonIds.add(id));
+
+                expandedCircles.clear();
+                (state.expanded_circles || []).forEach(c => expandedCircles.add(c));
+
+                // Restore GIF assignments
+                if (state.promo_gif_map) {
+                    promoGifAssignments = new Map(Object.entries(state.promo_gif_map));
+                }
+
+                // Restore user position
+                if (state.user_position) {
+                    currentUserPosition = state.user_position;
+                }
+
+                // Restore circle UID
+                if (state.current_circle_uid) {
+                    currentCircleUid = state.current_circle_uid;
+                }
+
+                // Store poster grid
+                if (state.poster_grid) {
+                    currentPosterGrid = state.poster_grid;
+                }
+
+                // Cache the data for future saves
+                cachedGameData = {
+                    polygons: state.polygons,
+                    white_lines: state.white_lines,
+                    green_circles: state.green_circles,
+                    blue_circles: state.blue_circles,
+                    poster_grid: state.poster_grid,
+                    groups: state.groups
+                };
+
+                // Build game data object for renderGameElements
+                const gameData = {
+                    polygons: state.polygons,
+                    white_lines: state.white_lines,
+                    green_circles: state.green_circles,
+                    blue_circles: state.blue_circles,
+                    poster_grid: state.poster_grid,
+                    groups: state.groups,
+                    red_lines: []
+                };
+
+                console.log(`GLOBAL_STATE: Restoring ${gameData.polygons.length} polygons, ${collectedCircles.size} collected circles`);
+
+                // Render everything
+                await renderGameElements(gameData, 'restore');
+
+                // Move marker to saved circle position
+                if (currentCircleUid && window.allItems) {
+                    const circleData = window.allItems.get(currentCircleUid);
+                    if (circleData && circleData.lat !== undefined && circleData.lon !== undefined) {
+                        console.log(`GLOBAL_STATE: Moving marker to saved circle ${currentCircleUid}`);
+                        updateAndSaveUserPosition(userMarker, circleData.lat, circleData.lon);
+                        map.setView([circleData.lat, circleData.lon], 18);
+                    } else if (currentUserPosition) {
+                        console.log(`GLOBAL_STATE: Circle not found, using saved position`);
+                        updateAndSaveUserPosition(userMarker, currentUserPosition.lat, currentUserPosition.lon);
+                        map.setView([currentUserPosition.lat, currentUserPosition.lon], 18);
+                    }
+                } else if (currentUserPosition) {
+                    console.log(`GLOBAL_STATE: No circle UID, using saved position`);
+                    updateAndSaveUserPosition(userMarker, currentUserPosition.lat, currentUserPosition.lon);
+                    map.setView([currentUserPosition.lat, currentUserPosition.lon], 18);
+                }
+
+                return true;
+            };
 
             // Initialize Map via MapControls (Centralized Logic)
             const controls = new MapControls('map', [DEFAULT_LAT, DEFAULT_LON], {
@@ -1088,126 +1195,59 @@
                     isRestoringState = true;
                     console.log(`DEBUG: 🔒 Setting isRestoringState = true (prevent saves during restoration)`);
 
-                    // DIAGNOSTIC: Show ALL localStorage keys
-                    console.log(`DEBUG: === localStorage DIAGNOSTIC ===`);
-                    console.log(`DEBUG: Total localStorage items: ${localStorage.length}`);
-                    const allKeys = [];
-                    for (let i = 0; i < localStorage.length; i++) {
-                        allKeys.push(localStorage.key(i));
-                    }
-                    console.log(`DEBUG: All localStorage keys:`, allKeys);
-                    console.log(`DEBUG: ================================`);
-
-                    // Try to load saved state from localStorage to restore visiblePolygonIds AND collectedCircles
+                    // Restore state from Redis (server) ONLY - no client-side storage
                     try {
-                        console.log(`DEBUG: Attempting to restore state from localStorage for key: state_${newLocationKey}`);
-                        const cachedState = localStorage.getItem(`state_${newLocationKey}`);
-                        if (cachedState) {
-                            console.log(`DEBUG: Found cached state in localStorage, parsing...`);
-                            const parsed = JSON.parse(cachedState);
-                            console.log(`DEBUG: Parsed state:`, parsed);
+                        console.log(`DEBUG: Attempting to restore state from Redis for location: ${newLocationKey}`);
+                        const serverState = await loadLocationState(newLocationKey);
 
-                            if (parsed.visible_polygon_ids && parsed.visible_polygon_ids.length > 0) {
-                                visiblePolygonIds.clear();
-                                parsed.visible_polygon_ids.forEach(id => visiblePolygonIds.add(id));
-                                console.log(`DEBUG: Pre-restored ${visiblePolygonIds.size} polygon IDs from localStorage before request`);
-                                console.log(`DEBUG: Sample restored polygon IDs: ${parsed.visible_polygon_ids.slice(0, 3).join(', ')}...`);
-                            } else {
-                                console.log(`DEBUG: No visible_polygon_ids found in cached state`);
-                            }
+                        if (serverState && serverState.visible_polygon_ids && serverState.visible_polygon_ids.length > 0) {
+                            console.log(`DEBUG: ✓ Found saved state in Redis: ${serverState.visible_polygon_ids.length} polygons, ${serverState.collected_circles.length} circles`);
 
-                            if (parsed.expanded_circles && parsed.expanded_circles.length > 0) {
+                            // Restore polygon IDs
+                            visiblePolygonIds.clear();
+                            serverState.visible_polygon_ids.forEach(id => visiblePolygonIds.add(id));
+                            console.log(`DEBUG: Restored ${visiblePolygonIds.size} polygon IDs from Redis`);
+
+                            // Restore expanded circles
+                            if (serverState.expanded_circles && serverState.expanded_circles.length > 0) {
                                 expandedCircles.clear();
-                                parsed.expanded_circles.forEach(coord => expandedCircles.add(coord));
-                                console.log(`DEBUG: Pre-restored ${expandedCircles.size} expanded circles from localStorage before request`);
-                            } else {
-                                console.log(`DEBUG: No expanded_circles found in cached state`);
+                                serverState.expanded_circles.forEach(coord => expandedCircles.add(coord));
+                                console.log(`DEBUG: Restored ${expandedCircles.size} expanded circles from Redis`);
                             }
 
-                            if (parsed.collected_circles && parsed.collected_circles.length > 0) {
+                            // Restore collected circles
+                            if (serverState.collected_circles && serverState.collected_circles.length > 0) {
                                 collectedCircles.clear();
-                                parsed.collected_circles.forEach(coord => collectedCircles.add(coord));
-                                console.log(`DEBUG: Pre-restored ${collectedCircles.size} collected circles from localStorage before request`);
-                            } else {
-                                console.log(`DEBUG: No collected_circles found in cached state`);
+                                serverState.collected_circles.forEach(coord => collectedCircles.add(coord));
+                                console.log(`DEBUG: Restored ${collectedCircles.size} collected circles from Redis`);
                             }
 
-                            if (parsed.blue_circles && parsed.blue_circles.length > 0) {
-                                restoredBlueCircles = parsed.blue_circles;
-                                console.log(`DEBUG: Pre-restored ${restoredBlueCircles.length} blue circles from localStorage`);
+                            // Restore blue circles
+                            if (serverState.blue_circles && serverState.blue_circles.length > 0) {
+                                restoredBlueCircles = serverState.blue_circles;
+                                console.log(`DEBUG: Restored ${restoredBlueCircles.length} blue circles from Redis`);
                             } else {
-                                console.log(`DEBUG: No blue_circles found in cached state`);
                                 restoredBlueCircles = [];
                             }
 
-                            if (parsed.user_position && parsed.user_position.lat !== undefined) {
-                                currentUserPosition = parsed.user_position;
-                                console.log(`DEBUG: Pre-restored user position from localStorage: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
-                            } else {
-                                console.log(`DEBUG: No user_position found in cached state`);
+                            // Restore user position
+                            if (serverState.user_position && serverState.user_position.lat !== undefined) {
+                                currentUserPosition = serverState.user_position;
+                                console.log(`DEBUG: Restored user position from Redis: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
                             }
                         } else {
-                            console.log(`DEBUG: No cached state found in localStorage for key: state_${newLocationKey}`);
-
-                            // localStorage empty - try to restore from server (Redis) BEFORE making request
-                            console.log(`DEBUG: localStorage empty, checking Redis for saved state...`);
-                            try {
-                                const serverState = await loadLocationState(newLocationKey);
-                                if (serverState && serverState.visible_polygon_ids && serverState.visible_polygon_ids.length > 0) {
-                                    console.log(`DEBUG: ✓ Found saved state in Redis: ${serverState.visible_polygon_ids.length} polygons, ${serverState.collected_circles.length} circles`);
-
-                                    // Restore polygon IDs
-                                    visiblePolygonIds.clear();
-                                    serverState.visible_polygon_ids.forEach(id => visiblePolygonIds.add(id));
-                                    console.log(`DEBUG: Pre-restored ${visiblePolygonIds.size} polygon IDs from Redis before request`);
-                                    console.log(`DEBUG: Sample restored polygon IDs from Redis: ${serverState.visible_polygon_ids.slice(0, 3).join(', ')}...`);
-
-                                    // Restore expanded circles
-                                    if (serverState.expanded_circles && serverState.expanded_circles.length > 0) {
-                                        expandedCircles.clear();
-                                        serverState.expanded_circles.forEach(coord => expandedCircles.add(coord));
-                                        console.log(`DEBUG: Pre-restored ${expandedCircles.size} expanded circles from Redis`);
-                                    }
-
-                                    // Restore collected circles
-                                    if (serverState.collected_circles && serverState.collected_circles.length > 0) {
-                                        collectedCircles.clear();
-                                        serverState.collected_circles.forEach(coord => collectedCircles.add(coord));
-                                        console.log(`DEBUG: Pre-restored ${collectedCircles.size} collected circles from Redis`);
-                                    }
-
-                                    // Restore blue circles
-                                    if (serverState.blue_circles && serverState.blue_circles.length > 0) {
-                                        restoredBlueCircles = serverState.blue_circles;
-                                        console.log(`DEBUG: Pre-restored ${restoredBlueCircles.length} blue circles from Redis`);
-                                    } else {
-                                        restoredBlueCircles = [];
-                                    }
-
-                                    // Restore user position
-                                    if (serverState.user_position && serverState.user_position.lat !== undefined) {
-                                        currentUserPosition = serverState.user_position;
-                                        console.log(`DEBUG: Pre-restored user position from Redis: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
-                                    } else {
-                                        console.log(`DEBUG: No user_position found in Redis state (old save format)`);
-                                    }
-                                } else {
-                                    console.log(`DEBUG: No saved state found in Redis either`);
-                                    restoredBlueCircles = [];
-                                }
-                            } catch (e) {
-                                console.warn("DEBUG: Failed to load state from Redis:", e);
-                                restoredBlueCircles = [];
-                            }
+                            console.log(`DEBUG: No saved state found in Redis for location: ${newLocationKey}`);
+                            restoredBlueCircles = [];
                         }
                     } catch (e) {
-                        console.warn("DEBUG: Failed to pre-restore state:", e);
+                        console.warn("DEBUG: Failed to load state from Redis:", e);
                         restoredBlueCircles = [];
                     }
                 } else {
                     // Expand mode - clear restored blue circles
                     restoredBlueCircles = [];
                 }
+
 
                 // In EXPAND mode, keep the same location key (don't switch)
                 // In INITIAL mode, save old location and switch to new
@@ -1314,8 +1354,33 @@
                         gameDataCache.set(newLocationKey, data);
                         console.log(`DEBUG: Cached game data for location ${newLocationKey}`);
 
-                        await renderGameElements(data, mode); // Changed to await and kept original data/mode
+                        // ACCUMULATE to global cached data for Redis persistence
+                        if (mode === 'expand' && cachedGameData) {
+                            // Merge new data with existing
+                            cachedGameData.polygons = [...(cachedGameData.polygons || []), ...(data.polygons || [])];
+                            cachedGameData.white_lines = [...(cachedGameData.white_lines || []), ...(data.white_lines || [])];
+                            cachedGameData.green_circles = [...(cachedGameData.green_circles || []), ...(data.green_circles || [])];
+                            cachedGameData.blue_circles = [...(cachedGameData.blue_circles || []), ...(data.blue_circles || [])];
+                            // Keep original poster_grid
+                            console.log(`DEBUG: Accumulated expand data - now ${cachedGameData.polygons.length} total polygons`);
+                        } else {
+                            // Initial load - replace all
+                            cachedGameData = {
+                                polygons: data.polygons || [],
+                                white_lines: data.white_lines || [],
+                                green_circles: data.green_circles || [],
+                                blue_circles: data.blue_circles || [],
+                                poster_grid: data.poster_grid || [],
+                                groups: data.groups || []
+                            };
+                            console.log(`DEBUG: Set initial cachedGameData - ${cachedGameData.polygons.length} polygons`);
+                        }
+
+                        await renderGameElements(data, mode);
                         revealMap();
+
+                        // Save to global Redis state after rendering
+                        await saveGlobalState();
                     })
                     .catch(err => {
                         console.error("GPS: ========================================");
@@ -1398,14 +1463,14 @@
 
                 // Clear layers based on mode
                 if (mode !== 'expand') {
-                    // Initial mode: clear everything EXCEPT visiblePolygonIds (they were restored from localStorage/server)
+                    // Initial mode: clear everything EXCEPT visiblePolygonIds (they were restored from Redis)
                     groupsLayer.clearLayers();
                     detailsLayer.clearLayers();
                     expandedLayer.clearLayers();
                     expandedItemUids.clear();
                     expandedCircleCoords.clear();
                     clearedCircleCoords.clear();
-                    // DON'T clear visiblePolygonIds - we just restored them from localStorage!
+                    // DON'T clear visiblePolygonIds - we just restored them from Redis!
                     // visiblePolygonIds.clear(); ← REMOVED to preserve restored state
                 } else {
                     // Expand mode: DON'T clear expandedLayer - accumulate polygons!
@@ -2411,6 +2476,8 @@
                     if (pLabel) {
                         // Use polygon UID to create deterministic white circle UID (prevents duplication on expand)
                         const whiteCircleUid = `WHITE_CIRCLE_${poly.uid.replace('POLYGON_', '')}`;
+                        pLabel.uid = whiteCircleUid; // EXPLICITLY TRACK UID ON MARKER
+
                         const labelDebugData = {
                             uid: whiteCircleUid,
                             parent_polygon_uid: poly.uid,
@@ -2716,6 +2783,19 @@
                         // Save connection count for debug restoration
                         marker.connections = circle.connections;
                         marker.isSaturated = isSaturated; // EXPOSE FOR LOGIC
+
+                        // UID Logic & Persistence
+                        const blueUid = circle.id || `BLUE_CIRCLE_${circle.lat.toFixed(6)}_${circle.lon.toFixed(6)}`;
+                        marker.uid = blueUid;
+
+                        // Ensure data is in window.allItems for persistence (Critical for saveGlobalState)
+                        if (window.allItems) {
+                            window.allItems.set(blueUid, {
+                                ...circle,
+                                id: blueUid,
+                                uid: blueUid // Unified key
+                            });
+                        }
 
                         if (!isCollected) {
                             marker.bindTooltip(String(circle.connections), { permanent: true, direction: 'center', className: 'circle-label' });
@@ -3112,61 +3192,36 @@
                 }
             };
 
-            // NEW: Helper to fetch saved circles (Pure Data Fetching)
+            // NEW: Helper to fetch saved circles from Redis (Pure Data Fetching)
             const fetchSavedCircles = async (locationKey) => {
                 const combinedCircles = new Set();
                 if (!locationKey) return combinedCircles;
 
-                // 1. Load from LocalStorage (fast, offline capable)
-                // Try new format first (state_), then fall back to old format (collected_)
-                try {
-                    let localData = localStorage.getItem(`state_${locationKey}`);
-                    if (localData) {
-                        const parsed = JSON.parse(localData);
-                        // New format has complete state
-                        if (parsed.collected_circles && Array.isArray(parsed.collected_circles)) {
-                            parsed.collected_circles.forEach(k => combinedCircles.add(k));
-                            console.log(`DEBUG: Loaded ${parsed.collected_circles.length} circles from LocalStorage (new format)`);
-                        }
-                    } else {
-                        // Fall back to old format
-                        localData = localStorage.getItem(`collected_${locationKey}`);
-                        if (localData) {
-                            const parsed = JSON.parse(localData);
-                            if (Array.isArray(parsed)) {
-                                parsed.forEach(k => combinedCircles.add(k));
-                                console.log(`DEBUG: Loaded ${parsed.length} circles from LocalStorage (old format)`);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.warn("DEBUG: Failed to load local circles:", e);
-                }
-
-                // 2. Load from Server (authoritative) - returns full state now
+                // Load from Server (Redis) - the authoritative source
                 try {
                     const savedState = await loadLocationState(locationKey);
                     if (savedState && savedState.collected_circles && savedState.collected_circles.length > 0) {
                         savedState.collected_circles.forEach(k => combinedCircles.add(k));
-                        console.log(`DEBUG: Loaded ${savedState.collected_circles.length} circles from Server`);
+                        console.log(`DEBUG: Loaded ${savedState.collected_circles.length} circles from Redis`);
 
                         // Restore expanded state
                         if (savedState.visible_polygon_ids && savedState.visible_polygon_ids.length > 0) {
                             savedState.visible_polygon_ids.forEach(id => visiblePolygonIds.add(id));
-                            console.log(`DEBUG: Restored ${savedState.visible_polygon_ids.length} visible polygon IDs`);
+                            console.log(`DEBUG: Restored ${savedState.visible_polygon_ids.length} visible polygon IDs from Redis`);
                         }
 
                         if (savedState.expanded_circles && savedState.expanded_circles.length > 0) {
                             savedState.expanded_circles.forEach(coord => expandedCircles.add(coord));
-                            console.log(`DEBUG: Restored ${savedState.expanded_circles.length} expanded circles`);
+                            console.log(`DEBUG: Restored ${savedState.expanded_circles.length} expanded circles from Redis`);
                         }
                     }
                 } catch (e) {
-                    console.warn("DEBUG: Failed to load server circles:", e);
+                    console.warn("DEBUG: Failed to load circles from Redis:", e);
                 }
 
                 return combinedCircles;
             };
+
 
             // Restore previously collected circles from server AND LocalStorage
             // REFACTORED: Now accepts pure data or fetches if needed
@@ -3197,6 +3252,19 @@
                     let targetKey = null;
 
                     if (target) {
+                        // GLOBAL STATE TRACKING: Update current circle UID
+                        if (target.uid) {
+                            if (currentCircleUid !== target.uid) {
+                                console.log(`GLOBAL_STATE: Player moved to circle ${target.uid}`);
+                                currentCircleUid = target.uid;
+
+                                // Save state immediately when reaching a new circle
+                                if (!isRestoringState) {
+                                    saveGlobalState();
+                                }
+                            }
+                        }
+
                         // Re-calculate targetKey (since target might be from fuzzy match)
                         targetKey = exactKey;
                         // If exact match failed, we need to recover the key from the target... 
@@ -3216,31 +3284,12 @@
                             // 1. Mark Collected
                             collectedCircles.add(targetKey);
 
-                            // 2. Save full state to localStorage immediately (complete state, not just circles)
-                            // BUT only if we're not currently restoring state
+                            // 2. Save to Redis (server) - no client-side storage
+                            // Note: saveLocationState is called periodically and on key events
                             if (!isRestoringState) {
-                                const fullState = {
-                                    location_key: currentLocationKey,
-                                    collected_circles: Array.from(collectedCircles),
-                                    visible_polygon_ids: Array.from(visiblePolygonIds),
-                                    expanded_circles: Array.from(expandedCircles)
-                                };
-                                localStorage.setItem(`state_${currentLocationKey}`, JSON.stringify(fullState));
-                                console.log(`DEBUG: Saved to localStorage - circles: ${fullState.collected_circles.length}, polygons: ${fullState.visible_polygon_ids.length}, expanded: ${fullState.expanded_circles.length}`);
-                                if (fullState.visible_polygon_ids.length > 0) {
-                                    console.log(`DEBUG: Sample polygon IDs saved: ${fullState.visible_polygon_ids.slice(0, 3).join(', ')}...`);
-                                }
-
-                                // VERIFICATION: Immediately read back to confirm write
-                                const verification = localStorage.getItem(`state_${currentLocationKey}`);
-                                if (verification) {
-                                    console.log(`DEBUG: ✓ VERIFIED localStorage write successful for state_${currentLocationKey}`);
-                                } else {
-                                    console.error(`DEBUG: ✗ FAILED TO VERIFY localStorage write for state_${currentLocationKey}!`);
-                                }
-                            } else {
-                                console.log(`DEBUG: ⏸️ SKIPPED save (isRestoringState = true)`);
+                                console.log(`DEBUG: Collected circle at ${targetKey}, will persist to Redis`);
                             }
+
 
                             // 3. Persist Server (Debounced/Throttled usually, but here immediate-ish)
                             // Note: frequent saves might spam server.
@@ -3296,35 +3345,12 @@
                             console.log(`DEBUG: Reached new Blue Circle ${targetKey} -> Triggering Map Expansion...`);
                             expandedCircles.add(targetKey);
 
-                            // Save state immediately before expansion
-                            // BUT only if we're not currently restoring state
-                            if (!isRestoringState) {
-                                const fullState = {
-                                    location_key: currentLocationKey,
-                                    collected_circles: Array.from(collectedCircles),
-                                    visible_polygon_ids: Array.from(visiblePolygonIds),
-                                    expanded_circles: Array.from(expandedCircles)
-                                };
-                                localStorage.setItem(`state_${currentLocationKey}`, JSON.stringify(fullState));
-                                console.log(`DEBUG: Saved to localStorage before expansion - circles: ${fullState.collected_circles.length}, polygons: ${fullState.visible_polygon_ids.length}, expanded: ${fullState.expanded_circles.length}`);
-                                if (fullState.visible_polygon_ids.length > 0) {
-                                    console.log(`DEBUG: Sample polygon IDs saved: ${fullState.visible_polygon_ids.slice(0, 3).join(', ')}...`);
-                                }
-
-                                // VERIFICATION: Immediately read back to confirm write
-                                const verification = localStorage.getItem(`state_${currentLocationKey}`);
-                                if (verification) {
-                                    console.log(`DEBUG: ✓ VERIFIED localStorage write successful for state_${currentLocationKey}`);
-                                } else {
-                                    console.error(`DEBUG: ✗ FAILED TO VERIFY localStorage write for state_${currentLocationKey}!`);
-                                }
-                            } else {
-                                console.log(`DEBUG: ⏸️ SKIPPED save before expansion (isRestoringState = true)`);
-                            }
+                            // State will be saved to Redis after expansion completes via saveLocationState()
 
                             const [latStr, lonStr] = targetKey.split(',');
                             loadGameData(parseFloat(latStr), parseFloat(lonStr), false, 'expand');
                         }
+
                     }
                 };
 
@@ -3352,36 +3378,8 @@
                     state.label.setIcon(icon);
                 }
 
-                // SAVE PROGRESS
-                // We need the ID. We don't have ID in 'state' object directly? 
-                // polygonState is Map<ID, State>. 
-                // 'state' is the value. We need 'key' or we add ID to state.
-                // Looking at init: ID is poly.id. 
-                // We need to add ID to state object to save it easily here.
-                // OR find key by value (slow).
-                // Let's assume we can get it or just pass it.
-                // updatePolygonVisuals is called with (state, lineMap).
-                // Let's just find the ID in the loop calling this: `relevantPolys.forEach(pid => ...)`
+                // Progress is tracked via visiblePolygonIds and persisted to Redis via saveLocationState()
 
-                // Wait, I can't modify the call signature easily without checking setupProgressHiding.
-                // Let's add ID to the state object in the init step first.
-                // BUT I already sent the init step replacement!
-                // FIX: I will depend on the NEXT tool call to add ID to state, then this one.
-                // Actually, I can use the `polyState` map iterator to find it? No.
-
-                // BETTER: Modify `setupProgressHiding` to pass the ID.
-                // Only `setupProgressHiding` calls this.
-                // Let's check `setupProgressHiding` implementation.
-                // It has `relevantPolys.forEach(pid => { const state = polyState.get(pid); ... })`
-                // So I have `pid` there!
-                // I should pass `pid` to `updatePolygonVisuals`.
-
-                // REFRESH: I will update `updatePolygonVisuals` signature to `(pid, state, lineMap)`.
-
-                // SAVE PROGRESS
-                if (state.id) {
-                    localStorage.setItem(`poly_${state.id}`, state.current);
-                }
 
                 // Check Completion
                 if (state.current >= state.total) {
@@ -3733,69 +3731,49 @@
             // Initial Auto-Start
             // isGpsActive = false; // REMOVED
 
-            // CRITICAL: Check server session ID to detect restarts - logic simplified for Cloud/Redis
+            // CRITICAL: Initialize game - check Redis for saved state first, otherwise generate fresh
             const initializeGame = async () => {
-                let initialLat = DEFAULT_LAT;
-                let initialLon = DEFAULT_LON;
-                let restoredFromLocalStorage = false; // Kept flag for compatibility, always false now
+                console.log(`DEBUG: === INITIALIZING GAME ===`);
 
                 try {
-                    console.log(`DEBUG: === INITIAL PAGE LOAD - Redis Migration Mode ===`);
+                    // STEP 1: Check for saved global state in Redis
+                    const savedState = await loadGlobalState();
 
-                    // STEP 2: Check server (Redis) for last saved location logic
-                    // We assume user is at default unless server says otherwise (fetched via loadLocationState later)
-                    // BUT: We need to know WHICH location key to load? 
-                    // Since we removed local storage, we depend on the user starting fresh relative to URL params 
-                    // or we could ask server "where was I last?" - adding that feature would be better 
-                    // but for now we follow the existing flow: Start at Default -> Load Data for Default.
+                    if (savedState) {
+                        console.log(`DEBUG: ✅ Found saved global state - restoring without regeneration`);
 
-                    // Note: If you want Start-Where-Left-Off without LocalStorage, the server needs an API like
-                    // GET /api/user_last_position. 
-                    // Current implementation: Stored 'user_position' in state. 
-                    // Problem: We need the location KEY to fetch the state. 
-                    // Solution: We will rely on the default lat/lon OR url params initially. 
+                        // Show loading indicator
+                        loadingGif.style.display = 'block';
+                        loadingGif.style.opacity = '1';
+                        mapElement.style.opacity = '0.3';
+                        hasRevealed = false;
 
-                    console.log(`DEBUG: Starting at default/url location (Server-side last pos not yet implemented)`);
+                        // Render from saved state
+                        await renderFromSavedState(savedState);
 
-                    // (Old session storage check removed - Redis is single source of truth)
-                    const serverStateResponse = await fetch(`/api/location_state?location_key=${defaultKey}`);
-                    const serverStateData = await serverStateResponse.json();
+                        // Reveal map
+                        revealMap();
 
-                    if (serverStateData.visible_polygon_ids && serverStateData.visible_polygon_ids.length > 0) {
-                        console.log(`DEBUG: ✓ Server has saved state for ${defaultKey}: ${serverStateData.visible_polygon_ids.length} polygons, ${serverStateData.collected_circles.length} circles`);
-                        // Server has data for this location, use it
-
-                        // PARSE USER POSITION FROM SERVER STATE
-                        // This allows exact restoration of the last snapped position
-                        if (serverStateData.user_position && serverStateData.user_position.lat !== undefined) {
-                            console.log(`DEBUG: ✓ Found saved USER POSITION in server state: ${serverStateData.user_position.lat}, ${serverStateData.user_position.lon}`);
-                            initialLat = serverStateData.user_position.lat;
-                            initialLon = serverStateData.user_position.lon;
-                            currentUserPosition = serverStateData.user_position;
-                            userMarker.setLatLng([initialLat, initialLon]);
-                            restoredFromLocalStorage = true; // Use this flag to trigger map centering below
-                        } else {
-                            console.log(`DEBUG: No specific user_position in state, using default/key center.`);
-                        }
-                    } else {
-                        console.log(`DEBUG: No saved state found on server either, will use default location: ${DEFAULT_LAT}, ${DEFAULT_LON}`);
+                        console.log(`DEBUG: ✅ Game restored from Redis - ${savedState.polygons.length} polygons, marker at ${currentCircleUid || 'position'}`);
+                        return;
                     }
+
+                    // STEP 2: No saved state - generate fresh (first time or after server restart)
+                    console.log(`DEBUG: No saved state found - generating fresh map`);
+
+                    let initialLat = DEFAULT_LAT;
+                    let initialLon = DEFAULT_LON;
+
+                    console.log(`DEBUG: Starting at default location: ${initialLat}, ${initialLon}`);
+
+                    // Generate new game data
+                    await loadGameData(initialLat, initialLon);
+
                 } catch (e) {
-                    console.warn(`DEBUG: Failed to check server for saved state:`, e);
+                    console.error(`DEBUG: Error during game initialization:`, e);
+                    // Fallback: try to generate fresh
+                    await loadGameData(DEFAULT_LAT, DEFAULT_LON);
                 }
-
-                console.log(`DEBUG: Loading game with coordinates: ${initialLat}, ${initialLon} (restored: ${restoredFromLocalStorage})`);
-
-                // If we restored from server state (flag is reused), update user marker position and center map
-                if (restoredFromLocalStorage) {
-                    console.log(`DEBUG: Centering map on restored location: ${initialLat}, ${initialLon}`);
-                    userMarker.setLatLng([initialLat, initialLon]);
-                    controls.resetView(initialLat, initialLon);
-                    updateAndSaveUserPosition(userMarker, initialLat, initialLon, false); // Initialize global pos variable
-                }
-
-                loadGameData(initialLat, initialLon);
-                // User position will be restored in renderGameElements during initial snap check
             };
 
             // Start game initialization

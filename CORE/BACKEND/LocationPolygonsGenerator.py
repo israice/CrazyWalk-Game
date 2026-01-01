@@ -484,10 +484,29 @@ class LocationPolygonsGenerator:
         """
         logger.info(f">>> generate_map CALLED: lat={lat}, lon={lon}, force_rebuild={force_rebuild}, mode={mode}, restored_ids={len(restored_polygon_ids) if restored_polygon_ids else 0}")
 
+        # --- CACHE CHECK (only for initial mode, not expand) ---
+        # Round coordinates to create consistent cache key (~111m precision)
+        cache_lat = round(lat, 3)
+        cache_lon = round(lon, 3)
+        cache_key = f"map_cache:{cache_lat}_{cache_lon}"
+        
+        if mode == 'initial' and not force_rebuild:
+            cached_data = load_from_redis(cache_key)
+            if cached_data:
+                logger.info(f"✅ CACHE HIT: Returning cached map data for {cache_key}")
+                return cached_data
+            else:
+                logger.info(f"❌ CACHE MISS: No cached data for {cache_key}, generating...")
+        elif mode == 'expand':
+            logger.info(f"EXPAND MODE: Skipping cache check, generating new polygons...")
+        elif force_rebuild:
+            logger.info(f"FORCE REBUILD: Skipping cache, regenerating map...")
+
         # Region sizes: ~166m, ~555m, ~1110m
         # NOTE: We use normal region size even when restoring. Polygons outside the region
         # won't be restored, but user can re-expand them. Large regions are too slow.
         REGION_SIZES = [0.0015, 0.005, 0.01]
+
         
         for attempt, size in enumerate(REGION_SIZES, 1):
             meters = int(size * 111000)
@@ -1247,7 +1266,7 @@ class LocationPolygonsGenerator:
                     blue_circles = filtered_blue_circles
                     green_circles = filtered_green_circles
 
-            return {
+            result_data = {
                 "red_lines": [],
                 "blue_circles": blue_circles,
                 "white_lines": white_lines,
@@ -1256,6 +1275,14 @@ class LocationPolygonsGenerator:
                 "groups": groups,
                 "poster_grid": poster_grid
             }
+            
+            # --- SAVE TO CACHE (only for initial mode) ---
+            if mode == 'initial':
+                save_to_redis(cache_key, result_data, expiration=86400)  # 24 hours TTL
+                logger.info(f"💾 CACHE SAVED: Stored map data in {cache_key}")
+            
+            return result_data
+
         
         # Should not reach here, but safety fallback
         return {"error": "UNKNOWN", "message": "Generation failed unexpectedly"}

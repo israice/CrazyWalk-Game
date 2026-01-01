@@ -28,6 +28,7 @@ KEY_GREEN_CIRCLES = "game:green_circles"
 KEY_POLYGONS = "game:polygons"
 KEY_GROUPS = "game:groups"
 KEY_META = "game:meta"
+KEY_GAME_STATE = "game:session:state"  # Global session state (all geometry + progress)
 
 def save_to_redis(key, data, expiration=3600):
     """

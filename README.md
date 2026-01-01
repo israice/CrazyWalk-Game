@@ -201,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard 10e4fb1
+  git reset --hard 281f966
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -325,7 +325,9 @@
     - added promo gif inside polygons 
     - fixed gif randomizer only on start not after expend
   - [x] v0.0.29 - fixed large white circle, now it is the circle in the middle of polygon
-  - [x] v0.0.30 - fixed as redis only 
+  - [x] v0.0.30 - fixed as redis only
+    - debug mode fixed 
+  - [x] v0.0.31 - added save history to redis
 
 
   - ### Next Tasks
@@ -346,7 +348,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.30 - fixed as redis only"
+  git commit -m "v0.0.31 - added save history to redis"
   git push
   ```
 

@@ -3,20 +3,21 @@
 
 <head>
     <script>
-        // CLEANUP: Force clear all local domain data on entry
+        // CLEANUP: Clear session data on entry (game state is stored in Redis server-side)
+        // sessionStorage is only used for passing GPS coords between pages
         try {
-            localStorage.clear();
             sessionStorage.clear();
             if ('caches' in window) {
                 caches.keys().then(names => {
                     for (let name of names) caches.delete(name);
                 });
             }
-            console.log("Domain storage cleared.");
+            console.log("Session storage cleared.");
         } catch (e) {
             console.warn("Storage cleanup failed:", e);
         }
     </script>
+
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
