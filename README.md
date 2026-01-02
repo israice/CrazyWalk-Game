@@ -201,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard 281f966
+  git reset --hard 60c644e
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -331,6 +331,7 @@
     - fixed speed of polygon generation and added keyboard enter as GUEST
     - added entry sound
   - [x] v0.0.32 - fixed restore point of user marker
+    - fixed restore point of user marker on green circle 
 
 
   - ### Next Tasks
@@ -351,7 +352,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.32 - fixed restore point of user marker"
+  git commit -m "v0.0.32 - fixed restore point of user marker on green circle"
   git push
   ```
 
