@@ -534,6 +534,12 @@
                 // Restore user position
                 if (state.user_position) {
                     currentUserPosition = state.user_position;
+
+                    // FIX: Move marker IMMEDIATELY to saved position BEFORE rendering
+                    // This prevents any logic inside renderGameElements from seeing DEFAULT position
+                    console.log(`GLOBAL_STATE: Pre-positioning marker at saved position: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
+                    userMarker.setLatLng([currentUserPosition.lat, currentUserPosition.lon]);
+                    map.setView([currentUserPosition.lat, currentUserPosition.lon], 18);
                 }
 
                 // Restore circle UID
@@ -569,25 +575,21 @@
 
                 console.log(`GLOBAL_STATE: Restoring ${gameData.polygons.length} polygons, ${collectedCircles.size} collected circles`);
 
-                // Render everything
+                // Render everything - marker is already at correct position from above
                 await renderGameElements(gameData, 'restore');
 
-                // Move marker to saved circle position
+                // Refine position to exact circle center if UID is available
                 if (currentCircleUid && window.allItems) {
                     const circleData = window.allItems.get(currentCircleUid);
                     if (circleData && circleData.lat !== undefined && circleData.lon !== undefined) {
-                        console.log(`GLOBAL_STATE: Moving marker to saved circle ${currentCircleUid}`);
+                        console.log(`GLOBAL_STATE: Refining marker to saved circle center ${currentCircleUid}`);
                         updateAndSaveUserPosition(userMarker, circleData.lat, circleData.lon);
                         map.setView([circleData.lat, circleData.lon], 18);
-                    } else if (currentUserPosition) {
-                        console.log(`GLOBAL_STATE: Circle not found, using saved position`);
-                        updateAndSaveUserPosition(userMarker, currentUserPosition.lat, currentUserPosition.lon);
-                        map.setView([currentUserPosition.lat, currentUserPosition.lon], 18);
+                    } else {
+                        console.log(`GLOBAL_STATE: Circle ${currentCircleUid} not found in items, keeping position at ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
                     }
                 } else if (currentUserPosition) {
-                    console.log(`GLOBAL_STATE: No circle UID, using saved position`);
-                    updateAndSaveUserPosition(userMarker, currentUserPosition.lat, currentUserPosition.lon);
-                    map.setView([currentUserPosition.lat, currentUserPosition.lon], 18);
+                    console.log(`GLOBAL_STATE: No circle UID saved, marker remains at position ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
                 }
 
                 return true;
@@ -3270,6 +3272,7 @@
                 // ALWAYS snap to nearest active circle on initial load (force centering)
                 // This ensures the "collection" logic triggers correctly
                 if (mode === 'initial') {
+                    console.log(`DEBUG: Mode is 'initial' - SNAP logic will execute`);
                     const currentPos = userMarker.getLatLng();
                     const initialSnap = window.findNearestActiveCircle(currentPos.lat, currentPos.lng);
                     if (initialSnap) {
@@ -3278,6 +3281,11 @@
                         userMarker.setLatLng([initialSnap.lat, initialSnap.lon]);
                         updateAndSaveUserPosition(userMarker, initialSnap.lat, initialSnap.lon, (isGpsActive && window.loadedQuality !== 'NONE'));
                     }
+                } else if (mode === 'restore') {
+                    // Debug logging to confirm SNAP is skipped during restoration
+                    console.log(`DEBUG: Mode is 'restore' - SNAP logic SKIPPED (marker should be at saved position)`);
+                    const currentPos = userMarker.getLatLng();
+                    console.log(`DEBUG: Current marker position after restore: ${currentPos.lat}, ${currentPos.lng}`);
                 }
 
                 controls.updateGraph(localGreenCircles, localBlueCircles, localWhiteLines);

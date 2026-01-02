@@ -328,6 +328,9 @@
   - [x] v0.0.30 - fixed as redis only
     - debug mode fixed 
   - [x] v0.0.31 - added save history to redis
+    - fixed speed of polygon generation and added keyboard enter as GUEST
+    - added entry sound
+  - [x] v0.0.32 - fixed restore point of user marker
 
 
   - ### Next Tasks
@@ -348,7 +351,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.31 - added save history to redis"
+  git commit -m "v0.0.32 - fixed restore point of user marker"
   git push
   ```
 
