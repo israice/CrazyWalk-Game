@@ -949,6 +949,14 @@
                 requestGPSLocation();
             });
 
+            // Listen for Enter key to trigger GUEST button
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    console.log("DEBUG: Enter key pressed. Triggering GUEST button click.");
+                    document.querySelector('.btn-guest').click();
+                }
+            });
+
             // LOGIN Button (placeholder)
             document.querySelector('.btn-login').addEventListener('click', () => {
                 console.log("DEBUG: LOGIN button clicked.");

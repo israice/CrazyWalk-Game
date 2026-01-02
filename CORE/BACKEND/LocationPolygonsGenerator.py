@@ -3,6 +3,7 @@ import logging
 import os
 import math
 import time
+import concurrent.futures
 import requests
 import networkx as nx
 from shapely.geometry import Polygon, LineString
@@ -243,10 +244,15 @@ class LocationPolygonsGenerator:
 
             center_point = (center[1], center[0])  # Swap to (lon, lat) for Shapely
 
-            # Sample 16 directions around the center (every 22.5 degrees)
-            num_samples = 16
+            # Sample 8 directions around the center (every 45 degrees) - Optimized from 16
+            num_samples = 8
             max_distance = 0
             best_angle = 0
+            
+            # Pre-calculate boundary once
+            boundary = poly.boundary
+            from shapely.geometry import Point # Ensure Point is available if not global, though it usually is. 
+            # (LineString is imported globally)
 
             for i in range(num_samples):
                 angle = (i * 2 * math.pi) / num_samples
@@ -260,11 +266,10 @@ class LocationPolygonsGenerator:
                 )
 
                 # Create line from center to far point
-                from shapely.geometry import LineString, Point
+                # Reuse global LineString
                 ray = LineString([center_point, far_point])
 
                 # Find intersection with polygon boundary
-                boundary = poly.boundary
                 intersection = ray.intersection(boundary)
 
                 # Calculate distance from center to intersection
@@ -746,7 +751,9 @@ class LocationPolygonsGenerator:
                 
                 # Check for saturation: connections (roads) == connected polygons (loops)
                 # If equal, it means every road connected to this intersection is part of a polygon value.
-                if bc['connections'] == bc['connected_polygons_count'] and bc['connections'] > 0:
+                # UPDATED: Use active_connections (White Lines) instead of raw connections (OSM).
+                # This ensures we only count roads that actually exist in the game graph.
+                if bc.get('active_connections', 0) == bc.get('connected_polygons_count', 0) and bc.get('active_connections', 0) > 0:
                      bc['is_saturated'] = True
                 else:
                      bc['is_saturated'] = False
@@ -1327,19 +1334,39 @@ class LocationPolygonsGenerator:
         ]
         
         data = None
-        for attempt in range(len(servers) * 2):
-            url = servers[attempt % len(servers)]
+        
+        # Parallel Fetching: Race the servers!
+        def fetch_from_server(url):
             try:
-                # logger.info(f"Requesting from {url}...")
-                resp = requests.post(url, data=query, headers=headers, timeout=30)
+                # logger.info(f"Starting request to {url}...")
+                resp = requests.post(url, data=query, headers=headers, timeout=15)
                 resp.raise_for_status()
-                data = resp.json()
-                break
-            except Exception:
-                time.sleep(1)
+                return resp.json(), url
+            except Exception as e:
+                # logger.warning(f"Request to {url} failed: {e}")
+                raise e
+
+        logger.info(f"Racing {len(servers)} Overpass servers simultaneously...")
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(servers)) as executor:
+            future_to_url = {executor.submit(fetch_from_server, url): url for url in servers}
+            
+            for future in concurrent.futures.as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    data, successful_url = future.result()
+                    logger.info(f"🏆 WINNER: {successful_url} returned data first!")
+                    
+                    # Cancel other futures (best effort)
+                    for f in future_to_url:
+                        if f != future:
+                            f.cancel()
+                    break # Stop waiting
+                except Exception as e:
+                    logger.warning(f"❌ Server {url} failed or timed out: {e}")
         
         if not data:
-            logger.error("LocationPolygonsGenerator: Overpass failed.")
+            logger.error("LocationPolygonsGenerator: All Overpass servers failed.")
             return [], []
 
         # Process
