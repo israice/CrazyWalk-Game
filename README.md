@@ -332,6 +332,7 @@
     - added entry sound
   - [x] v0.0.32 - fixed restore point of user marker
     - fixed restore point of user marker on green circle 
+    - added white line to comleted polygons
 
 
   - ### Next Tasks
@@ -352,7 +353,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.32 - fixed restore point of user marker on green circle"
+  git commit -m "v0.0.32 - added white line to comleted polygons"
   git push
   ```
 
