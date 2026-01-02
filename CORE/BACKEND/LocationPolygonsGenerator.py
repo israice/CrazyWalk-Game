@@ -1170,36 +1170,60 @@ class LocationPolygonsGenerator:
                         # ONLY show circles that are endpoints of visible white lines
                         if bc_key in visible_blue_coords:
                             # If circle is at endpoint of visible line, ALWAYS show it
-                            # Recalculate is_saturated: orange ONLY if connections == visible polygon count
-                            total_connections = bc.get('connections', 0)
-                            visible_polygon_count = len([pid for pid in bc.get('connected_polygon_ids', []) if pid in filtered_polygon_ids])
+                            # Recalculate is_saturated: orange ONLY if active_connections == visible polygon count
+                            # UPDATED: Use active_connections (White Lines) instead of raw connections (OSM).
+                            active_connections = bc.get('active_connections', 0)
+                            
+                            # Baseline totals
+                            total_osm_connections = bc.get('connections', 0) # Raw OSM roads (Potential)
+                            total_real_polygons = len(bc.get('connected_polygon_ids', [])) # Game Polygons (Actual)
+                            
+                            # Calculate VISIBLE counts based on filters
+                            
+                            # Calculate VISIBLE counts based on filters
+                            # We only care about polygons that are actually going to be rendered (in visible_polygon_ids)
+                            # to avoid counting "ghost" or "filtered" polygons that exist in the raw graph but not in the game.
+                            connected_pids = bc.get('connected_polygon_ids', [])
+                            visible_connected_pids = [pid for pid in connected_pids if pid in filtered_polygon_ids]
+                            
+                            # CRITICAL FIX: Update the circle's list to ONLY contain visible polygons.
+                            # This ensures the Frontend (which counts this list) matches the Backend stats.
+                            bc['connected_polygon_ids'] = visible_connected_pids
+                            visible_polygon_count = len(visible_connected_pids)
+                            
+                            # Calculate VISIBLE LINES based on filter
+                            # We need to know which lines connected to this circle are currently visible
+                            visible_lines_count = len([lid for lid in bc.get('connected_white_lines', []) if lid in visible_line_ids])
 
                             # Update connected_polygons_count to reflect only VISIBLE polygons
                             bc['connected_polygons_count'] = visible_polygon_count
                             
-                            # --- RECALCULATE STATS FOR INITIAL FILTER MODE ---
+                            # --- RECALCULATE STATS FOR INITIAL FILTER MODE (PRECISE) ---
                             # Only update if stats were previously calculated
                             if 'stats_connected_polygons' in bc:
                                 bc['stats_connected_polygons'] = visible_polygon_count
-                                # Re-derive line stats
-                                bc['stats_connected_lines'] = visible_polygon_count * 2
-                                if bc['stats_connected_lines'] > total_connections:
-                                    bc['stats_connected_lines'] = total_connections
-                                    
-                                bc['stats_not_connected_lines'] = total_connections - bc['stats_connected_lines']
+                                bc['stats_connected_lines'] = visible_lines_count
+                                
+                                # Not Connected Lines = OSM Roads - Visible White Lines
+                                bc['stats_not_connected_lines'] = total_osm_connections - visible_lines_count
                                 if bc['stats_not_connected_lines'] < 0: bc['stats_not_connected_lines'] = 0
                                 
-                                # Re-derive missing sectors
-                                bc['stats_not_connected_polygons'] = total_connections - visible_polygon_count
+                                # Precise Polygon Stats
+                                # LOGIC: Missing Sectors = Total Lines - Filled Sectors (Polygons)
+                                # Assumption: 1 Line corresponds to 1 Sector in a planar graph node.
+                                
+                                bc['stats_not_connected_polygons'] = total_osm_connections - visible_polygon_count
                                 if bc['stats_not_connected_polygons'] < 0: bc['stats_not_connected_polygons'] = 0
 
                             # Circle is saturated (orange) ONLY if ALL its lines belong to visible polygons
-                            # If connections != visible_polygon_count, it has lines to hidden polygons (blue - expansion point)
-                            bc['is_saturated'] = (total_connections == visible_polygon_count)
+                            # AND it has at least one connection.
+                            # UPDATED: Reverted to Strict check of Polygons.
+                            # We must have 0 Missing Polygons AND 0 Missing Lines to be Orange.
+                            bc['is_saturated'] = (bc.get('stats_not_connected_polygons', 0) == 0) and (bc.get('stats_not_connected_lines', 0) == 0) and (bc.get('stats_connected_lines', 0) > 0)
 
                             # Debug logging for first few circles
                             if len(filtered_blue_circles) < 3:
-                                logger.info(f"Circle {bc['id']}: connections={total_connections}, visible_polys={visible_polygon_count}, is_saturated={bc['is_saturated']}")
+                                logger.info(f"Circle {bc['id']}: connections={active_connections}, visible_polys={visible_polygon_count}, is_saturated={bc['is_saturated']}")
 
                             filtered_blue_circles.append(bc)
 

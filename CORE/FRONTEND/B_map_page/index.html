@@ -704,6 +704,11 @@
                 if (hasRevealed) return;
                 hasRevealed = true;
                 console.log("DEBUG: Revealing Map...");
+
+                // Play Entry Sound
+                const entrySound = new Audio('/B_map_page/components/entry_sound.m4a');
+                entrySound.play().catch(e => console.warn("DEBUG: Audio play failed:", e));
+
                 map.invalidateSize();
                 loadingGif.style.opacity = '0';
                 mapElement.style.opacity = '1';
@@ -2232,7 +2237,7 @@
                             const connectedPolyIds = data.connected_polygon_ids ? data.connected_polygon_ids.join(', ') : 'None';
 
                             const notConnVal = data.stats_not_connected_polygons !== undefined ? data.stats_not_connected_polygons : (2 - connectedPolyCount);
-                            const notConnHtml = notConnVal > 0 ? `Not Connected Polygons: <b>${notConnVal}</b><br>` : '';
+                            const notConnHtml = notConnVal !== undefined ? `Not Connected Polygons: <b>${notConnVal}</b><br>` : '';
 
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#fff7e6; border-radius:4px; border:1px solid #ffd591;">
@@ -2257,7 +2262,7 @@
                             // Check if detailed stats are available (server-side calc)
                             if (data.stats_connected_lines !== undefined) {
                                 const notConnPolys = data.stats_not_connected_polygons;
-                                const notConnPolysHtml = notConnPolys > 0 ? `Not Connected Polygons: <b>${notConnPolys}</b>` : '';
+                                const notConnPolysHtml = notConnPolys !== undefined ? `Not Connected Polygons: <b>${notConnPolys}</b><br>` : '';
 
                                 statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6f7ff; border-radius:4px; border:1px solid #91d5ff;">
@@ -2287,7 +2292,7 @@
                             const lineId = data.line_id || '?';
 
                             const notConnVal = data.stats_not_connected_polygons !== undefined ? data.stats_not_connected_polygons : (2 - connectedCount);
-                            const notConnHtml = notConnVal > 0 ? `Not Connected Polygons: <b>${notConnVal}</b>` : '';
+                            const notConnHtml = notConnVal !== undefined ? `Not Connected Polygons: <b>${notConnVal}</b>` : '';
 
                             statsHtml = `
                                 <div style="margin-bottom:8px; padding:4px; background:#e6ffe6; border-radius:4px; border:1px solid #91ff91;">
@@ -2744,6 +2749,39 @@
                                         (circle.connected_polygon_ids || []).forEach(pid => existingIds.add(pid));
                                         item.connected_polygon_ids = Array.from(existingIds);
                                         item.connected_polygons_count = item.connected_polygon_ids.length;
+
+                                        // UPDATE STATS: Start by overwriting with new stats from backend
+                                        // The backend sends fresh stats for this node in the expansion response.
+                                        item.stats_connected_lines = circle.stats_connected_lines;
+                                        item.stats_not_connected_lines = circle.stats_not_connected_lines;
+                                        item.active_connections = circle.active_connections; // Ensure this is updated too
+                                        item.is_saturated = circle.is_saturated; // Crucial for visuals
+
+                                        // RECALCULATE Polygon Stats based on Merged Data (Global View)
+                                        // Backend only sees local polygons in the expansion region.
+                                        // Frontend has the full history.
+                                        item.stats_connected_polygons = item.connected_polygon_ids.length;
+
+                                        // Precise Logic: Missing = Connected Lines (Total/Expected) - Found Polygons
+                                        // This allows mismatch (e.g. Lines=3, Found=2, Missing=1)
+                                        const expectedPolygons = item.stats_connected_lines;
+                                        item.stats_not_connected_polygons = Math.max(0, expectedPolygons - item.stats_connected_polygons);
+
+                                        // Update visual marker state if needed (e.g. saturation color)
+                                        // Strict Saturation: Must have 0 Missing Polygons AND 0 Missing Lines.
+                                        const isNowSaturated = (item.stats_not_connected_polygons === 0) && (item.stats_not_connected_lines === 0) && (item.stats_connected_lines > 0);
+                                        item.is_saturated = isNowSaturated;
+
+                                        const existingMarker = circleLayerMap.get(key);
+                                        if (existingMarker) {
+                                            existingMarker.isSaturated = isNowSaturated;
+                                            if (isNowSaturated) {
+                                                existingMarker.setStyle({ color: '#ff7b00', fillColor: '#ffa600' });
+                                            } else {
+                                                // REVERT TO BLUE if no longer saturated!
+                                                existingMarker.setStyle({ color: 'blue', fillColor: '#00ccff' });
+                                            }
+                                        }
                                         break;
                                     }
                                 }
@@ -2808,6 +2846,192 @@
                         // Track for polygon debug highlighting
                         const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
                         blueCircleLayerMap.set(coordKey, marker);
+                    });
+                }
+
+                // --- NEIGHBOR PROPAGATION: Update relevant Blue Circles even if not in response ---
+                // Expansion sends New Polygons and their "Focus" Blue Circles. All neighboring Blue Circles sharing a White Line
+                // with the new Polygon must also be updated to know about the new Polygon.
+                if (localPolys && localPolys.length > 0) {
+                    localPolys.forEach(poly => {
+                        const polyId = poly.id;
+                        (poly.boundary_white_lines || []).forEach(lineId => {
+                            // Find the white line to get its endpoints
+                            // We don't have a direct map of Line ID -> Objects easily accessible in scope unless we search.
+                            // But we can search localWhiteLines first, then global active lines?
+                            // Optimization: Iterate window.allItems to find lines? No, too slow.
+
+                            // Better: In backend, 'white_lines' response includes ALL lines of the new polygons?
+                            // Yes, 'expand' usually sends the white lines of the new polygons.
+                            // Let's assume the line is in 'localWhiteLines'.
+
+                            let whiteLine = null;
+                            if (localWhiteLines) whiteLine = localWhiteLines.find(l => l.id === lineId);
+
+                            // Optimization: Check global items directly by ID (Keys are UIDs)
+                            if (!whiteLine && window.allItems) {
+                                whiteLine = window.allItems.get(lineId);
+                            }
+
+                            if (whiteLine && whiteLine.endpoint_blue_circles) {
+                                whiteLine.endpoint_blue_circles.forEach(bcUid => {
+                                    // Find this Blue Circle in global items to update it
+                                    if (window.allItems && window.allItems.has(bcUid)) {
+                                        const bcItem = window.allItems.get(bcUid);
+
+                                        // Update Connected Polygons
+                                        const existingIds = new Set(bcItem.connected_polygon_ids || []);
+                                        existingIds.add(polyId);
+                                        bcItem.connected_polygon_ids = Array.from(existingIds);
+                                        bcItem.connected_polygons_count = bcItem.connected_polygon_ids.length;
+
+                                        // RECALCULATE Stats (Local Calculation)
+                                        // 1. Recalculate Connected Lines (Visible)
+                                        // We must ensure the 'Total Lines' count increases if a new line became visible.
+                                        if (bcItem.connected_white_lines) {
+                                            let visibleLinesCount = 0;
+                                            bcItem.connected_white_lines.forEach(lid => {
+                                                // Check if line is visible (in global items or local new items)
+                                                let isVisible = false;
+                                                if (window.allItems && window.allItems.has(lid)) isVisible = true;
+                                                if (!isVisible && localWhiteLines) {
+                                                    if (localWhiteLines.find(l => l.id === lid)) isVisible = true;
+                                                }
+                                                if (isVisible) visibleLinesCount++;
+                                            });
+                                            bcItem.stats_connected_lines = visibleLinesCount;
+                                        }
+
+                                        // 2. Recalculate Connected Polygons (Visible)
+                                        // Precise Logic: Missing = Connected Lines - Found Polygons
+                                        bcItem.stats_connected_polygons = bcItem.connected_polygon_ids.length;
+
+                                        const expectedPolygons = bcItem.stats_connected_lines || bcItem.connections || 0;
+                                        bcItem.stats_not_connected_polygons = Math.max(0, expectedPolygons - bcItem.stats_connected_polygons);
+
+                                        // Update Saturation
+                                        // Strict Saturation: Must have 0 Missing Polygons AND 0 Missing Lines.
+                                        const isNowSaturated = (bcItem.stats_not_connected_polygons === 0) && (bcItem.stats_not_connected_lines === 0) && (bcItem.stats_connected_lines > 0);
+                                        bcItem.is_saturated = isNowSaturated;
+
+                                        // Update Visuals
+                                        const key = `${bcItem.lat.toFixed(6)},${bcItem.lon.toFixed(6)}`;
+                                        const marker = circleLayerMap.get(key);
+                                        if (marker) {
+                                            marker.isSaturated = isNowSaturated;
+                                            if (isNowSaturated) {
+                                                marker.setStyle({ color: '#ff7b00', fillColor: '#ffa600' });
+                                            } else {
+                                                // REVERT TO BLUE if no longer saturated!
+                                                marker.setStyle({ color: 'blue', fillColor: '#00ccff' });
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    });
+                }
+
+
+
+                // --- FINAL SAFETY CHECK: Verification of ALL Blue Circles ---
+                // "Is there another method to check?" -> Yes, checking EVERYTHING.
+                // RECONSTRUCTION MODE: We don't just validate, we REBUILD the Blue Circle data from the White Lines.
+                // This ensures that the Blue Circle's view of the world matches the Graph's reality.
+                if (mode === 'expand' && window.allItems) {
+
+                    // 1. Prepare: Clear/Init stats for reconstruction?
+                    // Actually, safer to just Accumulate correct data, then Deduplicate.
+                    // We need to map [WhiteLine -> Polygons] and [WhiteLine -> BlueCircles]
+
+                    // Let's iterate ALL White Lines (Global + Local if merged)
+                    const relevantBlueCircles = new Set();
+
+                    window.allItems.forEach(item => {
+                        // Identify White Lines
+                        if (item.id && item.id.startsWith('WHITE_LINE_')) {
+                            // Valid White Line.
+                            const lineUid = item.id;
+                            const linePolys = item.connected_polygon_ids || [];
+
+                            // Propagate to Blue Circle Endpoints
+                            if (item.endpoint_blue_circles) {
+                                item.endpoint_blue_circles.forEach(bcUid => {
+                                    if (window.allItems.has(bcUid)) {
+                                        const bcItem = window.allItems.get(bcUid);
+                                        relevantBlueCircles.add(bcItem);
+
+                                        // A. Ensure this White Line UID is in the Blue Circle's list
+                                        // (Handling the Raw ID mismatch issue automatically by pushing UID)
+                                        if (!bcItem.connected_white_lines_uids) bcItem.connected_white_lines_uids = new Set();
+                                        bcItem.connected_white_lines_uids.add(lineUid);
+
+                                        // B. Ensure all Polygons of this Line are in the Blue Circle's list
+                                        if (!bcItem.connected_polygon_ids_set) bcItem.connected_polygon_ids_set = new Set(bcItem.connected_polygon_ids || []);
+                                        linePolys.forEach(pid => {
+                                            if (window.allItems.has(pid)) { // Only add if Polygon actually exists
+                                                bcItem.connected_polygon_ids_set.add(pid);
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    // 2. Finalize & Recalculate for all touched Blue Circles
+                    // (Or just all Blue Circles to be safe? Let's do all items that look like Blue Circles)
+                    window.allItems.forEach(item => {
+                        if (item.id && item.id.startsWith('BLUE_CIRCLE_')) {
+                            // Flush Sets to Lists if we used them, or validate existing if we didn't touch them
+                            if (item.connected_white_lines_uids) {
+                                // We have reconstructed UIDs! Use them for count.
+                                item.stats_connected_lines = item.connected_white_lines_uids.size;
+                                // Optional: sync back to array if needed for debugging
+                                // item.connected_white_lines = Array.from(item.connected_white_lines_uids); 
+                            } else {
+                                // Fallback: If we didn't find any white lines connecting to it via traversal,
+                                // maybe it's isolated or data is weird.
+                                // But we should verify validity of what it holds.
+                                if (item.connected_white_lines) {
+                                    let visibleCount = 0;
+                                    item.connected_white_lines.forEach(lid => {
+                                        if (window.allItems.has(lid)) visibleCount++;
+                                    });
+                                    item.stats_connected_lines = visibleCount;
+                                }
+                            }
+
+                            if (item.connected_polygon_ids_set) {
+                                item.connected_polygon_ids = Array.from(item.connected_polygon_ids_set);
+                            } else if (item.connected_polygon_ids) {
+                                // Filter ghosts
+                                item.connected_polygon_ids = item.connected_polygon_ids.filter(pid => window.allItems.has(pid));
+                            }
+                            item.stats_connected_polygons = item.connected_polygon_ids ? item.connected_polygon_ids.length : 0;
+
+                            // 3. Recalculate Stats & Saturation
+                            const expectedPolygons = item.stats_connected_lines || item.connections || 0;
+                            item.stats_not_connected_polygons = Math.max(0, expectedPolygons - item.stats_connected_polygons);
+                            item.stats_not_connected_lines = Math.max(0, (item.connections || 0) - (item.stats_connected_lines || 0));
+
+                            // Strict Saturation Check
+                            const isNowSaturated = (item.stats_not_connected_polygons === 0) && (item.stats_not_connected_lines === 0) && (item.stats_connected_lines > 0);
+                            item.is_saturated = isNowSaturated;
+
+                            // 4. Update Visuals
+                            const key = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
+                            const marker = circleLayerMap.get(key);
+                            if (marker) {
+                                marker.isSaturated = isNowSaturated;
+                                if (marker.isSaturated) {
+                                    marker.setStyle({ color: '#ff7b00', fillColor: '#ffa600' });
+                                } else {
+                                    marker.setStyle({ color: 'blue', fillColor: '#00ccff' });
+                                }
+                            }
+                        }
                     });
                 }
 
