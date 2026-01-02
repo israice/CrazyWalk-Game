@@ -232,26 +232,32 @@
             z-index: 100;
             display: flex;
             flex-direction: column;
-            padding: clamp(1vh, 3vh, 4vh) clamp(1.5vh, 2.5vh, 2.5vh) clamp(1vh, 2vh, 3vh);
+            /* Center everything vertically to reduce huge gaps */
+            justify-content: center;
+            /* Reduced horizontal padding to fit text better */
+            padding: clamp(1vh, 2vh, 3vh) clamp(1vh, 1.5vh, 2vh) clamp(1vh, 2vh, 3vh);
             pointer-events: auto;
             overflow: hidden;
             /* Prevent any overflow */
+            gap: clamp(1vh, 2vh, 3vh);
+            /* Use gap to control spacing instead of flex-grow */
         }
 
         /* 1. HEADER section */
         .header {
             text-align: center;
-            flex-shrink: 1;
-            /* Allow shrinking */
-            margin-bottom: clamp(0.3vh, 0.8vh, 1vh);
+            flex-shrink: 0;
+            margin-bottom: 0;
+            /* Let gap handle spacing */
         }
 
         .logo-img {
-            height: clamp(6vh, 10vh, 12vh);
+            height: clamp(6vh, 9vh, 10vh);
+            /* Slightly smaller */
             width: auto;
             filter: drop-shadow(0 0 5px rgba(0, 243, 255, 0.8));
             animation: pulse 3s infinite alternate;
-            margin-bottom: clamp(0.3vh, 0.6vh, 1vh);
+            margin-bottom: clamp(0.3vh, 0.5vh, 0.8vh);
         }
 
         @keyframes pulse {
@@ -262,7 +268,7 @@
         }
 
         h1 {
-            font-size: clamp(2vh, 2.8vh, 3.2vh);
+            font-size: clamp(2vh, 2.5vh, 3vh);
             font-weight: 800;
             margin: clamp(0.2vh, 0.4vh, 0.5vh) 0 0;
             line-height: 1;
@@ -282,17 +288,13 @@
             opacity: 0.9;
         }
 
-        /* 2. MIDDLE SECTION (Menu + Legal) - Flex Grow to take space */
+        /* 2. MIDDLE SECTION (Menu + Legal) - NO FLEX GROW to keep it compact */
         .middle-section {
-            flex-grow: 1;
-            flex-shrink: 1;
-            /* Allow shrinking */
-            min-height: 0;
-            /* Allow shrinking below content */
+            flex-grow: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            gap: clamp(0.5vh, 1vh, 1.5vh);
+            gap: clamp(1vh, 1.5vh, 2vh);
             width: 100%;
             overflow: hidden;
         }
@@ -300,14 +302,15 @@
         .menu-links {
             display: flex;
             flex-direction: column;
-            gap: clamp(0.5vh, 0.8vh, 1vh);
+            gap: clamp(0.8vh, 1vh, 1.2vh);
         }
 
         .menu-item {
             display: flex;
             align-items: center;
             gap: clamp(0.8vh, 1.2vh, 1.5vh);
-            padding: clamp(0.6vh, 1vh, 1.2vh) clamp(0.8vh, 1.2vh, 1.5vh);
+            /* Reduced padding to save width */
+            padding: clamp(0.8vh, 1vh, 1.2vh) clamp(0.8vh, 1.2vh, 1.5vh);
             border-radius: clamp(0.8vh, 1.2vh, 1.5vh);
             /* Liquid Glass styling */
             position: relative;
@@ -324,7 +327,9 @@
             transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
             cursor: pointer;
             overflow: hidden;
-            flex-shrink: 1;
+            flex-shrink: 0;
+            white-space: nowrap;
+            /* Prevent wrapping */
         }
 
         /* Liquid Glass shine on menu items */
@@ -415,7 +420,8 @@
         }
 
         .menu-item span {
-            font-size: clamp(1vh, 1.3vh, 1.5vh);
+            font-size: clamp(1vh, 1.2vh, 1.4vh);
+            /* Slightly reduced max size */
             font-weight: 500;
             letter-spacing: 0.5px;
         }
@@ -448,8 +454,9 @@
             justify-content: center;
             align-items: center;
             gap: clamp(1vh, 1.5vh, 2vh);
-            margin-bottom: clamp(0.3vh, 0.6vh, 1vh);
-            flex-shrink: 1;
+            margin-bottom: 0;
+            /* Let gap handle spacing */
+            flex-shrink: 0;
         }
 
         .legal-item {
@@ -482,16 +489,18 @@
 
         /* 3. BOTTOM ACTIONS */
         .action-buttons {
-            flex-shrink: 1;
+            flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            gap: clamp(0.4vh, 0.7vh, 1vh);
-            margin-top: clamp(0.2vh, 0.4vh, 0.5vh);
+            gap: clamp(0.8vh, 1vh, 1.2vh);
+            /* Standardized gap */
+            margin-top: 0;
+            /* Let gap handle spacing */
         }
 
         .btn {
             width: 100%;
-            padding: clamp(0.8vh, 1.2vh, 1.5vh);
+            padding: clamp(1vh, 1.2vh, 1.5vh);
             border-radius: clamp(0.8vh, 1.2vh, 1.5vh);
             font-size: clamp(1vh, 1.4vh, 1.6vh);
             font-weight: 700;
@@ -525,15 +534,16 @@
             width: 100%;
             text-align: center;
             color: rgba(255, 255, 255, 0.5);
-            font-size: clamp(1.5vh, 2.5vh, 3vh);
+            font-size: clamp(1.5vh, 2vh, 2.5vh);
             font-weight: 600;
             letter-spacing: 2px;
             pointer-events: none;
             opacity: 0;
             transition: opacity 1s;
             text-transform: uppercase;
-            margin-top: clamp(1vh, 3vh, 6vh);
-            flex-shrink: 1;
+            margin-top: clamp(0.5vh, 1vh, 2vh);
+            /* Reduced margin */
+            flex-shrink: 0;
         }
 
         img.iphone-frame {
@@ -573,20 +583,24 @@
                 transform: none;
                 padding: clamp(2vh, 3vh, 4vh) clamp(3vw, 5vw, 2.5vh) clamp(2vh, 2.5vh, 3vh);
                 border-radius: 0;
-                justify-content: space-between;
+                /* Inherit center alignment from base styles */
+                /* justify-content: space-between; <-- REMOVED to fix huge gaps */
             }
 
             .logo-img {
-                height: clamp(8vh, 12vh, 15vh);
+                height: clamp(6vh, 9vh, 12vh);
+                /* Reduced max height */
             }
 
             h1 {
-                font-size: clamp(3vh, 4vh, 5vh);
+                font-size: clamp(2.5vh, 3.5vh, 4vh);
+                /* Reduced slightly */
             }
 
             h2 {
-                font-size: clamp(1.5vh, 2vh, 2.5vh);
+                font-size: clamp(1.2vh, 1.8vh, 2.2vh);
             }
+
 
             .btn {
                 font-size: clamp(1.8vh, 2.5vh, 3vh);
@@ -594,7 +608,8 @@
             }
 
             .menu-item span {
-                font-size: clamp(1.5vh, 2vh, 2.5vh);
+                font-size: clamp(1.2vh, 1.6vh, 2vh);
+                /* Reduced to prevent wrapping */
             }
 
             .icon-circle {
@@ -609,7 +624,8 @@
 
             #city-label {
                 font-size: clamp(2vh, 3vh, 5vh);
-                margin-top: clamp(1vh, 2vh, 4vh);
+                margin-top: clamp(1vh, 1.5vh, 2vh);
+                /* Reduced significant gap */
             }
         }
 

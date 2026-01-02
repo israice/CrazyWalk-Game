@@ -55,7 +55,6 @@ class Initializer:
         # Verify directory exists
         if not os.path.isdir(DIRECTORY):
             logger.error(f"Directory not found: {DIRECTORY}")
-            logger.info("Current working directory: " + os.getcwd())
             sys.exit(1)
 
 # Initialize environment
@@ -75,10 +74,7 @@ if "A_home_page" in DIRECTORY:
     DIRECTORY = "CORE/FRONTEND"
 
 logger.info("Server starting.")
-logger.info(f"Current Working Directory: {os.getcwd()}")
-logger.info(f"Serving Directory: {DIRECTORY}")
 full_path = os.path.abspath(DIRECTORY)
-logger.info(f"Full Serving Path: {full_path}")
 if not os.path.exists(full_path):
     logger.error(f"CRITICAL: Serving directory does not exist: {full_path}")
 
@@ -130,7 +126,6 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_routing(self):
         """Shared routing for GET and HEAD."""
-        logger.info(f"INCOMING {self.command} REQUEST: {self.path}")
         
         if self.path.startswith('/api/session'):
             self.handle_get_session()
@@ -572,8 +567,11 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # Save complete state with 7-day TTL
+            t0 = time.perf_counter()
             r.set(KEY_GAME_STATE, json.dumps(state))
             r.expire(KEY_GAME_STATE, 60 * 60 * 24 * 7)  # 7 days
+            t1 = time.perf_counter()
+            logger.info(f"PERF: handle_save_game_state (Redis write) took {t1 - t0:.4f}s")
 
             logger.info(f"Saved global game state: {len(polygons)} polygons, "
                        f"{len(state.get('white_lines', []))} lines, "
@@ -790,8 +788,11 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
             importlib.reload(LocationPolygonsGenerator)
 
             # Generate Data
+            t0 = time.perf_counter()
             generator = LocationPolygonsGenerator.LocationPolygonsGenerator()
             data = generator.generate_map(lat, lon, force_rebuild=force_rebuild, mode=mode_param, restored_polygon_ids=restored_polygon_ids)
+            t1 = time.perf_counter()
+            logger.info(f"PERF: handle_game_data total took {t1 - t0:.4f}s")
             
             # Send Response
             self.send_response(200)

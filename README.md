@@ -333,6 +333,7 @@
   - [x] v0.0.32 - fixed restore point of user marker
     - fixed restore point of user marker on green circle 
     - added white line to comleted polygons
+    - fixed home page
 
 
   - ### Next Tasks
@@ -353,7 +354,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.32 - added white line to comleted polygons"
+  git commit -m "v0.0.32 - fixed home page"
   git push
   ```
 

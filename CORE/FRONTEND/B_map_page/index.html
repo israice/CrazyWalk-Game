@@ -756,9 +756,7 @@
                 hasRevealed = true;
                 console.log("DEBUG: Revealing Map...");
 
-                // Play Entry Sound
-                const entrySound = new Audio('/B_map_page/components/entry_sound.m4a');
-                entrySound.play().catch(e => console.warn("DEBUG: Audio play failed:", e));
+
 
                 map.invalidateSize();
                 loadingGif.style.opacity = '0';

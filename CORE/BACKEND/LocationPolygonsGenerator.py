@@ -286,10 +286,6 @@ class LocationPolygonsGenerator:
                             max_distance = min_dist
                             best_angle = angle
 
-            logger.info(f"_calculate_label_position: center=({center[0]:.6f}, {center[1]:.6f}), "
-                       f"max_distance={max_distance * 111000:.2f}m, "
-                       f"angle={math.degrees(best_angle):.1f}°")
-
             return {
                 'angle': best_angle,
                 'max_distance': max_distance
@@ -513,7 +509,10 @@ class LocationPolygonsGenerator:
         REGION_SIZES = [0.0015, 0.005, 0.01]
 
         
+        t_start = time.perf_counter()
+        
         for attempt, size in enumerate(REGION_SIZES, 1):
+            t0 = time.perf_counter()
             meters = int(size * 111000)
             logger.info("========================================")
             logger.info(f"GPS POLYGON ATTEMPT {attempt}/3: region_size={size} (~{meters}m)")
@@ -524,6 +523,8 @@ class LocationPolygonsGenerator:
             # reuse_existing=False usually means "fetch fresh from API".
             # But in expand mode, we want "fetch fresh API" + "merge with Redis".
             red_segments, red_visual = self._fetch_red_lines(lat, lon, size, reuse_existing=False, mode=mode)
+            t1 = time.perf_counter()
+            logger.info(f"PERF: Fetch Red Lines took {t1 - t0:.4f}s")
             
             if not red_visual and not red_segments:
                 logger.warning(f"ATTEMPT {attempt}/3: No roads found for region_size={size}")
@@ -538,20 +539,25 @@ class LocationPolygonsGenerator:
             
             # 2. Blue Circles (Intersections)
             blue_circles, adjacency, relevant_nodes = self._identify_intersections()
+            t2 = time.perf_counter()
+            logger.info(f"PERF: Identify Intersections took {t2 - t1:.4f}s")
             logger.info(f"ATTEMPT {attempt}/3: Identified {len(blue_circles)} intersections")
             
             # 3. White Lines + Green Circles
             white_lines, green_circles = self._create_graph_elements()
+            t3 = time.perf_counter()
+            logger.info(f"PERF: Create Graph Elements took {t3 - t2:.4f}s")
             logger.info(f"ATTEMPT {attempt}/3: Created {len(white_lines)} white lines, {len(green_circles)} green circles")
             
             # 4. Polygons
             polygons, used_white_line_ids = self._find_polygons()
+            t4 = time.perf_counter()
+            logger.info(f"PERF: Find Polygons took {t4 - t3:.4f}s")
             
             if not polygons:
                 logger.warning(f"ATTEMPT {attempt}/3: No polygons created from roads")
                 if attempt < len(REGION_SIZES):
                     logger.info("Retrying with larger region...")
-                    continue
                 else:
                     logger.error("FAILED: No polygons created after 3 attempts")
                     return {"error": "NO_POLYGONS", "message": f"No polygons created at ({lat}, {lon}) after 3 attempts"}
@@ -590,31 +596,15 @@ class LocationPolygonsGenerator:
             for poly in polygons:
                 # Count green circles on boundary white lines
                 green_total = 0
-                for line_id in poly.get('boundary_white_lines', []):
-                    green_total += line_green_counts.get(line_id, 0)
-                
-                # Count blue circles that are on this polygon's boundary
-                # NEW LOGIC: Use TOPOLOGY (white lines) not GEOMETRY (polygon vertices)
-                # This fixes issues where merged polygons (buffer) shift coords slightly off the blue circles.
-                
-                polygon_nodes = set()
-                for line_id in poly.get('boundary_white_lines', []):
-                     # Find the line object
-                     # We can't easily look up by ID in list unless we map it. 
-                     # Optimisation: Build map earlier or just loop? 
-                     # We built `line_green_counts` earlier, but that only has counts.
-                     # We need the START/END nodes of the lines.
-                     # Re-use white_lines list? It's filtered.
-                     pass
                 
                 # To do this efficiently, let's map ID -> (start, end) above.
-                
-                # ... (See below for map creation insertion) ...
                 
                 # ACTUAL REPLACEMENT BLOCK:
                 # Assuming `line_nodes_map` exists (we will add it above this loop)
                 polygon_nodes = set()
                 for line_id in poly.get('boundary_white_lines', []):
+                    green_total += line_green_counts.get(line_id, 0)
+                    
                     if line_id in line_nodes_map:
                         s, e = line_nodes_map[line_id]
                         polygon_nodes.add((round(s[0], 7), round(s[1], 7)))
@@ -626,9 +616,10 @@ class LocationPolygonsGenerator:
                 old_total = poly.get('total_points', 0)
                 new_total = green_total + blue_count
                 
-                if old_total != new_total:
-                    logger.info(f"Recalculated total_points for {poly['id']}: {old_total} -> {new_total} (greens={green_total}, blues={blue_count})")
-                    poly['total_points'] = new_total
+                # if old_total != new_total:
+                #    logger.info(f"Recalculated total_points for {poly['id']}: {old_total} -> {new_total} (greens={green_total}, blues={blue_count})")
+                
+                poly['total_points'] = new_total
             
             # 5. Groups
             groups = self._create_groups()
@@ -802,6 +793,10 @@ class LocationPolygonsGenerator:
                     gc['connected_polygon_ids'] = []
                     gc['stats_connected_polygons'] = 0
                     gc['stats_not_connected_polygons'] = 2 # Worst case (isolated line)
+            
+            t5 = time.perf_counter()
+            logger.info(f"PERF: Filtering & Calculations took {t5 - t4:.4f}s")
+
             # --- VALIDATE AND SANITIZE CONNECTIONS ---
             # Ensure no "ghost" polygons are referenced in connected_polygon_ids
             # This fixes the issue where White Lines claim to connect to polygons that were not returned/generated
