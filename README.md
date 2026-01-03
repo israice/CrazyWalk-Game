@@ -201,7 +201,7 @@
   ```
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard 60c644e
+  git reset --hard de8b98f
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force  
@@ -334,6 +334,7 @@
     - fixed restore point of user marker on green circle 
     - added white line to comleted polygons
     - fixed home page
+    - added sposorship prices to polygons
 
 
   - ### Next Tasks
@@ -354,7 +355,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.32 - fixed home page"
+  git commit -m "v0.0.32 - added sposorship prices to polygons"
   git push
   ```
 

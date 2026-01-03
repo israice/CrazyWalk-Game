@@ -2494,6 +2494,7 @@
                     const isCompleted = savedCount >= poly.total_points;
 
                     // Create Large Promo Circle at polygon center (ONLY if not completed OR in debug mode)
+                    // Create Large Promo Circle at polygon center (ONLY if not completed OR in debug mode)
                     const gifFile = poly.promo_gif;
                     let pPromo = null;
                     if (gifFile && (!isCompleted || isPostersDebugActive)) {
@@ -2508,6 +2509,111 @@
                             }),
                             interactive: true
                         }).addTo(targetLayer);
+
+                        // --- PROMO POPUP LOGIC ---
+                        const popupContent = document.createElement('div');
+                        popupContent.innerHTML = `
+                            <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #333; font-size: 13px; padding: 5px;">
+                                <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                                    <b>Polygon ID:</b> ${poly.uid || poly.id}
+                                </div>
+
+                                <!-- Local Sponsor -->
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-weight: bold; color: #0078d4; margin-bottom: 5px;">Local Sponsor:</div>
+                                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                        <div style="width: 50px; height: 50px; background: #f0f0f0; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #888;">GIF</div>
+                                        <div>
+                                            Next Start: <b>20.01.2026 - 18:00</b><br>
+                                            Next End: <b>20.02.2026 - 18:00</b><br>
+                                            Price: <b>2 USD</b>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Global Sponsor -->
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-weight: bold; color: #d13438; margin-bottom: 5px;">Global Sponsor:</div>
+                                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                        <div style="width: 50px; height: 50px; background: #f0f0f0; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #888;">GIF</div>
+                                        <div>
+                                            Next Start: <b>16.01.2026 - 4:00</b><br>
+                                            Next End: <b>16.02.2026 - 4:00</b><br>
+                                            Price: <b>150 USD</b>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- History -->
+                                <div>
+                                    <div style="font-weight: bold; margin-bottom: 5px;">Local Sponsor History:</div>
+                                    <table style="width:100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                                        <tr style="border-bottom: 1px solid #ccc; background: #f9f9f9;">
+                                            <th style="padding: 4px;">GIF</th>
+                                            <th style="padding: 4px;">Company</th>
+                                            <th style="padding: 4px;">Start</th>
+                                            <th style="padding: 4px;">End</th>
+                                            <th style="padding: 4px;">Price</th>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 4px;">GIF</td>
+                                            <td style="padding: 4px;">Some Company</td>
+                                            <td style="padding: 4px;">20.01.2026<br>18:00</td>
+                                            <td style="padding: 4px;">20.01.2026<br>18:00</td>
+                                            <td style="padding: 4px;">1 USD</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+
+                        pPromo.bindPopup(popupContent, { minWidth: 300, maxWidth: 350 });
+
+                        // Highlight Lines on Popup Open
+                        pPromo.on('popupopen', () => {
+                            if (poly.boundary_white_lines && lineLayerMap) {
+                                // Initialize temp array if needed
+                                if (!pPromo._tempHighlightLines) pPromo._tempHighlightLines = [];
+
+                                poly.boundary_white_lines.forEach(lineId => {
+                                    const composite = lineLayerMap.get(String(lineId));
+                                    if (composite && composite.visual) {
+                                        // Create Overlay Clone (Red)
+                                        // Draw ON TOP of existing lines
+                                        const tempLine = L.polyline(composite.visual.getLatLngs(), {
+                                            color: '#ff0000', // Bright Red
+                                            weight: 4,
+                                            opacity: 1,
+                                            interactive: false,
+                                            pane: 'blueCirclesPane' // Ensures correct z-index sorting
+                                        }).addTo(map);
+
+                                        // Apply CSS Offset to the SVG Path Element
+                                        // This creates the "floating" effect relative to the original white line (shadow)
+                                        const path = tempLine.getElement();
+                                        if (path) {
+                                            // Ensure transition for smooth effect
+                                            path.style.transition = "transform 0.15s ease-out";
+                                            // Force reflow or next frame to animate? 
+                                            // Usually setting it immediately renders fine, but RAF is safer for animation start.
+                                            requestAnimationFrame(() => {
+                                                path.style.transform = "translate(5px, -5px)"; // Up and Right
+                                            });
+                                        }
+
+                                        pPromo._tempHighlightLines.push(tempLine);
+                                    }
+                                });
+                            }
+                        });
+
+                        // Restore Lines on Popup Close
+                        pPromo.on('popupclose', () => {
+                            if (pPromo._tempHighlightLines) {
+                                pPromo._tempHighlightLines.forEach(l => l.remove());
+                                pPromo._tempHighlightLines = [];
+                            }
+                        });
                     }
 
                     // Create Small Percentage Circle on circumference of large circle (ONLY if not completed OR in debug mode)
