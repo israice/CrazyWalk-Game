@@ -814,7 +814,7 @@
             </div>
 
             <div class="action-buttons">
-                <button class="btn btn-login">LOGIN</button>
+                <button class="btn btn-login" onclick="window.location.href='/A_home_page/login.html'">LOGIN</button>
                 <button class="btn btn-guest">GUEST</button>
             </div>
 
@@ -973,12 +973,8 @@
                 }
             });
 
-            // LOGIN Button (placeholder)
-            document.querySelector('.btn-login').addEventListener('click', () => {
-                console.log("DEBUG: LOGIN button clicked.");
-                // TODO: Implement login flow
-                alert("Login feature coming soon!");
-            });
+            // LOGIN Button - Navigation handled by inline onclick
+            document.querySelector('.btn-login').onclick = () => window.location.href = '/A_home_page/login.html';
 
             // Initial load - use IP-based location (no permission popup)
             setTimeout(loadIPLocation, 1000);

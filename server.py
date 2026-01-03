@@ -8,6 +8,7 @@ import logging
 import urllib.request
 import urllib.parse
 import json
+import csv
 import uuid
 import time
 from typing import Any
@@ -176,7 +177,111 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith('/api/location_state'):
             self.handle_save_location_state()
             return
+        if self.path.startswith('/api/register'):
+            self.handle_register()
+            return
+        if self.path.startswith('/api/login'):
+            self.handle_login()
+            return
         self.send_error(404, "Not Found")
+
+    def handle_register(self):
+        """
+        Handle POST /api/register
+        Body: { "username": "...", "password": "..." }
+        """
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode())
+            username = data.get('username')
+            password = data.get('password')
+
+            if not username or not password:
+                self.send_error(400, "Missing username or password")
+                return
+
+            users_file = os.path.join(os.getcwd(), 'CORE', 'DATA', 'users.csv')
+            
+            # Read existing users to check duplicate
+            existing_users = []
+            if os.path.exists(users_file):
+                with open(users_file, 'r', newline='') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # Handle 'usename' typo in csv header gracefully
+                        u = row.get('usename') or row.get('username')
+                        if u:
+                            existing_users.append(u)
+            
+            if username in existing_users:
+                 self.send_response(200) # Returning 200 with error status for simplicity
+                 self.send_header('Content-Type', 'application/json')
+                 self.send_header('Access-Control-Allow-Origin', '*')
+                 self.end_headers()
+                 self.wfile.write(json.dumps({"status": "error", "message": "Username taken"}).encode())
+                 return
+
+            # Append new user
+            with open(users_file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                # If file ends with newline, good. If not, csv.writer might handle or we might need check.
+                # But typically 'a' works. 
+                # Note: 'usename' header is assumed. We depend on column order: username, password, type
+                writer.writerow([username, password, 'user'])
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok", "message": "User registered"}).encode())
+
+        except Exception as e:
+            logger.error(f"Register Error: {e}")
+            self.send_error(500, str(e))
+
+    def handle_login(self):
+        """
+        Handle POST /api/login
+        Body: { "username": "...", "password": "..." }
+        """
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode())
+            username = data.get('username')
+            password = data.get('password')
+            
+            users_file = os.path.join(os.getcwd(), 'CORE', 'DATA', 'users.csv')
+            user_found = None
+            
+            if os.path.exists(users_file):
+                with open(users_file, 'r', newline='') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        u = row.get('usename') or row.get('username')
+                        p = row.get('password')
+                        if u == username and p == password:
+                            user_found = row
+                            break
+            
+            if user_found:
+                 self.send_response(200)
+                 self.send_header('Content-Type', 'application/json')
+                 self.send_header('Access-Control-Allow-Origin', '*')
+                 self.end_headers()
+                 self.wfile.write(json.dumps({"status": "ok", "user": {"username": username, "type": user_found.get('type')}}).encode())
+            else:
+                 self.send_response(200) # Simpler to handle 200 with error status in frontend often
+                 self.send_header('Content-Type', 'application/json')
+                 self.send_header('Access-Control-Allow-Origin', '*')
+                 self.end_headers()
+                 self.wfile.write(json.dumps({"status": "error", "message": "Invalid credentials"}).encode())
+
+        except Exception as e:
+             logger.error(f"Login Error: {e}")
+             self.send_error(500, str(e))
+
 
     def handle_get_session(self):
         """

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CrazyWalk - Login</title>
+    <script>
+        // Mask URL to show only root address
+        window.history.replaceState(null, '', '/');
+    </script>
+    <link rel="icon" type="image/png" href="/A_home_page/components/crazywalk_logo.png">
+
+    <!-- Leaflet CSS (Reused primarily for consistency, though map might not be active) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* Reusing variables from index.html */
+        :root {
+            /* Professional "Bio-Digital" Palette */
+            --primary-color: #00ff9d;
+            --secondary-color: #00b8ff;
+            --glass-bg: rgba(5, 20, 10, 0.7);
+            --glass-border: rgba(0, 255, 157, 0.2);
+            --text-glow: 0 0 15px rgba(0, 255, 157, 0.4);
+            --error-color: #ff0033;
+        }
+
+        /* Essential Reset & Body */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Poppins', sans-serif;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        /* Container matching index.html */
+        .black-square {
+            position: absolute;
+            width: 42vh;
+            height: 72vh;
+            background-color: #050505;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            overflow: hidden;
+            border-radius: 3vh;
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.15);
+            /* Static background for login page, reusing map style filter essentially or just dark */
+            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+        }
+
+        /* Shared UI Overlay Layer */
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            padding: clamp(2vh, 3vh, 4vh);
+            gap: 2vh;
+            gap: 2vh;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Reuse Header Style */
+        .header {
+            text-align: center;
+            margin-bottom: 2vh;
+        }
+
+        .logo-img {
+            height: 8vh;
+            width: auto;
+            filter: drop-shadow(0 0 5px rgba(0, 243, 255, 0.8));
+            margin-bottom: 1vh;
+        }
+
+        h1 {
+            font-size: 2.5vh;
+            font-weight: 800;
+            background: linear-gradient(to right, #fff, #ddd);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- TABS --- */
+        .tabs {
+            display: flex;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 1vh;
+            padding: 0.5vh;
+            margin-bottom: 2vh;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 1vh;
+            text-align: center;
+            border-radius: 0.8vh;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 1.6vh;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary-color);
+            color: black;
+            box-shadow: 0 0 10px rgba(0, 255, 157, 0.4);
+        }
+
+        /* --- FORMS --- */
+        .form-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2vh;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5vh;
+        }
+
+        .input-group label {
+            font-size: 1.2vh;
+            color: var(--secondary-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-left: 0.5vh;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 1.5vh;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1vh;
+            color: white;
+            font-family: inherit;
+            font-size: 1.4vh;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-field:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px rgba(0, 255, 157, 0.1);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 1.5vh;
+            margin-top: 1vh;
+            border-radius: 1vh;
+            border: none;
+            font-size: 1.6vh;
+            font-weight: 800;
+            text-transform: uppercase;
+            cursor: pointer;
+            background: linear-gradient(90deg, #00ff9d 0%, #00b8ff 100%);
+            color: black;
+            box-shadow: 0 4px 20px rgba(0, 255, 157, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .btn-submit:active {
+            transform: scale(0.97);
+        }
+
+        .btn-back {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-weight: 600;
+        }
+
+        .status-message {
+            text-align: center;
+            font-size: 1.2vh;
+            min-height: 2vh;
+            margin-top: 1vh;
+        }
+
+        .status-error {
+            color: var(--error-color);
+        }
+
+        .status-success {
+            color: var(--primary-color);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Mobile specific adjustments to match index.html */
+        @media (max-width: 1024px) {
+            .black-square {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+
+        img.iphone-frame {
+            height: 100vh;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            pointer-events: none;
+            filter: drop-shadow(0 20px 50px rgba(0, 0, 0, 0.9));
+        }
+
+        @media (max-width: 1024px) {
+            img.iphone-frame {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="black-square">
+        <div class="ui-overlay">
+            <div class="header">
+                <img src="/A_home_page/components/crazywalk_logo.png" class="logo-img" alt="Logo">
+                <h1>CrazyWalk</h1>
+                <p style="font-size: 1.2vh; color: #aaa; letter-spacing: 1px; margin-top:0.5vh;">MEMBER ACCESS</p>
+            </div>
+
+            <div class="tabs">
+                <div class="tab-btn active" onclick="switchTab('login')">LOGIN</div>
+                <div class="tab-btn" onclick="switchTab('register')">REGISTER</div>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <div id="login-form" class="form-container">
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="login-user" class="input-field" placeholder="Enter username">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="login-pass" class="input-field" placeholder="Enter password">
+                </div>
+                <button class="btn-submit" onclick="handleLogin()">Login</button>
+                <div id="login-status" class="status-message"></div>
+            </div>
+
+            <!-- REGISTER FORM -->
+            <div id="register-form" class="form-container hidden">
+                <div class="input-group">
+                    <label>New Username</label>
+                    <input type="text" id="reg-user" class="input-field" placeholder="Choose username">
+                </div>
+                <div class="input-group">
+                    <label>New Password</label>
+                    <input type="password" id="reg-pass" class="input-field" placeholder="Choose password">
+                </div>
+                <button class="btn-submit" onclick="handleRegister()">Create Account</button>
+                <div id="reg-status" class="status-message"></div>
+            </div>
+
+            <button class="btn-submit btn-back" onclick="window.location.href='/'">Back to Home</button>
+        </div>
+    </div>
+
+    <img src="/A_home_page/components/iphone.png" class="iphone-frame" alt="iPhone Frame">
+
+    <script>
+        function switchTab(tab) {
+            const loginForm = document.getElementById('login-form');
+            const regForm = document.getElementById('register-form');
+            const tabs = document.querySelectorAll('.tab-btn');
+            const loginStatus = document.getElementById('login-status');
+            const regStatus = document.getElementById('reg-status');
+
+            // Clear status
+            loginStatus.textContent = '';
+            regStatus.textContent = '';
+
+            if (tab === 'login') {
+                loginForm.classList.remove('hidden');
+                regForm.classList.add('hidden');
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                loginForm.classList.add('hidden');
+                regForm.classList.remove('hidden');
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+
+        async function handleLogin() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            const status = document.getElementById('login-status');
+
+            if (!user || !pass) {
+                status.textContent = "Please fill in all fields";
+                status.className = "status-message status-error";
+                return;
+            }
+
+            status.textContent = "Authenticating...";
+            status.className = "status-message";
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+
+                if (data.status === 'ok') {
+                    status.textContent = "Login Successful!";
+                    status.className = "status-message status-success";
+
+                    // Simple redirection logic
+                    // In a real app we might store token/session
+                    setTimeout(() => {
+                        window.location.href = '/B_map_page/index.html';
+                    }, 1000);
+                } else {
+                    status.textContent = data.message || "Login Failed";
+                    status.className = "status-message status-error";
+                }
+            } catch (e) {
+                status.textContent = "Connection Error";
+                status.className = "status-message status-error";
+            }
+        }
+
+        async function handleRegister() {
+            const user = document.getElementById('reg-user').value;
+            const pass = document.getElementById('reg-pass').value;
+            const status = document.getElementById('reg-status');
+
+            if (!user || !pass) {
+                status.textContent = "Please fill in all fields";
+                status.className = "status-message status-error";
+                return;
+            }
+
+            status.textContent = "Creating Account...";
+            status.className = "status-message";
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+
+                if (data.status === 'ok') {
+                    status.textContent = "Account Created! Switching to Login...";
+                    status.className = "status-message status-success";
+                    setTimeout(() => {
+                        switchTab('login');
+                        document.getElementById('login-user').value = user;
+                        document.getElementById('login-status').textContent = "Please login with new account";
+                    }, 1500);
+                } else {
+                    status.textContent = data.message || "Registration Failed";
+                    status.className = "status-message status-error";
+                }
+            } catch (e) {
+                status.textContent = "Connection Error";
+                status.className = "status-message status-error";
+            }
+        }
+    </script>
+</body>
+
+</html>

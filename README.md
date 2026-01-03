@@ -335,6 +335,7 @@
     - added white line to comleted polygons
     - fixed home page
     - added sposorship prices to polygons
+  - [x] v0.0.33 - added user registration and login page
 
 
   - ### Next Tasks
@@ -355,7 +356,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.32 - added sposorship prices to polygons"
+  git commit -m "v0.0.33 - added user registration and login page"
   git push
   ```
 
