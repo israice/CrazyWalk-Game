@@ -3,3 +3,5 @@ shapely
 networkx
 redis==5.0.1
 numpy<2.0
+pytest>=7.0.0
+

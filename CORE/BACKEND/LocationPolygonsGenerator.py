@@ -13,6 +13,7 @@ from .redis_tools import (
     KEY_META, KEY_RED_LINES, KEY_BLUE_CIRCLES, KEY_ADJACENCY, 
     KEY_WHITE_LINES, KEY_GREEN_CIRCLES, KEY_POLYGONS, KEY_GROUPS
 )
+from .uid_utils import generate_uid, UIDPrefix
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,8 @@ class LocationPolygonsGenerator:
     
     def __init__(self):
         self.data_dir = os.path.dirname(__file__)
+
+    # generate_uid removed - now using uid_utils module
 
     def haversine_distance(self, coord1, coord2):
         R = 6371000 # meters
@@ -956,11 +959,8 @@ class LocationPolygonsGenerator:
                     available_images = [f"{i}.jpg" for i in range(1, 10)]
 
                 import random
-                import secrets
                 
-                def generate_uid(prefix):
-                    """Generate a random UID like POSTER_phy5i6tgz"""
-                    return f"{prefix}_{secrets.token_hex(4)}"
+                # Using centralized uid_utils for poster UID generation
                 
                 # --- POSTER PERSISTENCE ---
                 # Check Redis for existing poster assignment for this location
@@ -996,7 +996,7 @@ class LocationPolygonsGenerator:
                 for row in range(2, -1, -1):  # Start from row 2 (top) down to row 0 (bottom)
                     for col in range(3):
                         # Simple formula: row 2 = IDs 7,8,9; row 1 = IDs 4,5,6; row 0 = IDs 1,2,3
-                        poster_id = generate_uid('POSTER')
+                        poster_id = generate_uid(UIDPrefix.POSTER)
                         poster_position = row * 3 + col + 1  # Keep numeric position for debugging
                         
                         # Use the randomly selected image
@@ -1505,7 +1505,7 @@ class LocationPolygonsGenerator:
         for node, count in node_counts.items():
             if count != 2:
                 blue_circles.append({
-                    'id': f"{node[0]}_{node[1]}",
+                    'id': generate_uid(UIDPrefix.BLUE_CIRCLE),
                     'lat': node[0], 'lon': node[1],
                     'connections': count
                 })
@@ -1609,7 +1609,7 @@ class LocationPolygonsGenerator:
                 
                 if curr in relevant_set and curr != start_node:
                     wl = {
-                        'id': len(white_lines),
+                        'id': generate_uid(UIDPrefix.WHITE_LINE),
                         'start': start_node,
                         'end': curr,
                         'path': path,
@@ -1636,7 +1636,7 @@ class LocationPolygonsGenerator:
                                 nlat = p1[0] + (p2[0] - p1[0]) * ratio
                                 nlon = p1[1] + (p2[1] - p1[1]) * ratio
                                 green_circles.append({
-                                    'id': f"gc_{wl['id']}_{count}",
+                                    'id': generate_uid(UIDPrefix.GREEN_CIRCLE),
                                     'lat': nlat, 'lon': nlon, 
                                     'line_id': wl['id']
                                 })
@@ -1705,15 +1705,9 @@ class LocationPolygonsGenerator:
                     poly = poly.buffer(0)
                 center = poly.centroid
 
-                # STABLE ID GENERATION (2025-12-28)
-                # Use hash of centroid coordinates (rounded) to ensure ID persists across rebuilds/expansions.
-                # Format: poly_LAT_LON
-                # Rounding to 5 decimal places (~1.1 meter precision) to handle minor drift during regeneration
-                clat = round(center.x, 5)
-                clon = round(center.y, 5)
-
-                # Use simple coordinate string as ID to be readable and unique
-                stable_id = f"poly_{clat}_{clon}".replace('.', '')
+                # UID GENERATION - now using centralized uid_utils
+                # Random UID for consistent format across all elements
+                stable_id = generate_uid(UIDPrefix.POLYGON)
                 
                 # --- AREA FILTER (2025-12-31) ---
                 # discard sliver/invisible polygons (< ~50m^2)

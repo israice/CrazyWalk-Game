@@ -1,3 +1,7 @@
+"""
+CrazyWalk-Game Server
+Main entry point with routing logic. Handlers are delegated to separate modules.
+"""
 import http.server
 import socketserver
 import os
@@ -5,10 +9,6 @@ import sys
 import signal
 import threading
 import logging
-import urllib.request
-import urllib.parse
-import json
-import csv
 import uuid
 import time
 from typing import Any
@@ -20,6 +20,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
 
 class Initializer:
     @staticmethod
@@ -39,11 +40,10 @@ class Initializer:
                         key, value = line.split('=', 1)
                         key = key.strip()
                         value = value.strip().strip("'").strip('"')
-                        # Do not override existing environment variables
                         if key not in os.environ:
                             os.environ[key] = value
                     except ValueError:
-                        pass # Ignore malformed lines
+                        pass
         except Exception as e:
             logger.warning(f"Failed to read .env file: {e}")
 
@@ -53,10 +53,10 @@ class Initializer:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         os.chdir(script_dir)
         
-        # Verify directory exists
         if not os.path.isdir(DIRECTORY):
             logger.error(f"Directory not found: {DIRECTORY}")
             sys.exit(1)
+
 
 # Initialize environment
 Initializer.load_env()
@@ -80,11 +80,25 @@ if not os.path.exists(full_path):
     logger.error(f"CRITICAL: Serving directory does not exist: {full_path}")
 
 # Generate unique session ID on server startup
-# This allows frontend to detect server restarts and reset in-memory state
 SERVER_SESSION_ID = str(uuid.uuid4())
 SERVER_START_TIME = int(time.time())
 logger.info(f"Server Session ID: {SERVER_SESSION_ID}")
 logger.info(f"Server Start Time: {SERVER_START_TIME}")
+
+# Import handlers
+from CORE.BACKEND.handlers import (
+    handle_register, handle_login,
+    handle_get_session,
+    handle_locate, handle_ip_locate,
+    handle_save_location_state, handle_get_location_state,
+    handle_get_game_state, handle_save_game_state,
+    handle_serve_poster, handle_serve_promo,
+    handle_get_promos, handle_serve_readme,
+    proxy_nominatim,
+    handle_game_data,
+    handle_unified_state
+)
+
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
     """Custom handler to filter out known noise and improve logging."""
@@ -94,24 +108,15 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         """Add caching headers. Always disabled for development."""
-        # ⚠️ WARNING: DO NOT ENABLE BROWSER CACHING DURING DEVELOPMENT ⚠️
-        # Caching causes browsers to use old file versions even after server restart
-        # This led to multiple debugging issues where changes weren't visible
-        # Only re-enable this for production deployment with proper versioning
-        
-        # Always disable cache completely
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")  # HTTP/1.0 compatibility
-        self.send_header("Expires", "0")  # Proxies
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         super().end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
         """Override to filter specific 404s and use standard logging."""
-        # Filter out Chrome DevTools 404 noise
         if hasattr(self, 'path') and "com.chrome.devtools.json" in self.path:
             return
-            
-        # Log everything else normally using our logger
         logger.info("%s - - [%s] %s" %
                     (self.client_address[0],
                      self.log_date_time_string(),
@@ -127,41 +132,43 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_routing(self):
         """Shared routing for GET and HEAD."""
-        
         if self.path.startswith('/api/session'):
-            self.handle_get_session()
+            handle_get_session(self, SERVER_SESSION_ID, SERVER_START_TIME)
             return
         if self.path.startswith('/api/ip_locate'):
-            self.handle_ip_locate()
+            handle_ip_locate(self)
             return
         if self.path.startswith('/api/locate'):
-            self.handle_locate()
+            handle_locate(self)
             return
         if self.path.startswith('/api/reverse') or self.path.startswith('/api/search'):
-            self.proxy_nominatim()
+            proxy_nominatim(self)
+            return
+        if self.path.startswith('/api/unified_state'):
+            handle_unified_state(self, 'GET')
             return
         if self.path.startswith('/api/game_state'):
-            self.handle_get_game_state()
+            handle_get_game_state(self)
             return
         if self.path.startswith('/api/game_data'):
-            self.handle_game_data()
+            handle_game_data(self)
             return
         if self.path.startswith('/api/location_state'):
-            self.handle_get_location_state()
+            handle_get_location_state(self)
             return
         if self.path.startswith('/GAME_POSTERS/'):
             logger.info(f"MATCHED Poster Route: {self.path}")
-            self.handle_serve_poster()
+            handle_serve_poster(self)
             return
         if self.path.startswith('/GAME_PROMOS/'):
             logger.info(f"MATCHED Promo Route: {self.path}")
-            self.handle_serve_promo()
+            handle_serve_promo(self)
             return
         if self.path.startswith('/api/promos'):
-            self.handle_get_promos()
+            handle_get_promos(self)
             return
         if self.path.startswith('/README.md'):
-            self.handle_serve_readme()
+            handle_serve_readme(self)
             return
 
         if self.command == 'GET':
@@ -171,756 +178,23 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests."""
+        if self.path.startswith('/api/unified_state'):
+            handle_unified_state(self, 'POST')
+            return
         if self.path.startswith('/api/game_state'):
-            self.handle_save_game_state()
+            handle_save_game_state(self)
             return
         if self.path.startswith('/api/location_state'):
-            self.handle_save_location_state()
+            handle_save_location_state(self)
             return
         if self.path.startswith('/api/register'):
-            self.handle_register()
+            handle_register(self)
             return
         if self.path.startswith('/api/login'):
-            self.handle_login()
+            handle_login(self)
             return
         self.send_error(404, "Not Found")
 
-    def handle_register(self):
-        """
-        Handle POST /api/register
-        Body: { "username": "...", "password": "..." }
-        """
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode())
-            username = data.get('username')
-            password = data.get('password')
-
-            if not username or not password:
-                self.send_error(400, "Missing username or password")
-                return
-
-            users_file = os.path.join(os.getcwd(), 'CORE', 'DATA', 'users.csv')
-            
-            # Read existing users to check duplicate
-            existing_users = []
-            if os.path.exists(users_file):
-                with open(users_file, 'r', newline='') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        # Handle 'usename' typo in csv header gracefully
-                        u = row.get('usename') or row.get('username')
-                        if u:
-                            existing_users.append(u)
-            
-            if username in existing_users:
-                 self.send_response(200) # Returning 200 with error status for simplicity
-                 self.send_header('Content-Type', 'application/json')
-                 self.send_header('Access-Control-Allow-Origin', '*')
-                 self.end_headers()
-                 self.wfile.write(json.dumps({"status": "error", "message": "Username taken"}).encode())
-                 return
-
-            # Append new user
-            with open(users_file, 'a', newline='') as f:
-                writer = csv.writer(f)
-                # If file ends with newline, good. If not, csv.writer might handle or we might need check.
-                # But typically 'a' works. 
-                # Note: 'usename' header is assumed. We depend on column order: username, password, type
-                writer.writerow([username, password, 'user'])
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok", "message": "User registered"}).encode())
-
-        except Exception as e:
-            logger.error(f"Register Error: {e}")
-            self.send_error(500, str(e))
-
-    def handle_login(self):
-        """
-        Handle POST /api/login
-        Body: { "username": "...", "password": "..." }
-        """
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode())
-            username = data.get('username')
-            password = data.get('password')
-            
-            users_file = os.path.join(os.getcwd(), 'CORE', 'DATA', 'users.csv')
-            user_found = None
-            
-            if os.path.exists(users_file):
-                with open(users_file, 'r', newline='') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        u = row.get('usename') or row.get('username')
-                        p = row.get('password')
-                        if u == username and p == password:
-                            user_found = row
-                            break
-            
-            if user_found:
-                 self.send_response(200)
-                 self.send_header('Content-Type', 'application/json')
-                 self.send_header('Access-Control-Allow-Origin', '*')
-                 self.end_headers()
-                 self.wfile.write(json.dumps({"status": "ok", "user": {"username": username, "type": user_found.get('type')}}).encode())
-            else:
-                 self.send_response(200) # Simpler to handle 200 with error status in frontend often
-                 self.send_header('Content-Type', 'application/json')
-                 self.send_header('Access-Control-Allow-Origin', '*')
-                 self.end_headers()
-                 self.wfile.write(json.dumps({"status": "error", "message": "Invalid credentials"}).encode())
-
-        except Exception as e:
-             logger.error(f"Login Error: {e}")
-             self.send_error(500, str(e))
-
-
-    def handle_get_session(self):
-        """
-        Returns server session information.
-        This allows frontend to detect server restarts and reset in-memory state.
-        Returns: { 'session_id': 'uuid', 'start_time': timestamp }
-        """
-        try:
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-
-            response = {
-                'session_id': SERVER_SESSION_ID,
-                'start_time': SERVER_START_TIME
-            }
-
-            self.wfile.write(json.dumps(response).encode())
-            logger.info(f"Session info sent: {SERVER_SESSION_ID}")
-        except Exception as e:
-            logger.error(f"Error handling session request: {e}")
-            self.send_error(500, f"Server Error: {str(e)}")
-
-    def handle_locate(self):
-        """
-        Handle /api/locate request.
-        Takes lat/lon, reverse geocodes to find city, 
-        then optionally searches for city center to return canonical coordinates.
-        Returns: { 'city': 'City Name', 'lat': 0.0, 'lon': 0.0 }
-        """
-        try:
-            # Parse params
-            parsed_path = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed_path.query)
-            lat = params.get('lat', [None])[0]
-            lon = params.get('lon', [None])[0]
-
-            if not lat or not lon:
-                self.send_error(400, "Missing lat or lon parameters")
-                return
-            
-            user_lat = float(lat)
-            user_lon = float(lon)
-            
-            # Default fallback values
-            city = "Unknown City"
-            target_lat = user_lat
-            target_lon = user_lon
-            
-            headers = {'User-Agent': 'CrazyWalk/1.0'}
-            api_timeout = 3 # seconds
-
-            # 1. Reverse Geocode to get City Name
-            try:
-                # zoom=18 provides city-level detail in reverse geocoding
-                reverse_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&accept-language=en"
-                req = urllib.request.Request(reverse_url, headers=headers)
-                
-                with urllib.request.urlopen(req, timeout=api_timeout) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        address = data.get('address', {})
-                        # Priority: city > municipality > town > suburb > village > hamlet > county > state
-                        # This ensures we get the actual city name, not the region/district
-                        city = address.get('city') or address.get('municipality') or address.get('town') or \
-                               address.get('suburb') or address.get('village') or address.get('hamlet') or \
-                               address.get('county') or address.get('state') or "Unknown City"
-            except Exception as e:
-                logger.warning(f"Reverse geocoding failed: {e}")
-                # Continue with defaults
-
-            # 2. (Optional) Search for City Center
-            # Only try if we found a valid city name
-            if city != "Unknown City":
-                try:
-                    encoded_q = urllib.parse.quote(city)
-                    search_url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_q}&limit=1&accept-language=en"
-                    req_search = urllib.request.Request(search_url, headers=headers)
-                    
-                    with urllib.request.urlopen(req_search, timeout=api_timeout) as response:
-                        if response.status == 200:
-                            search_data = json.loads(response.read().decode())
-                            if search_data:
-                                target_lat = float(search_data[0]['lat'])
-                                target_lon = float(search_data[0]['lon'])
-                except Exception as e:
-                    logger.warning(f"City search failed: {e}")
-                    # Continue with user coords as target
-
-            # Construct Response
-            result = {
-                "city": city.upper(),
-                "lat": target_lat,
-                "lon": target_lon,
-                "user_lat": user_lat,
-                "user_lon": user_lon
-            }
-
-            # Send Headers
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*') 
-            self.end_headers()
-            
-            # Send Body
-            self.wfile.write(json.dumps(result).encode())
-
-        except Exception as e:
-            logger.error(f"Locate Fatal Error: {e}")
-            self.send_error(500, f"Server Error: {str(e)}")
-
-    def handle_ip_locate(self):
-        """
-        Handle /api/ip_locate request.
-        Uses ip-api.com to get approximate location from client IP.
-        Returns: { 'city': 'City Name', 'lat': 0.0, 'lon': 0.0 }
-        """
-        try:
-            # Get client IP from request
-            client_ip = self.client_address[0]
-            
-            # For localhost, we need to get external IP or use a fallback
-            if client_ip in ('127.0.0.1', '::1', 'localhost'):
-                # Use ip-api without IP param to detect server's external IP
-                api_url = "http://ip-api.com/json/?fields=status,message,city,lat,lon"
-            else:
-                api_url = f"http://ip-api.com/json/{client_ip}?fields=status,message,city,lat,lon"
-            
-            headers = {'User-Agent': 'CrazyWalk/1.0'}
-            req = urllib.request.Request(api_url, headers=headers)
-            
-            with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    
-                    if data.get('status') == 'success':
-                        city = data.get('city')
-                        logger.info(f"IP Geolocation Success: City='{city}', lat={data.get('lat')}, lon={data.get('lon')}")
-                        result = {
-                            "city": (city or 'Unknown City').upper(),
-                            "lat": data.get('lat', 0),
-                            "lon": data.get('lon', 0)
-                        }
-                    else:
-                        logger.warning(f"IP Geolocation 1st attempt failed: {data.get('message')}. Retrying as server/localhost...")
-                        # RETRY: Try without IP (uses server's external IP)
-                        # This handles cases where client_ip is a private LAN IP (e.g. 192.168.x.x) which ip-api rejects
-                        retry_url = "http://ip-api.com/json/?fields=status,message,city,lat,lon"
-                        req_retry = urllib.request.Request(retry_url, headers=headers)
-                        with urllib.request.urlopen(req_retry, timeout=5) as response_retry:
-                             if response_retry.status == 200:
-                                data_retry = json.loads(response_retry.read().decode())
-                                if data_retry.get('status') == 'success':
-                                    city = data_retry.get('city')
-                                    logger.info(f"IP Geolocation Retry Success: City='{city}'")
-                                    result = {
-                                        "city": (city or 'Unknown City').upper(),
-                                        "lat": data_retry.get('lat', 0),
-                                        "lon": data_retry.get('lon', 0)
-                                    }
-                                else:
-                                    logger.error(f"IP Geolocation Retry Failed: {data_retry.get('message')}")
-                                    result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
-                             else:
-                                result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
-                else:
-                    result = {"city": "UNKNOWN CITY", "lat": 0, "lon": 0}
-            
-            # Send Response
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(result).encode())
-            
-        except Exception as e:
-            logger.error(f"IP Locate Error: {e}")
-            # Return fallback on error
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"city": "UNKNOWN CITY", "lat": 0, "lon": 0}).encode())
-
-    def handle_save_location_state(self):
-        """
-        Handle POST /api/location_state
-        Saves complete game state for a location to Redis.
-        Body: {
-            "location_key": "lat_lon",
-            "collected_circles": ["lat,lon", ...],
-            "visible_polygon_ids": ["POLYGON_xxx", ...],
-            "expanded_circles": ["lat,lon", ...]
-        }
-        """
-        try:
-            from CORE.BACKEND.redis_tools import get_redis_client
-
-            # Read POST body
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode())
-
-            location_key = data.get('location_key')
-            collected_circles = data.get('collected_circles', [])
-            visible_polygon_ids = data.get('visible_polygon_ids', [])
-            expanded_circles = data.get('expanded_circles', [])
-            blue_circles = data.get('blue_circles', [])
-            user_position = data.get('user_position', None)
-            promo_gif_map = data.get('promo_gif_map', {})
-
-            if not location_key:
-                self.send_error(400, "Missing location_key")
-                return
-
-            # Save COMPLETE STATE to Redis with 7-day TTL
-            redis_key = f"location:{location_key}:state"
-            r = get_redis_client()
-
-            # Save complete state as JSON
-            complete_state = {
-                'collected_circles': collected_circles,
-                'visible_polygon_ids': visible_polygon_ids,
-                'expanded_circles': expanded_circles,
-                'blue_circles': blue_circles,
-                'user_position': user_position,
-                'promo_gif_map': promo_gif_map
-            }
-
-            if collected_circles or visible_polygon_ids or expanded_circles or blue_circles or promo_gif_map:
-                r.set(redis_key, json.dumps(complete_state))
-                r.expire(redis_key, 60 * 60 * 24 * 7)  # 7 days
-                logger.info(f"Saved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons, {len(expanded_circles)} expanded, {len(blue_circles)} blue circles")
-            else:
-                # Clear if empty
-                r.delete(redis_key)
-                logger.info(f"Cleared state for location {location_key}")
-
-            # Send response
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "status": "ok",
-                "saved_circles": len(collected_circles),
-                "saved_polygons": len(visible_polygon_ids),
-                "saved_expanded": len(expanded_circles)
-            }).encode())
-            
-        except Exception as e:
-            logger.error(f"Save Location State Error: {e}")
-            self.send_error(500, str(e))
-
-    def handle_get_location_state(self):
-        """
-        Handle GET /api/location_state?location_key=lat_lon
-        Returns saved complete game state for a location.
-        """
-        try:
-            from CORE.BACKEND.redis_tools import get_redis_client
-
-            # Parse query params
-            parsed_path = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed_path.query)
-            location_key = params.get('location_key', [None])[0]
-
-            if not location_key:
-                self.send_error(400, "Missing location_key parameter")
-                return
-
-            # Get from Redis (NEW KEY: :state instead of :collected)
-            redis_key = f"location:{location_key}:state"
-            r = get_redis_client()
-            data = r.get(redis_key)
-
-            if data:
-                # Load complete state
-                state = json.loads(data)
-                collected_circles = state.get('collected_circles', [])
-                visible_polygon_ids = state.get('visible_polygon_ids', [])
-                expanded_circles = state.get('expanded_circles', [])
-                blue_circles = state.get('blue_circles', [])
-                user_position = state.get('user_position', None)
-                promo_gif_map = state.get('promo_gif_map', {})
-                logger.info(f"Retrieved state for location {location_key}: {len(collected_circles)} circles, {len(visible_polygon_ids)} polygons")
-            else:
-                # No state found
-                collected_circles = []
-                visible_polygon_ids = []
-                expanded_circles = []
-                blue_circles = []
-                user_position = None
-                promo_gif_map = {}
-                logger.info(f"No state found for location {location_key}")
-
-            # Send response
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "location_key": location_key,
-                "collected_circles": collected_circles,
-                "visible_polygon_ids": visible_polygon_ids,
-                "expanded_circles": expanded_circles,
-                "blue_circles": blue_circles,
-                "user_position": user_position,
-                "promo_gif_map": promo_gif_map
-            }).encode())
-            
-        except Exception as e:
-            logger.error(f"Get Location State Error: {e}")
-            self.send_error(500, str(e))
-
-    def handle_get_game_state(self):
-        """
-        Handle GET /api/game_state
-        Returns COMPLETE game state from Redis including all geometry.
-        If no state exists, returns empty response (signals fresh start).
-        """
-        try:
-            from CORE.BACKEND.redis_tools import get_redis_client, KEY_GAME_STATE
-
-            r = get_redis_client()
-            data = r.get(KEY_GAME_STATE)
-
-            if data:
-                state = json.loads(data)
-                polygon_count = len(state.get('polygons', []))
-                logger.info(f"Retrieved global game state: {polygon_count} polygons")
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(data.encode())
-            else:
-                logger.info("No global game state found - signaling fresh start")
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"empty": True}).encode())
-
-        except Exception as e:
-            logger.error(f"Get Game State Error: {e}")
-            self.send_error(500, str(e))
-
-    def handle_save_game_state(self):
-        """
-        Handle POST /api/game_state
-        Saves COMPLETE game state including ALL geometry to Redis.
-        Body: {
-            "polygons": [...],           # Full geometry
-            "white_lines": [...],        # Full geometry  
-            "green_circles": [...],      # Full data
-            "blue_circles": [...],       # Full data
-            "collected_circles": [...],  # Progress
-            "visible_polygon_ids": [...], # Progress
-            "expanded_circles": [...],   # Progress
-            "user_position": {...},       # Last position
-            "current_circle_uid": "...",  # Current circle UID for marker
-            "promo_gif_map": {...},       # GIF assignments
-            "poster_grid": [...]          # Poster data
-        }
-        """
-        try:
-            from CORE.BACKEND.redis_tools import get_redis_client, KEY_GAME_STATE
-
-            # Read POST body
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            state = json.loads(body.decode())
-
-            r = get_redis_client()
-
-            # Validate we have some data
-            polygons = state.get('polygons', [])
-            if not polygons:
-                logger.warning("Attempted to save empty game state - ignoring")
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "ignored", "reason": "no polygons"}).encode())
-                return
-
-            # Save complete state with 7-day TTL
-            t0 = time.perf_counter()
-            r.set(KEY_GAME_STATE, json.dumps(state))
-            r.expire(KEY_GAME_STATE, 60 * 60 * 24 * 7)  # 7 days
-            t1 = time.perf_counter()
-            logger.info(f"PERF: handle_save_game_state (Redis write) took {t1 - t0:.4f}s")
-
-            logger.info(f"Saved global game state: {len(polygons)} polygons, "
-                       f"{len(state.get('white_lines', []))} lines, "
-                       f"{len(state.get('collected_circles', []))} collected, "
-                       f"circle_uid={state.get('current_circle_uid', 'none')}")
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "status": "ok",
-                "saved_polygons": len(polygons),
-                "saved_lines": len(state.get('white_lines', [])),
-                "saved_circles": len(state.get('collected_circles', []))
-            }).encode())
-
-        except Exception as e:
-            logger.error(f"Save Game State Error: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            self.send_error(500, str(e))
-
-
-    def handle_serve_poster(self):
-        """Serve images from CORE/DATA/GAME_POSTERS."""
-        try:
-            # Extract filename and ensure it's safe
-            filename = os.path.basename(self.path)
-            poster_path = os.path.join(os.getcwd(), 'CORE', 'DATA', 'GAME_POSTERS', filename)
-            
-            logger.info(f"Attempting to serve poster: {poster_path}")
-
-            if not os.path.exists(poster_path):
-                logger.error(f"POSTER NOT FOUND on disk: {poster_path}")
-                self.send_error(404, "Poster Not Found")
-                return
-                
-            if not filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-                logger.error(f"INVALID POSTER EXTENSION: {filename}")
-                self.send_error(404, "Invalid Extension")
-                return
-                
-            self.send_response(200)
-            self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Cache-Control', 'public, max-age=86400') # Cache for 1 day
-            self.end_headers()
-            
-            with open(poster_path, 'rb') as f:
-                self.wfile.write(f.read())
-        except Exception as e:
-            logger.error(f"Error serving poster: {e}")
-            self.send_error(500, str(e))
-
-    def handle_serve_promo(self):
-        """Serve GIFs from CORE/DATA/GAME_PROMOS."""
-        try:
-            # Extract filename and ensure it's safe
-            filename = os.path.basename(self.path)
-            promo_path = os.path.join(os.getcwd(), 'CORE', 'DATA', 'GAME_PROMOS', filename)
-            
-            logger.info(f"Attempting to serve promo: {promo_path}")
-
-            if not os.path.exists(promo_path):
-                logger.error(f"PROMO NOT FOUND on disk: {promo_path}")
-                self.send_error(404, "Promo Not Found")
-                return
-                
-            if not filename.lower().endswith('.gif'):
-                logger.error(f"INVALID PROMO EXTENSION: {filename}")
-                self.send_error(404, "Invalid Extension")
-                return
-                
-            self.send_response(200)
-            self.send_header('Content-Type', 'image/gif')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Cache-Control', 'public, max-age=86400') # Cache for 1 day
-            self.end_headers()
-            
-            with open(promo_path, 'rb') as f:
-                self.wfile.write(f.read())
-        except Exception as e:
-            logger.error(f"Error serving promo: {e}")
-            self.send_error(500, str(e))
-
-    def handle_get_promos(self):
-        """
-        Handle GET /api/promos
-        Returns list of GIF filenames from CORE/DATA/GAME_PROMOS
-        """
-        try:
-            promos_dir = os.path.join(os.getcwd(), 'CORE', 'DATA', 'GAME_PROMOS')
-            if not os.path.exists(promos_dir):
-                logger.warning(f"Promos directory not found: {promos_dir}")
-                file_list = []
-            else:
-                files = os.listdir(promos_dir)
-                file_list = [f for f in files if f.lower().endswith('.gif')]
-            
-            logger.info(f"Retrieved {len(file_list)} promo GIFs")
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(file_list).encode())
-            
-        except Exception as e:
-            logger.error(f"Get Promos Error: {e}")
-            self.send_error(500, str(e))
-
-    def handle_serve_readme(self):
-        """Serve README.md from project root for version badge."""
-        try:
-            readme_path = os.path.join(os.getcwd(), 'README.md')
-            
-            if not os.path.exists(readme_path):
-                logger.error(f"README.md not found: {readme_path}")
-                self.send_error(404, "README.md Not Found")
-                return
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/markdown; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Cache-Control', 'no-cache')  # Always fresh for version check
-            self.end_headers()
-            
-            with open(readme_path, 'rb') as f:
-                self.wfile.write(f.read())
-                
-        except Exception as e:
-            logger.error(f"Error serving README.md: {e}")
-            self.send_error(500, str(e))
-
-    def proxy_nominatim(self):
-        """Proxy requests to Nominatim to avoid CORS."""
-        try:
-            # Parse internal request
-            parsed_path = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed_path.query)
-            
-            # Construct target URL based on endpoint
-            if self.path.startswith('/api/reverse'):
-                # Extract lat/lon
-                lat = params.get('lat', [None])[0]
-                lon = params.get('lon', [None])[0]
-                if not lat or not lon:
-                    self.send_error(400, "Missing lat/lon")
-                    return
-                target_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&accept-language=en"
-                
-            elif self.path.startswith('/api/search'):
-                # Extract query
-                q = params.get('q', [None])[0]
-                limit = params.get('limit', ['1'])[0]
-                if not q:
-                    self.send_error(400, "Missing query")
-                    return
-                # Encode query params properly
-                encoded_q = urllib.parse.quote(q)
-                target_url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_q}&limit={limit}&accept-language=en"
-            
-            # Make request with User-Agent (Required by OSM)
-            req = urllib.request.Request(target_url, headers={'User-Agent': 'CrazyWalk/1.0'})
-            
-            with urllib.request.urlopen(req) as response:
-                data = response.read()
-                
-            # Send response back to frontend
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*') 
-            self.end_headers()
-            self.wfile.write(data)
-            
-        except Exception as e:
-            logger.error(f"Proxy error: {e}")
-            self.send_error(500, f"Proxy error: {str(e)}")
-
-    def handle_game_data(self):
-        """
-        Handle /api/game_data.
-        Generates/Retrieves game elements (Lines, Polygons).
-        """
-        try:
-            # Parse params
-            parsed_path = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed_path.query)
-            lat = float(params.get('lat', [0])[0])
-            lon = float(params.get('lon', [0])[0])
-            rebuild_param = params.get('rebuild', ['false'])[0].lower()
-            mode_param = params.get('mode', ['initial'])[0]
-            restored_polygon_ids_param = params.get('restored_polygon_ids', [None])[0]
-
-            # Parse restored polygon IDs if provided
-            restored_polygon_ids = None
-            if restored_polygon_ids_param:
-                restored_polygon_ids = [pid.strip() for pid in restored_polygon_ids_param.split(',') if pid.strip()]
-                logger.info(f"Restoring {len(restored_polygon_ids)} previously visible polygons")
-
-            # Use rebuild param from request (default false = use Redis cache if available)
-            force_rebuild = rebuild_param == 'true'
-
-            if not lat or not lon:
-                self.send_error(400, "Missing lat/lon")
-                return
-
-            # Import and Reload to ensure fresh code
-            import importlib
-            from CORE.BACKEND import LocationPolygonsGenerator
-
-            # Force reload of dependencies in order
-            importlib.reload(LocationPolygonsGenerator)
-
-            # Generate Data
-            t0 = time.perf_counter()
-            generator = LocationPolygonsGenerator.LocationPolygonsGenerator()
-            data = generator.generate_map(lat, lon, force_rebuild=force_rebuild, mode=mode_param, restored_polygon_ids=restored_polygon_ids)
-            t1 = time.perf_counter()
-            logger.info(f"PERF: handle_game_data total took {t1 - t0:.4f}s")
-            
-            # Send Response
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*') 
-            self.end_headers()
-            
-            # Use a custom JSON encoder if needed, or ensure data is basic types.
-            # Shapely objects (Polygon) or sets are not JSON serializable. 
-            # Review Modules:
-            # AA: returns list of tuples (lat, lon) -> JSON OK? No, tuple becomes list.
-            # AB: returns list of dicts -> JSON OK.
-            # AC: list of dicts -> JSON OK.
-            # AD: list of dicts, coords is list of tuples -> JSON OK.
-            # AE: list of dicts -> JSON OK.
-
-            self.wfile.write(json.dumps(data).encode())
-            
-        except Exception as e:
-            logger.error(f"Game Data Error: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            self.send_error(500, str(e))
 
 class ThreadedHTTPServer(socketserver.ThreadingTCPServer):
     """Multi-threaded server to handle concurrent requests."""
@@ -929,29 +203,23 @@ class ThreadedHTTPServer(socketserver.ThreadingTCPServer):
 
     def handle_error(self, request, client_address):
         """Override to silence disconnect errors."""
-        # Get the exception info
         exc_type, exc_value, _ = sys.exc_info()
         
-        # Check for known connection dropping errors
-        # WinError 10053 = Connection aborted by host machine
-        # BrokenPipeError = Client closed before we finished
         if exc_type is ConnectionAbortedError or exc_type is BrokenPipeError:
-            return  # Ignore these common occurrences
+            return
             
-        # For Windows specifically, check the errno/winerror if available
         if hasattr(exc_value, 'winerror') and exc_value.winerror == 10053:
             return
 
-        # Log real errors normally
         super().handle_error(request, client_address)
+
 
 def ensure_redis_running():
     """Checks if Redis is accessible. If not, attempts to start it via Docker."""
     from CORE.BACKEND.redis_tools import get_redis_client
     import subprocess
-    import time
+    import time as time_module
     
-    # Try connecting with current settings (likely default 6379)
     try:
         r = get_redis_client()
         r.ping()
@@ -960,7 +228,6 @@ def ensure_redis_running():
         logger.info(f"✅ Redis database FLUSHED successfully (Port {os.getenv('REDIS_PORT', 6379)})")
         return
     except Exception:
-        # If default failed, try port 6500 (common dev port)
         try:
             os.environ['REDIS_PORT'] = '6500'
             r = get_redis_client()
@@ -970,22 +237,16 @@ def ensure_redis_running():
             logger.info("✅ Redis database FLUSHED successfully (Port 6500)")
             return
         except Exception:
-            # If 6500 also failed, proceed to start Docker
             pass
 
     logger.warning("Redis is not running. Attempting to start via Docker Compose...")
     try:
-        # Build/Start redis service using modern Docker Compose V2 plugin
         subprocess.run(["docker", "compose", "-f", "docker-compose.dev.yml", "up", "-d", "redis"], check=True)
         logger.info("Docker Compose command executed. Waiting for Redis to initialize...")
         
-        # When started via dev compose, it is definitely on port 6500
         os.environ['REDIS_PORT'] = '6500'
-        
-        # Re-get client with new port
         r = get_redis_client()
 
-        # Wait loop
         retries = 10
         for i in range(retries):
             try:
@@ -995,13 +256,14 @@ def ensure_redis_running():
                 logger.info("✅ Redis database FLUSHED successfully (Port 6500)")
                 return
             except Exception:
-                time.sleep(2)
+                time_module.sleep(2)
                 logger.info(f"Waiting for Redis... ({i+1}/{retries})")
         
         logger.error("Redis failed to come online after starting container.")
     except Exception as docker_e:
         logger.error(f"Failed to start Redis via Docker: {docker_e}")
         logger.error("Please run 'docker compose up -d redis' manually.")
+
 
 def run_server():
     Initializer.setup_working_directory()
@@ -1010,10 +272,8 @@ def run_server():
     with ThreadedHTTPServer(("", PORT), QuietHandler) as httpd:
         logger.info(f"http://localhost:{PORT}")
         
-        # Register signal handlers for graceful shutdown (Docker friendly)
         def signal_handler(sig, frame):
             logger.info("Shutting down server...")
-            # shutdown() must be called from a different thread to avoid deadlock with serve_forever()
             threading.Thread(target=httpd.shutdown).start()
 
         signal.signal(signal.SIGINT, signal_handler)
@@ -1022,10 +282,11 @@ def run_server():
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            pass # Handled by signal handler, but just in case
+            pass
         finally:
             httpd.server_close()
             logger.info("Server stopped.")
+
 
 if __name__ == "__main__":
     run_server()

@@ -22,275 +22,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            width: 100vw;
-            height: 100vh;
-            /* Fallback */
-            height: 100dvh;
-            /* Dynamic viewport height */
-            overflow: hidden;
-            background-color: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            -webkit-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: none;
-        }
-
-        /* Container for the map content */
-        .black-square {
-            position: absolute;
-            width: 146vh;
-            height: 82vh;
-            background-color: #050505;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 0;
-            overflow: hidden;
-            /* Ensure map doesn't spill out */
-        }
-
-        /* The Map itself */
-        #map {
-            width: 100%;
-            height: 100%;
-            background: #050505;
-            opacity: 0;
-            transition: opacity 0.8s ease-in-out;
-            z-index: 1;
-        }
-
-        /* Loader GIF */
-        #loading-gif {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            /* Centered in the square */
-            width: 150vh;
-            /* Adjust size as appropriate */
-            height: 150vh;
-            object-fit: contain;
-            z-index: 10;
-            transition: opacity 0.6s ease-out;
-        }
-
-        /* The Phone Frame */
-        .phone-frame {
-            height: 200vh;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-90deg);
-            z-index: 9999;
-            /* On top of everything */
-            pointer-events: none;
-        }
-
-
-
-        /* Leaflet DivIcon Custom Style for Marker */
-        .leaftlet-div-icon {
-            background: transparent !important;
-            border: none !important;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 1024px) {
-            .phone-frame {
-                display: none !important;
-            }
-
-            .black-square {
-                width: 100vw;
-                height: 100vh;
-                height: 100dvh;
-                border-radius: 0;
-                transform: translate(-50%, -50%);
-            }
-        }
-
-
-        /* Debug Boundary Box */
-        .debug-boundary-box {
-            display: none;
-            border: 2px solid red;
-            box-sizing: border-box;
-            background: rgba(255, 0, 0, 0.1);
-            pointer-events: none;
-        }
-
-        /* Show when body has debug-mode class */
-        body.debug-mode .debug-boundary-box {
-            display: block !important;
-        }
-
-        /* Label Styles */
-        .leaflet-tooltip.circle-label {
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            color: white;
-            font-weight: bold;
-            font-size: 20px;
-            text-shadow: 0 0 2px black;
-            pointer-events: none;
-            /* Make tooltip transparent to clicks */
-        }
-
-
-        /* Debug Mode Styles */
-        body.debug-mode .black-square,
-        body.debug-mode #map,
-        body.debug-mode .leaflet-container {
-            background-color: #001a4d !important;
-        }
-
-        /* Tint Tiles Blue in Debug Mode (Invert Light Map to Dark Blue) */
-        body.debug-mode .leaflet-tile-pane {
-            opacity: 1 !important;
-            filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%) !important;
-        }
-
-        .street-label-tooltip {
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            color: #fff;
-            /* White text for Dark Map (Default) */
-            font-size: 11px;
-            font-weight: bold;
-            text-shadow: 0px 0px 2px #000;
-            /* Halo */
-        }
-
-        /* Invert Label Color in Debug Mode */
-        /* Invert Label Color in Debug Mode */
-        /* Invert Label Color in Debug Mode */
-        body.debug-mode .street-label-tooltip {
-            color: #000;
-            text-shadow: 0px 0px 2px rgba(255, 255, 255, 0.8);
-        }
-
-        /* ERROR SCREEN */
-        #error-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #ff0033;
-            /* Bright Red */
-            z-index: 1000;
-            display: none;
-            /* Hidden by default */
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 5vh;
-        }
-
-        #error-screen h1 {
-            font-size: 4vh;
-            color: white;
-            background: none;
-            -webkit-text-fill-color: white;
-            margin-bottom: 2vh;
-        }
-
-        #error-screen p {
-            font-size: 2vh;
-            color: white;
-            opacity: 0.9;
-            max-width: 80%;
-            margin-bottom: 4vh;
-        }
-
-        .btn-retry {
-            background: white;
-            color: #ff0033;
-            border: none;
-            padding: 1.5vh 4vh;
-            font-size: 2vh;
-            font-weight: 700;
-            border-radius: 1vh;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s;
-        }
-
-        .btn-retry:active {
-            transform: scale(0.95);
-        }
-
-        /* Allow text selection in popups */
-        .leaflet-popup-content {
-            -webkit-user-select: text !important;
-            -ms-user-select: text !important;
-            user-select: text !important;
-            cursor: auto;
-        }
-
-        /* Poster Styling */
-        .poster-overlay {
-            pointer-events: none;
-            transition: opacity 0.5s ease-in-out;
-            z-index: 20;
-            /* Above base map tiles (z-index 10-11) */
-        }
-
-        /* Version Badge */
-        #version-badge {
-            position: absolute;
-            top: 1vh;
-            left: 1vh;
-            background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(30, 30, 30, 0.9));
-            color: #00ff88;
-            font-family: 'Courier New', monospace;
-            font-size: 1.5vh;
-            font-weight: bold;
-            padding: 0.5vh 1vh;
-            border-radius: 0.5vh;
-            border: 1px solid rgba(0, 255, 136, 0.3);
-            z-index: 500;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease-in-out, background 0.3s;
-            text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
-        }
-
-        #version-badge.updated {
-            background: linear-gradient(135deg, rgba(255, 100, 0, 0.9), rgba(200, 50, 0, 0.9));
-            color: #fff;
-            border-color: rgba(255, 200, 0, 0.5);
-            animation: pulse-version 1s ease-in-out 3;
-        }
-
-        @keyframes pulse-version {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.1);
-            }
-        }
-    </style>
+    <!-- Map Page Styles -->
+    <link rel="stylesheet" href="/B_map_page/styles.css">
 </head>
 
 <body>
@@ -466,15 +199,33 @@
 
             // ========== GLOBAL STATE FUNCTIONS ==========
 
-            // Load complete game state from Redis (all geometry + progress)
-            const loadGlobalState = async () => {
+            // Load complete game state from Redis via unified endpoint
+            const loadGlobalState = async (lat, lon) => {
                 try {
                     console.log('GLOBAL_STATE: Checking Redis for saved state...');
-                    const response = await fetch('/api/game_state');
+                    // Build URL - lat/lon are optional for initial load
+                    let url = '/api/unified_state';
+                    if (lat !== undefined && lon !== undefined) {
+                        url += `?lat=${lat}&lon=${lon}`;
+                    }
+                    const response = await fetch(url);
                     const state = await response.json();
 
-                    if (state && !state.empty && state.polygons && state.polygons.length > 0) {
+                    if (state && state.has_saved_state && state.polygons && state.polygons.length > 0) {
                         console.log(`GLOBAL_STATE: Found saved state - ${state.polygons.length} polygons`);
+
+                        // Restore GIF assignments from backend
+                        if (state.promo_gif_map) {
+                            promoGifAssignments = new Map(Object.entries(state.promo_gif_map));
+                            console.log(`GLOBAL_STATE: Restored ${promoGifAssignments.size} GIF assignments`);
+                        }
+
+                        // Restore location key from backend response
+                        if (state.location_key) {
+                            currentLocationKey = state.location_key;
+                            console.log(`GLOBAL_STATE: Restored location key: ${currentLocationKey}`);
+                        }
+
                         return state;
                     }
 
@@ -486,15 +237,18 @@
                 }
             };
 
-            // Save complete game state to Redis (all geometry + progress)
+            // Save complete game state to Redis via unified endpoint
             const saveGlobalState = async () => {
                 if (!cachedGameData || !cachedGameData.polygons || cachedGameData.polygons.length === 0) {
                     console.log('GLOBAL_STATE: No data to save (empty cachedGameData)');
                     return;
                 }
 
-                // Build complete state
+                // Build complete state for unified endpoint
                 const state = {
+                    // Location key for progress tracking
+                    location_key: currentLocationKey,
+
                     // Geometry (accumulated from cachedGameData)
                     polygons: cachedGameData.polygons || [],
                     white_lines: cachedGameData.white_lines || [],
@@ -512,18 +266,18 @@
                     user_position: currentUserPosition,
                     current_circle_uid: currentCircleUid,
 
-                    // GIF assignments
+                    // GIF assignments (now handled by backend)
                     promo_gif_map: Object.fromEntries(promoGifAssignments)
                 };
 
                 try {
-                    const response = await fetch('/api/game_state', {
+                    const response = await fetch('/api/unified_state', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(state)
                     });
                     const result = await response.json();
-                    console.log(`GLOBAL_STATE: Saved - ${result.saved_polygons} polygons, ${result.saved_lines} lines, circle_uid=${currentCircleUid}`);
+                    console.log(`GLOBAL_STATE: Saved - ${result.saved_polygons} polygons, location=${result.location_key}`);
                 } catch (err) {
                     console.error('GLOBAL_STATE: Failed to save:', err);
                 }
@@ -597,6 +351,10 @@
 
                 // Refine position to exact circle center if UID is available
                 if (currentCircleUid && window.allItems) {
+                    // DEBUG: Log for troubleshooting - check both blue and green circles
+                    const circleKeys = Array.from(window.allItems.keys()).filter(k => k.startsWith('BLUE_CIRCLE_') || k.startsWith('GREEN_CIRCLE_'));
+                    console.log(`GLOBAL_STATE DEBUG: Looking for ${currentCircleUid}, available circles: ${circleKeys.length} total`);
+
                     const circleData = window.allItems.get(currentCircleUid);
                     if (circleData && circleData.lat !== undefined && circleData.lon !== undefined) {
                         console.log(`GLOBAL_STATE: Refining marker to saved circle center ${currentCircleUid}`);
@@ -728,16 +486,16 @@
                 // Update current position
                 currentUserPosition = { lat, lon };
 
-                // Update circle UID if we moved to a blue circle
+                // Update circle UID if we moved to a blue or green circle
                 const coordKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
                 if (window.allItems) {
-                    // Try to find blue circle at this position
+                    // Try to find blue OR green circle at this position
                     for (const [uid, item] of window.allItems.entries()) {
                         if (item.lat !== undefined && item.lon !== undefined) {
                             const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                            if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
+                            if (itemKey === coordKey && (uid.startsWith('BLUE_CIRCLE_') || uid.startsWith('GREEN_CIRCLE_'))) {
                                 currentCircleUid = uid;
-                                console.log(`DEBUG: Moved to blue circle ${uid}`);
+                                console.log(`DEBUG: Moved to circle ${uid}`);
                                 break;
                             }
                         }
@@ -1619,26 +1377,22 @@
                 }
                 */
 
-                // --- 1. UID/ID MAPPING (Foreign Key Normalization) ---
-                const lineIdMap = new Map(); // Old ID (number) -> New UID (string)
-
-                const generateUID = (prefix) => {
-                    return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
-                };
+                // --- 1. UID/ID MAPPING ---
+                // Backend now provides UIDs, frontend just uses them directly
+                const lineIdMap = new Map(); // Old ID -> UID for reference mapping
 
                 // A. Process White Lines (Dependencies for Polygons/Circles)
                 if (data.white_lines) {
                     data.white_lines.forEach(line => {
-                        const originalId = line.id;
+                        // Backend provides UID as 'id' (e.g., WHITE_LINE_a1b2c3d4)
+                        const backendId = line.id;
 
-                        // Check if line already exists by start/end coordinates (reuse UID in expand mode)
+                        // Check if line already exists in expand mode
                         let existingLine = null;
-                        if (line.start && line.end && line.start.length === 2 && line.end.length === 2) {
+                        if (mode === 'expand' && line.start && line.end) {
                             const lineKey = `${line.start[0].toFixed(7)},${line.start[1].toFixed(7)}_${line.end[0].toFixed(7)},${line.end[1].toFixed(7)}`;
-
-                            // Search for existing line with same coordinates in window.allItems
                             for (const [uid, item] of window.allItems.entries()) {
-                                if (item.start && item.end && item.start.length === 2 && item.end.length === 2) {
+                                if (item.start && item.end) {
                                     const itemLineKey = `${item.start[0].toFixed(7)},${item.start[1].toFixed(7)}_${item.end[0].toFixed(7)},${item.end[1].toFixed(7)}`;
                                     if (itemLineKey === lineKey && uid.startsWith('WHITE_LINE_')) {
                                         existingLine = { uid, item };
@@ -1649,24 +1403,18 @@
                         }
 
                         if (existingLine) {
-                            // Reuse existing UID
+                            // Reuse existing UID for consistency
                             line.uid = existingLine.uid;
                             line.id = existingLine.uid;
                         } else {
-                            // Generate new UID
-                            line.uid = generateUID('WHITE_LINE');
-                            line.id = line.uid; // Swap ID for consistency in app logic
+                            // Use backend-provided ID directly
+                            line.uid = backendId;
+                            // line.id already correct from backend
                         }
 
-                        line.original_id = originalId; // Keep for reference if needed
-
-                        if (originalId !== undefined) {
-                            lineIdMap.set(Number(originalId), line.uid);
-                            lineIdMap.set(String(originalId), line.uid); // String safety
-                        }
-
+                        lineIdMap.set(backendId, line.uid);
                         window.allItems.set(line.uid, line);
-                        // Track expanded items (only if new)
+
                         if (mode === 'expand' && !existingLine) {
                             expandedItemUids.add(line.uid);
                         }
@@ -1676,43 +1424,40 @@
                 // B. Process Green Circles (Depend on Lines)
                 if (data.green_circles) {
                     data.green_circles.forEach(circle => {
-                        // Check if circle already exists by coordinates (reuse UID in expand mode)
+                        const backendId = circle.id;
                         const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
                         let existingCircle = null;
 
-                        // Search for existing circle with same coordinates in window.allItems
-                        for (const [uid, item] of window.allItems.entries()) {
-                            if (item.lat !== undefined && item.lon !== undefined) {
-                                const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                                if (itemKey === coordKey && uid.startsWith('GREEN_CIRCLE_')) {
-                                    existingCircle = { uid, item };
-                                    break;
+                        // Check for existing in expand mode
+                        if (mode === 'expand') {
+                            for (const [uid, item] of window.allItems.entries()) {
+                                if (item.lat !== undefined && item.lon !== undefined) {
+                                    const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
+                                    if (itemKey === coordKey && uid.startsWith('GREEN_CIRCLE_')) {
+                                        existingCircle = { uid, item };
+                                        break;
+                                    }
                                 }
                             }
                         }
 
                         if (existingCircle) {
-                            // Reuse existing UID
                             circle.uid = existingCircle.uid;
                             circle.id = existingCircle.uid;
                         } else {
-                            // Create new UID
-                            circle.uid = generateUID('GREEN_CIRCLE');
-                            circle.id = circle.uid;
+                            // Use backend-provided ID directly
+                            circle.uid = backendId;
                         }
 
-                        // Update Reference (Foreign Key)
+                        // line_id already uses backend UIDs, just remap if needed
                         if (circle.line_id !== undefined) {
                             const newRef = lineIdMap.get(circle.line_id);
                             if (newRef) {
                                 circle.line_id = newRef;
-                            } else {
-                                console.warn(`Ref Error: Green Circle ${circle.uid} points to unknown line ${circle.line_id}`);
                             }
                         }
 
                         window.allItems.set(circle.uid, circle);
-                        // Track expanded items (only if new)
                         if (mode === 'expand' && !existingCircle) {
                             expandedItemUids.add(circle.uid);
                         }
@@ -1720,18 +1465,15 @@
                 }
 
                 // C. Process Polygons (Depend on Lines)
-                const polyIdMap = new Map(); // Old ID (poly_X) -> New UID (POLYGON_xxx)
+                const polyIdMap = new Map(); // Backend ID -> UID for reference
                 if (data.polygons) {
                     data.polygons.forEach(poly => {
-                        const originalId = poly.id; // Save original BACKEND ID (e.g., "poly_4055291218")
+                        const backendId = poly.id; // Backend provides POLYGON_xxxxxxxx
 
-                        // UNIFIED ID SCHEME:
-                        // Check if polygon already exists by center coordinates (reuse UID in expand mode)
+                        // Check if polygon already exists in expand mode
                         let existingPoly = null;
-                        if (poly.center && poly.center.length === 2) {
+                        if (mode === 'expand' && poly.center && poly.center.length === 2) {
                             const centerKey = `${poly.center[0].toFixed(7)},${poly.center[1].toFixed(7)}`;
-
-                            // Search for existing polygon with same center in window.allItems
                             for (const [uid, item] of window.allItems.entries()) {
                                 if (item.center && item.center.length === 2) {
                                     const itemCenterKey = `${item.center[0].toFixed(7)},${item.center[1].toFixed(7)}`;
@@ -1744,23 +1486,16 @@
                         }
 
                         if (existingPoly) {
-                            // Reuse existing UID
                             poly.uid = existingPoly.uid;
                             poly.id = existingPoly.uid;
-                            poly.backendId = existingPoly.item.backendId || originalId; // Preserve backend ID
                         } else {
-                            // Generate random UID for polygons
-                            poly.uid = generateUID('POLYGON');
-                            poly.id = poly.uid; // UNIFIED.
-                            poly.backendId = originalId; // Store original backend ID for restoration
+                            // Use backend-provided ID directly
+                            poly.uid = backendId;
                         }
 
-                        // Store mapping for later use
-                        if (originalId !== undefined) {
-                            polyIdMap.set(String(originalId), poly.uid);
-                        }
+                        polyIdMap.set(backendId, poly.uid);
 
-                        // Map Wrapper: Update boundary references
+                        // boundary_white_lines already use backend UIDs
                         if (poly.boundary_white_lines) {
                             poly.boundary_white_lines = poly.boundary_white_lines.map(oldId => {
                                 const newId = lineIdMap.get(oldId);
@@ -1769,7 +1504,6 @@
                         }
 
                         window.allItems.set(poly.uid, poly);
-                        // Track expanded items (only if new)
                         if (mode === 'expand' && !existingPoly) {
                             expandedItemUids.add(poly.uid);
                         }
@@ -1779,32 +1513,32 @@
                 // D. Process Blue Circles
                 if (localBlueCircles && localBlueCircles.length > 0) {
                     localBlueCircles.forEach(circle => {
-                        // Check if circle already exists by coordinates (reuse UID in expand mode)
+                        const backendId = circle.id;
                         const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
                         let existingCircle = null;
 
-                        // Search for existing circle with same coordinates in window.allItems
-                        for (const [uid, item] of window.allItems.entries()) {
-                            if (item.lat !== undefined && item.lon !== undefined) {
-                                const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                                if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
-                                    existingCircle = { uid, item };
-                                    break;
+                        // Check for existing in expand mode
+                        if (mode === 'expand') {
+                            for (const [uid, item] of window.allItems.entries()) {
+                                if (item.lat !== undefined && item.lon !== undefined) {
+                                    const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
+                                    if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
+                                        existingCircle = { uid, item };
+                                        break;
+                                    }
                                 }
                             }
                         }
 
                         if (existingCircle) {
-                            // Reuse existing UID
                             circle.uid = existingCircle.uid;
                             circle.id = existingCircle.uid;
                         } else {
-                            // Create new UID
-                            circle.uid = generateUID('BLUE_CIRCLE');
-                            circle.id = circle.uid;
+                            // Use backend-provided ID directly
+                            circle.uid = backendId;
                         }
 
-                        // Update connected_polygon_ids to use new UIDs
+                        // connected_polygon_ids already use backend UIDs
                         if (circle.connected_polygon_ids) {
                             circle.connected_polygon_ids = circle.connected_polygon_ids.map(oldId => {
                                 const newId = polyIdMap.get(String(oldId));
@@ -1813,7 +1547,6 @@
                         }
 
                         window.allItems.set(circle.uid, circle);
-                        // Track expanded items (only if new)
                         if (mode === 'expand' && !existingCircle) {
                             expandedItemUids.add(circle.uid);
                         }

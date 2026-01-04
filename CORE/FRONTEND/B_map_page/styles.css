@@ -1,0 +1,248 @@
+/* CrazyWalk-Game Map Page Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+}
+
+/* Container for the map content */
+.black-square {
+    position: absolute;
+    width: 146vh;
+    height: 82vh;
+    background-color: #050505;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+    overflow: hidden;
+}
+
+/* The Map itself */
+#map {
+    width: 100%;
+    height: 100%;
+    background: #050505;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    z-index: 1;
+}
+
+/* Loader GIF */
+#loading-gif {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 150vh;
+    height: 150vh;
+    object-fit: contain;
+    z-index: 10;
+    transition: opacity 0.6s ease-out;
+}
+
+/* The Phone Frame */
+.phone-frame {
+    height: 200vh;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    z-index: 9999;
+    pointer-events: none;
+}
+
+/* Leaflet DivIcon Custom Style for Marker */
+.leaftlet-div-icon {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Mobile Responsive */
+@media (max-width: 1024px) {
+    .phone-frame {
+        display: none !important;
+    }
+
+    .black-square {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0;
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* Debug Boundary Box */
+.debug-boundary-box {
+    display: none;
+    border: 2px solid red;
+    box-sizing: border-box;
+    background: rgba(255, 0, 0, 0.1);
+    pointer-events: none;
+}
+
+/* Show when body has debug-mode class */
+body.debug-mode .debug-boundary-box {
+    display: block !important;
+}
+
+/* Label Styles */
+.leaflet-tooltip.circle-label {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
+    text-shadow: 0 0 2px black;
+    pointer-events: none;
+}
+
+/* Debug Mode Styles */
+body.debug-mode .black-square,
+body.debug-mode #map,
+body.debug-mode .leaflet-container {
+    background-color: #001a4d !important;
+}
+
+/* Tint Tiles Blue in Debug Mode */
+body.debug-mode .leaflet-tile-pane {
+    opacity: 1 !important;
+    filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%) !important;
+}
+
+.street-label-tooltip {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    text-shadow: 0px 0px 2px #000;
+}
+
+/* Invert Label Color in Debug Mode */
+body.debug-mode .street-label-tooltip {
+    color: #000;
+    text-shadow: 0px 0px 2px rgba(255, 255, 255, 0.8);
+}
+
+/* ERROR SCREEN */
+#error-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #ff0033;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 5vh;
+}
+
+#error-screen h1 {
+    font-size: 4vh;
+    color: white;
+    background: none;
+    -webkit-text-fill-color: white;
+    margin-bottom: 2vh;
+}
+
+#error-screen p {
+    font-size: 2vh;
+    color: white;
+    opacity: 0.9;
+    max-width: 80%;
+    margin-bottom: 4vh;
+}
+
+.btn-retry {
+    background: white;
+    color: #ff0033;
+    border: none;
+    padding: 1.5vh 4vh;
+    font-size: 2vh;
+    font-weight: 700;
+    border-radius: 1vh;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s;
+}
+
+.btn-retry:active {
+    transform: scale(0.95);
+}
+
+/* Allow text selection in popups */
+.leaflet-popup-content {
+    -webkit-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
+    cursor: auto;
+}
+
+/* Poster Styling */
+.poster-overlay {
+    pointer-events: none;
+    transition: opacity 0.5s ease-in-out;
+    z-index: 20;
+}
+
+/* Version Badge */
+#version-badge {
+    position: absolute;
+    top: 1vh;
+    left: 1vh;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(30, 30, 30, 0.9));
+    color: #00ff88;
+    font-family: 'Courier New', monospace;
+    font-size: 1.5vh;
+    font-weight: bold;
+    padding: 0.5vh 1vh;
+    border-radius: 0.5vh;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    z-index: 500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out, background 0.3s;
+    text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+}
+
+#version-badge.updated {
+    background: linear-gradient(135deg, rgba(255, 100, 0, 0.9), rgba(200, 50, 0, 0.9));
+    color: #fff;
+    border-color: rgba(255, 200, 0, 0.5);
+    animation: pulse-version 1s ease-in-out 3;
+}
+
+@keyframes pulse-version {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
