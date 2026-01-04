@@ -2516,16 +2516,25 @@
                             return;
                         }
 
+                        // Backend Visibility Control
+                        const isHidden = (line.is_visible === false);
+                        const initialOpacity = isHidden ? 0 : 1;
+                        const initialHitInteractive = !isHidden;
+
                         const visual = L.polyline(linePath, {
                             color: 'white', weight: 2, dashArray: '5, 5', interactive: false,
-                            pane: 'blueCirclesPane'
+                            pane: 'blueCirclesPane',
+                            opacity: initialOpacity
                         }).addTo(targetLayer);
 
                         // Hit Layer (Thick, Solid, Transparent, Interactive)
                         const hit = L.polyline(linePath, {
-                            color: 'white', weight: 15, opacity: 0, interactive: true,
+                            color: 'white', weight: 15, opacity: 0, interactive: initialHitInteractive,
                             pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
+
+                        // Tag for debug filtering
+                        visual.isHiddenByGameLogic = isHidden;
 
                         attachDebugClick(hit, line, 'White Line');
 
@@ -2551,21 +2560,6 @@
                     });
                     const currentPos = userMarker.getLatLng();
                     updateAndSaveUserPosition(userMarker, currentPos.lat, currentPos.lng, isGpsActive);
-
-                    // POST-INIT: Hide lines for restored completed polygons
-                    // DISABLE HIDING per user request (Keep white lines visible)
-                    /*
-                    polygonState.forEach(state => {
-                        if (state.current >= state.total && state.lines) {
-                            state.lines.forEach(lid => {
-                                const lineLayer = lineLayerMap.get(String(lid));
-                                if (lineLayer) {
-                                    lineLayer.setStyle({ opacity: 0, fillOpacity: 0 });
-                                }
-                            });
-                        }
-                    });
-                    */
                 }
 
                 // 4. Circles (Rendering + Mapping)

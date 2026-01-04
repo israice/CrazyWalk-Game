@@ -86,30 +86,50 @@ def handle_game_data(handler):
                             matches += 1
                     
                     # Logic: is_completed if we collected enough points
-                    # Note: total_points might include green circles which are not in coords list directly here?
-                    # Wait, coords list usually contains the polygon boundary vertices.
-                    # Green circles are typically ON the boundary (vertices).
-                    # So checking coords should be sufficient for the "shape" completion.
-                    
                     is_completed = (matches >= len(coords)) # Strict check based on geometry vertices
                     
-                    # Fallback/Loose check if total_points implies more logic (like internal points?)
-                    # Frontend logic was: savedCount = poly.coords.filter(...).length; isCompleted = savedCount >= poly.total_points;
-                    # So we should use poly.total_points if possible, but matches is based on coords.
-                    # Usually len(coords) == total_points for simple polygons.
-                    
-                    if total_points > 0:
-                         is_completed = (matches >= total_points)
-                    
                     poly['is_completed'] = is_completed
-                    if is_completed:
-                         pass # logger.info(f"Polygon {poly['uid']} is COMPLETED (Backend verified)")
 
-        except Exception as state_e:
-            logger.error(f"Failed to calculate is_completed state: {state_e}")
-            # Default to False on error to be safe (don't reveal secrets)
-            for poly in data.get('polygons', []):
-                poly['is_completed'] = False
+            # 3. White Line Visibility Logic
+            # Collect sets of completed polygon IDs/UIDs for fast lookup
+            completed_poly_uids = set()
+            if 'polygons' in data and data['polygons']:
+                for poly in data['polygons']:
+                    if poly.get('is_completed'):
+                        if poly.get('uid'):
+                            completed_poly_uids.add(poly['uid'])
+                        if poly.get('id'): # Support legacy ID just in case
+                            completed_poly_uids.add(str(poly['id']))
+            
+            # Update white lines
+            if 'white_lines' in data and data['white_lines']:
+                for line in data['white_lines']:
+                    connected = line.get('connected_polygon_ids', [])
+                    if not connected:
+                        line['is_visible'] = True # Default visible if no info
+                        continue
+                        
+                    # Line is visible UNLESS ALL connected polygons are completed
+                    # Check if every connected poly ID is in our completed set
+                    all_neighbors_completed = True
+                    for pid in connected:
+                        # pid might be int or str, ensure str for set lookup
+                        if str(pid) not in completed_poly_uids:
+                            all_neighbors_completed = False
+                            break
+                    
+                    line['is_visible'] = not all_neighbors_completed
+                    
+        except Exception as e:
+            logger.error(f"Error injecting game state logic: {e}")
+            # Fallback: ensure flags exist
+            if 'polygons' in data:
+                for p in data['polygons']:
+                    if 'is_completed' not in p: p['is_completed'] = False
+            if 'white_lines' in data:
+                for l in data['white_lines']:
+                    if 'is_visible' not in l: l['is_visible'] = True
+
 
         t1 = time.perf_counter()
         logger.info(f"PERF: handle_game_data total took {t1 - t0:.4f}s")
