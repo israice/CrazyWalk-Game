@@ -1565,55 +1565,37 @@
                     });
                 }
 
-                // E. Count Blue Circles per Polygon (match coords)
-                if (data.polygons && localBlueCircles && localBlueCircles.length > 0) {
-                    // Build a Set of blue circle coordinates for fast lookup
-                    const blueCircleCoords = new Set(
-                        localBlueCircles.map(bc => `${bc.lat.toFixed(7)},${bc.lon.toFixed(7)}`)
-                    );
-
+                // E. Count Blue Circles per Polygon (Using Explicit IDs)
+                if (data.polygons) {
                     data.polygons.forEach(poly => {
-                        let count = 0;
-                        if (poly.coords) {
-                            // DEDUPLICATE polygon coords first (closing vertex = first vertex)
-                            const uniquePolyCoords = new Set(
-                                poly.coords.map(c => `${c[0].toFixed(7)},${c[1].toFixed(7)}`)
-                            );
-                            // Count how many unique polygon vertices have a blue circle
-                            uniquePolyCoords.forEach(coordKey => {
-                                if (blueCircleCoords.has(coordKey)) {
-                                    count++;
+                        const uniqueBlueIDs = new Set();
+                        if (poly.boundary_white_lines) {
+                            poly.boundary_white_lines.forEach(lineUid => {
+                                const line = window.allItems.get(lineUid);
+                                if (line) {
+                                    if (line.start_blue_circle_id) uniqueBlueIDs.add(line.start_blue_circle_id);
+                                    if (line.end_blue_circle_id) uniqueBlueIDs.add(line.end_blue_circle_id);
                                 }
                             });
                         }
-                        poly.blue_circles_count = count;
+                        poly.blue_circles_count = uniqueBlueIDs.size;
                     });
                 }
 
                 // F. Enrich White Lines with related elements
-                if (data.white_lines && localBlueCircles && localBlueCircles.length > 0 && data.green_circles) {
-                    // Build coord -> blue circle UID map
-                    const blueByCoord = new Map();
-                    localBlueCircles.forEach(bc => {
-                        const key = `${bc.lat.toFixed(7)},${bc.lon.toFixed(7)}`;
-                        blueByCoord.set(key, bc.uid);
-                    });
-
+                if (data.white_lines && data.green_circles) {
                     // Build lineId -> green circles list
                     const greenByLine = new Map();
                     data.green_circles.forEach(gc => {
-                        if (!greenByLine.has(gc.line_id)) greenByLine.set(gc.line_id, []);
-                        greenByLine.get(gc.line_id).push(gc.uid);
+                        if (gc.line_id && !greenByLine.has(gc.line_id)) greenByLine.set(gc.line_id, []);
+                        if (gc.line_id) greenByLine.get(gc.line_id).push(gc.uid);
                     });
 
                     data.white_lines.forEach(line => {
-                        // Find endpoint blue circles
-                        const startKey = `${line.start[0].toFixed(7)},${line.start[1].toFixed(7)}`;
-                        const endKey = `${line.end[0].toFixed(7)},${line.end[1].toFixed(7)}`;
-
+                        // Find endpoint blue circles (Explicit IDs)
                         line.endpoint_blue_circles = [];
-                        if (blueByCoord.has(startKey)) line.endpoint_blue_circles.push(blueByCoord.get(startKey));
-                        if (blueByCoord.has(endKey)) line.endpoint_blue_circles.push(blueByCoord.get(endKey));
+                        if (line.start_blue_circle_id) line.endpoint_blue_circles.push(line.start_blue_circle_id);
+                        if (line.end_blue_circle_id) line.endpoint_blue_circles.push(line.end_blue_circle_id);
 
                         // Find green circles on this line
                         line.green_circles_uids = greenByLine.get(line.uid) || [];
@@ -1622,19 +1604,7 @@
                     });
                 }
 
-                // G. Build blue circle data map for neighbor polygon calculations
-                const blueCircleDataMap = new Map(); // coord key -> { connections, connected_polygon_ids }
-                if (localBlueCircles && localBlueCircles.length > 0) {
-                    localBlueCircles.forEach(bc => {
-                        const key = `${bc.lat.toFixed(7)},${bc.lon.toFixed(7)}`;
-                        blueCircleDataMap.set(key, {
-                            id: bc.id,
-                            connections: bc.connections || 0,
-                            connected_polygon_ids: bc.connected_polygon_ids || [],
-                            connected_polygons_count: bc.connected_polygons_count || 0
-                        });
-                    });
-                }
+                // G. REMOVED (Legacy blueCircleDataMap)
 
                 // H. Calculate neighbor polygons for each polygon - MOVED TO SERVER
                 // White Line Data Map is no longer strictly needed for this, but might be useful for other lookups if kept.
@@ -1651,30 +1621,28 @@
                 // STATE STORAGE - Now global (defined at top)
                 // polygonState, circleToPolyMap, lineLayerMap are now global and persist across renders
 
-                // Helper to map a circle coord to polygons
-                const mapCircleToPolys = (lat, lon, polyList, whiteLineId = -1) => {
+                // Helper to map a circle to polygons using Explicit IDs
+                const mapCircleToPolys = (circleData, lat, lon) => {
                     const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
-
                     if (!circleToPolyMap.has(key)) circleToPolyMap.set(key, []);
                     const list = circleToPolyMap.get(key);
 
-                    polyList.forEach(poly => {
-                        let isRelevant = false;
-                        // Check Green Stickiness (Line ID)
-                        // Note: poly.boundary_white_lines and whiteLineId are now UIDs (Strings)
-                        if (whiteLineId !== -1 && poly.boundary_white_lines && poly.boundary_white_lines.includes(whiteLineId)) {
-                            isRelevant = true;
-                        }
-                        // Check Blue Stickiness (Vertex Match)
-                        else if (whiteLineId === -1) {
-                            // This is a blue circle. Check if it matches a vertex of the polygon.
-                            const isVertex = poly.coords.some(c => Math.abs(c[0] - lat) < 0.00001 && Math.abs(c[1] - lon) < 0.00001);
-                            if (isVertex) isRelevant = true;
-                        }
+                    let connectedPolys = [];
 
-                        if (isRelevant) {
-                            if (!list.includes(poly.id)) list.push(poly.id);
+                    // 1. Blue Circle: Direct list
+                    if (circleData.connected_polygon_ids && circleData.connected_polygon_ids.length > 0) {
+                        connectedPolys = circleData.connected_polygon_ids;
+                    }
+                    // 2. Green Circle: Via White Line
+                    else if (circleData.line_id) {
+                        const line = window.allItems.get(circleData.line_id);
+                        if (line && line.connected_polygon_ids) {
+                            connectedPolys = line.connected_polygon_ids;
                         }
+                    }
+
+                    connectedPolys.forEach(pid => {
+                        if (!list.includes(pid)) list.push(pid);
                     });
                 };
 
@@ -2198,7 +2166,19 @@
                     // Large circle stays at polygon center
                     // Small circle is positioned on the circumference of large circle, towards longest edge
 
-                    const centerPos = poly.center;
+                    let centerPos = poly.center;
+                    if (!centerPos && poly.coords && poly.coords.length > 0) {
+                        // Fallback: Calculate centroid if missing
+                        let sumLat = 0, sumLon = 0;
+                        poly.coords.forEach(c => { sumLat += c[0]; sumLon += c[1]; });
+                        centerPos = [sumLat / poly.coords.length, sumLon / poly.coords.length];
+                        console.warn(`Polygon ${poly.id} missing center, calculated centroid:`, centerPos);
+                    }
+
+                    if (!centerPos) {
+                        console.error(`Polygon ${poly.id} has no center and no coords, skipping visual.`);
+                        return;
+                    }
                     const direction = poly.label_direction || { angle: 0 };
 
                     // Large circle radius in pixels = 30px
@@ -2555,13 +2535,20 @@
                         }
 
                         // Visual Layer (Thin, Dashed, Non-Interactive)
-                        const visual = L.polyline(line.path, {
+                        // Safety check: ensure coordinates exist
+                        const linePath = line.path || (line.start && line.end ? [line.start, line.end] : null);
+                        if (!linePath || linePath.length < 2) {
+                            console.warn(`Skipping malformed white line ${line.id}`, line);
+                            return;
+                        }
+
+                        const visual = L.polyline(linePath, {
                             color: 'white', weight: 2, dashArray: '5, 5', interactive: false,
                             pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
 
                         // Hit Layer (Thick, Solid, Transparent, Interactive)
-                        const hit = L.polyline(line.path, {
+                        const hit = L.polyline(linePath, {
                             color: 'white', weight: 15, opacity: 0, interactive: true,
                             pane: 'blueCirclesPane'
                         }).addTo(targetLayer);
@@ -2611,12 +2598,12 @@
                 // Track Layers for Hiding Logic
                 // Note: circleLayerMap, blueCircleLayerMap, lineLayerMap, greenCirclesByLine are now global (defined at top)
 
-                const addToMap = (lat, lon, layer, type, lineId = -1) => {
+                const addToMap = (lat, lon, layer, type, data) => {
                     const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
                     circleLayerMap.set(key, layer);
 
                     // Map to Polygons
-                    mapCircleToPolys(lat, lon, localPolys, lineId);
+                    mapCircleToPolys(data, lat, lon);
                 };
 
                 // Shared Debug Click Handler (Removed from here, moved to top)
@@ -2677,7 +2664,7 @@
                                 }
                             }
                             // Update polygon mapping
-                            mapCircleToPolys(circle.lat, circle.lon, localPolys, -1);
+                            mapCircleToPolys(circle, circle.lat, circle.lon);
                             return; // Skip rendering
                         }
 
@@ -2730,7 +2717,7 @@
                         }
 
                         // Blue circles are large enough, no composite needed yet unless requested
-                        addToMap(circle.lat, circle.lon, marker, 'blue');
+                        addToMap(circle.lat, circle.lon, marker, 'blue', circle);
                         attachDebugClick(marker, circle, 'Blue Circle');
 
                         // Track for polygon debug highlighting
@@ -2739,29 +2726,13 @@
                     });
                 }
 
-                // --- NEIGHBOR PROPAGATION: Update relevant Blue Circles even if not in response ---
-                // Expansion sends New Polygons and their "Focus" Blue Circles. All neighboring Blue Circles sharing a White Line
-                // with the new Polygon must also be updated to know about the new Polygon.
+                // --- NEIGHBOR PROPAGATION: Update relevant Blue Circles ---
                 if (localPolys && localPolys.length > 0) {
                     localPolys.forEach(poly => {
                         const polyId = poly.id;
                         (poly.boundary_white_lines || []).forEach(lineId => {
-                            // Find the white line to get its endpoints
-                            // We don't have a direct map of Line ID -> Objects easily accessible in scope unless we search.
-                            // But we can search localWhiteLines first, then global active lines?
-                            // Optimization: Iterate window.allItems to find lines? No, too slow.
-
-                            // Better: In backend, 'white_lines' response includes ALL lines of the new polygons?
-                            // Yes, 'expand' usually sends the white lines of the new polygons.
-                            // Let's assume the line is in 'localWhiteLines'.
-
-                            let whiteLine = null;
-                            if (localWhiteLines) whiteLine = localWhiteLines.find(l => l.id === lineId);
-
-                            // Optimization: Check global items directly by ID (Keys are UIDs)
-                            if (!whiteLine && window.allItems) {
-                                whiteLine = window.allItems.get(lineId);
-                            }
+                            // Direct ID lookup
+                            const whiteLine = window.allItems.get(lineId);
 
                             if (whiteLine && whiteLine.endpoint_blue_circles) {
                                 whiteLine.endpoint_blue_circles.forEach(bcUid => {
@@ -2781,26 +2752,22 @@
                                         if (bcItem.connected_white_lines) {
                                             let visibleLinesCount = 0;
                                             bcItem.connected_white_lines.forEach(lid => {
-                                                // Check if line is visible (in global items or local new items)
-                                                let isVisible = false;
-                                                if (window.allItems && window.allItems.has(lid)) isVisible = true;
-                                                if (!isVisible && localWhiteLines) {
-                                                    if (localWhiteLines.find(l => l.id === lid)) isVisible = true;
-                                                }
-                                                if (isVisible) visibleLinesCount++;
+                                                if (window.allItems.has(lid)) visibleLinesCount++;
                                             });
                                             bcItem.stats_connected_lines = visibleLinesCount;
+                                        } else if (bcItem.connections) {
+                                            // Fallback if connected_white_lines list missing
+                                            // We can't easily recalc visible lines without the list.
+                                            // Assume stats from backend are reasonably fresh or use what we have.
                                         }
 
                                         // 2. Recalculate Connected Polygons (Visible)
-                                        // Precise Logic: Missing = Connected Lines - Found Polygons
                                         bcItem.stats_connected_polygons = bcItem.connected_polygon_ids.length;
 
                                         const expectedPolygons = bcItem.stats_connected_lines || bcItem.connections || 0;
                                         bcItem.stats_not_connected_polygons = Math.max(0, expectedPolygons - bcItem.stats_connected_polygons);
 
                                         // Update Saturation
-                                        // Strict Saturation: Must have 0 Missing Polygons AND 0 Missing Lines.
                                         const isNowSaturated = (bcItem.stats_not_connected_polygons === 0) && (bcItem.stats_not_connected_lines === 0) && (bcItem.stats_connected_lines > 0);
                                         bcItem.is_saturated = isNowSaturated;
 
@@ -2933,7 +2900,7 @@
                         // Skip if already rendered (expand mode reuses existing circles)
                         if (circleLayerMap.has(coordKey)) {
                             // Circle already exists, just update polygon mapping
-                            mapCircleToPolys(circle.lat, circle.lon, localPolys, circle.line_id || -1);
+                            mapCircleToPolys(circle, circle.lat, circle.lon);
 
                             // Also ensure it's in greenCirclesByLine map (for hide on completion)
                             if (circle.line_id !== undefined) {
@@ -3004,7 +2971,7 @@
                             unbindTooltip: function () { return this.visual.unbindTooltip(); }
                         };
 
-                        addToMap(circle.lat, circle.lon, composite, 'green', circle.line_id);
+                        addToMap(circle.lat, circle.lon, composite, 'green', circle);
 
                         // Track for polygon debug highlighting (by line_id)
                         if (circle.line_id !== undefined) {
@@ -3016,92 +2983,33 @@
                     });
                 }
 
-                // STEP 1: Update connected_polygon_ids for ALL existing blue circles with new polygon UIDs
-                if (mode === 'expand') {
-                    // Create a map of white line endpoints to polygon UIDs from localPolys
-                    const endpointToPolyIds = new Map();
-                    localPolys.forEach(poly => {
-                        const whiteLines = poly.whiteLines || [];
-                        whiteLines.forEach(line => {
-                            // Add start point
-                            const startKey = `${line.start[0].toFixed(6)},${line.start[1].toFixed(6)}`;
-                            if (!endpointToPolyIds.has(startKey)) {
-                                endpointToPolyIds.set(startKey, new Set());
-                            }
-                            endpointToPolyIds.get(startKey).add(poly.id);
-
-                            // Add end point
-                            const endKey = `${line.end[0].toFixed(6)},${line.end[1].toFixed(6)}`;
-                            if (!endpointToPolyIds.has(endKey)) {
-                                endpointToPolyIds.set(endKey, new Set());
-                            }
-                            endpointToPolyIds.get(endKey).add(poly.id);
-                        });
-                    });
-
-                    // Update ALL blue circles with new polygon IDs
-                    blueCircleLayerMap.forEach((layer, coordKey) => {
-                        // Get circle data from window.allItems
-                        let circleData = null;
-                        for (const [uid, item] of window.allItems.entries()) {
-                            if (item.lat !== undefined && item.lon !== undefined) {
-                                const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                                if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
-                                    circleData = item;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (circleData) {
-                            // Check if this circle is an endpoint of any new polygons
-                            const newPolyIds = endpointToPolyIds.get(coordKey);
-                            if (newPolyIds && newPolyIds.size > 0) {
-                                // Merge new polygon IDs with existing ones
-                                const existingIds = new Set(circleData.connected_polygon_ids || []);
-                                newPolyIds.forEach(pid => existingIds.add(pid));
-                                circleData.connected_polygon_ids = Array.from(existingIds);
-
-                                console.log(`DEBUG: Updated circle ${coordKey}: added ${newPolyIds.size} new polygon IDs, total now: ${circleData.connected_polygon_ids.length}`);
-                            }
-                        }
-                    });
-                }
+                // STEP 1: REMOVED (Legacy coordinate reconstruction)
 
                 // STEP 2: Recalculate is_saturated for ALL blue circles based on updated connected_polygon_ids
                 if (mode === 'expand') {
-                    // Iterate through ALL circles in blueCircleLayerMap (not just new ones from data.blue_circles)
+                    // Iterate through ALL circles in blueCircleLayerMap
                     blueCircleLayerMap.forEach((layer, coordKey) => {
-                        // Get circle data from window.allItems
-                        let circleData = null;
-                        for (const [uid, item] of window.allItems.entries()) {
-                            if (item.lat !== undefined && item.lon !== undefined) {
-                                const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                                if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
-                                    circleData = item;
-                                    break;
+                        // Optimization: Use UID directly attached to layer
+                        if (layer.uid && window.allItems.has(layer.uid)) {
+                            const circleData = window.allItems.get(layer.uid);
+
+                            if (circleData && circleData.connected_polygon_ids) {
+                                // Count how many of this circle's polygons are currently visible
+                                const visiblePolyCount = circleData.connected_polygon_ids.filter(pid => visiblePolygonIds.has(pid)).length;
+                                const totalConnections = circleData.connections || 0;
+
+                                // Circle is saturated (orange) if ALL its connections are to visible polygons
+                                const shouldBeSaturated = (totalConnections === visiblePolyCount && totalConnections > 0);
+
+                                // Update visual if saturation state changed
+                                if (shouldBeSaturated !== circleData.is_saturated) {
+                                    circleData.is_saturated = shouldBeSaturated;
+                                    layer.isSaturated = shouldBeSaturated;
+
+                                    const newMainColor = shouldBeSaturated ? '#ff7b00' : 'blue';
+                                    const newFillColor = shouldBeSaturated ? '#ffa600' : '#00ccff';
+                                    layer.setStyle({ color: newMainColor, fillColor: newFillColor });
                                 }
-                            }
-                        }
-
-                        if (circleData && circleData.connected_polygon_ids) {
-                            // Count how many of this circle's polygons are currently visible
-                            const visiblePolyCount = circleData.connected_polygon_ids.filter(pid => visiblePolygonIds.has(pid)).length;
-                            const totalConnections = circleData.connections || 0;
-
-                            // Circle is saturated (orange) if ALL its connections are to visible polygons
-                            const shouldBeSaturated = (totalConnections === visiblePolyCount && totalConnections > 0);
-
-                            // Update visual if saturation state changed
-                            if (shouldBeSaturated !== circleData.is_saturated) {
-                                circleData.is_saturated = shouldBeSaturated;
-                                layer.isSaturated = shouldBeSaturated;
-
-                                const newMainColor = shouldBeSaturated ? '#ff7b00' : 'blue';
-                                const newFillColor = shouldBeSaturated ? '#ffa600' : '#00ccff';
-                                layer.setStyle({ color: newMainColor, fillColor: newFillColor });
-
-                                console.log(`DEBUG: Updated circle at ${coordKey}: connections=${totalConnections}, visible_polys=${visiblePolyCount}, is_saturated=${shouldBeSaturated}`);
                             }
                         }
                     });

@@ -24,9 +24,7 @@ class TestGeneratorImport:
         import sys
         sys.path.insert(0, project_root)
         
-        from CORE.BACKEND.LocationPolygonsGenerator import LocationPolygonsGenerator
-        
-        generator = LocationPolygonsGenerator()
+        from CORE.BACKEND import geometry_utils
         
         # Test distance between two known points
         # Kyiv coordinates
@@ -34,7 +32,7 @@ class TestGeneratorImport:
         # Nearby point (approximately 1km away)
         coord2 = (50.4591, 30.5234)
         
-        distance = generator.haversine_distance(coord1, coord2)
+        distance = geometry_utils.haversine_distance(coord1, coord2)
         
         # Should be approximately 1000 meters (1km)
         assert 900 < distance < 1100
@@ -48,9 +46,7 @@ class TestGeneratorHelpers:
         import sys
         sys.path.insert(0, project_root)
         
-        from CORE.BACKEND.LocationPolygonsGenerator import LocationPolygonsGenerator
-        
-        generator = LocationPolygonsGenerator()
+        from CORE.BACKEND import geometry_utils
         
         # A large square polygon (should fit a circle)
         # Coordinates in [lat, lon] format
@@ -62,7 +58,7 @@ class TestGeneratorHelpers:
             [50.45, 30.52]  # Close the polygon
         ]
         
-        result = generator._can_fit_circle(large_polygon, radius_meters=10)
+        result = geometry_utils.can_fit_circle(large_polygon, radius_meters=10)
         assert result is True
 
     def test_cannot_fit_circle_in_tiny_polygon(self, project_root):
@@ -70,9 +66,7 @@ class TestGeneratorHelpers:
         import sys
         sys.path.insert(0, project_root)
         
-        from CORE.BACKEND.LocationPolygonsGenerator import LocationPolygonsGenerator
-        
-        generator = LocationPolygonsGenerator()
+        from CORE.BACKEND import geometry_utils
         
         # A very small polygon (should NOT fit a 15m circle)
         tiny_polygon = [
@@ -83,5 +77,5 @@ class TestGeneratorHelpers:
             [50.4500, 30.5200]
         ]
         
-        result = generator._can_fit_circle(tiny_polygon, radius_meters=100)
+        result = geometry_utils.can_fit_circle(tiny_polygon, radius_meters=100)
         assert result is False
