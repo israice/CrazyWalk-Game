@@ -338,6 +338,7 @@
   - [x] v0.0.33 - added user registration and login page
     - stage 1 of code refactoring and added tests 
     - stage 2 of code refactoring and added tests 
+    - stage 3 of code refactoring and added tests 
 
 
 
@@ -359,7 +360,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.33 - stage 2 of code refactoring and added tests"
+  git commit -m "v0.0.33 - stage 3 of code refactoring and added tests"
   git push
   ```
 

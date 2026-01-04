@@ -1785,7 +1785,6 @@
                                         if (!selectedLayers.includes(blueCircle)) {
                                             originalStyles.push({
                                                 color: blueCircle.options.color,
-                                                weight: blueCircle.options.weight,
                                                 fillColor: blueCircle.options.fillColor,
                                                 fillOpacity: blueCircle.options.fillOpacity
                                             });
@@ -1795,56 +1794,27 @@
                                     }
                                 });
                             }
+                            selectedLayers.push(targetLayer);
+                            targetLayer.setStyle({ color: 'red', weight: 4, opacity: 1 });
+                        } else if (type.includes('Line')) {
+                            originalStyles.push({
+                                color: targetLayer.options.color,
+                                dashArray: targetLayer.options.dashArray,
+                                weight: targetLayer.options.weight,
+                                opacity: targetLayer.options.opacity
+                            });
+                            selectedLayers.push(targetLayer);
+                            targetLayer.setStyle({ color: 'red', dashArray: null, weight: 4, opacity: 1 });
+                        } else if (type.includes('Polygon')) {
+                            originalStyles.push({
+                                color: targetLayer.options.color,
+                                weight: targetLayer.options.weight,
+                                fillOpacity: targetLayer.options.fillOpacity
+                            });
+                            selectedLayers.push(targetLayer);
+                            targetLayer.setStyle({ color: 'red', weight: 3 });
+                        }
 
-                            // 3. Highlight Green Circles on this line
-                            if (_greenCirclesByLine) {
-                                const greenCircles = _greenCirclesByLine.get(String(data.uid));
-                                if (greenCircles) {
-                                    greenCircles.forEach(circleLayer => {
-                                        if (typeof circleLayer.setStyle === 'function' && !selectedLayers.includes(circleLayer)) {
-                                            originalStyles.push({
-                                                color: circleLayer.options.color,
-                                                weight: circleLayer.options.weight || 1,
-                                                fillColor: circleLayer.options.fillColor,
-                                                fillOpacity: circleLayer.options.fillOpacity
-                                            });
-                                            selectedLayers.push(circleLayer);
-                                            circleLayer.setStyle({ color: 'red', weight: 3 });
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                        // STANDARD HANDLING for other types
-                        else if (typeof targetLayer.setStyle === 'function') {
-                            if (type.includes('Circle')) {
-                                originalStyles.push({
-                                    color: targetLayer.options.color,
-                                    weight: targetLayer.options.weight,
-                                    fillColor: targetLayer.options.fillColor,
-                                    fillOpacity: targetLayer.options.fillOpacity
-                                });
-                                selectedLayers.push(targetLayer);
-                                targetLayer.setStyle({ color: 'red', weight: 4, opacity: 1 });
-                            } else if (type.includes('Line')) {
-                                originalStyles.push({
-                                    color: targetLayer.options.color,
-                                    dashArray: targetLayer.options.dashArray,
-                                    weight: targetLayer.options.weight,
-                                    opacity: targetLayer.options.opacity
-                                });
-                                selectedLayers.push(targetLayer);
-                                targetLayer.setStyle({ color: 'red', dashArray: null, weight: 4, opacity: 1 });
-                            } else if (type.includes('Polygon')) {
-                                originalStyles.push({
-                                    color: targetLayer.options.color,
-                                    weight: targetLayer.options.weight,
-                                    fillOpacity: targetLayer.options.fillOpacity
-                                });
-                                selectedLayers.push(targetLayer);
-                                targetLayer.setStyle({ color: 'red', weight: 3 });
-                            }
-                        }
 
                         // PREPARE DISPLAY DATA
                         // Fix for circular ref if any, and ensure UID is top
@@ -2084,6 +2054,7 @@
                     });
                 };
 
+
                 // Helper to set lazy references after maps are created
                 const setDebugMaps = (lineMap, circleMap, blueMap, greenByLine, polyState) => {
                     _lineLayerMap = lineMap;
@@ -2196,7 +2167,8 @@
                     const offsetY = -Math.sin(angle) * radius_px; // Negative because screen Y is inverted
 
                     // Check if polygon is already completed (all circles collected)
-                    // DYNAMIC CALCULATION: Count how many poly coordinates are in collectedCircles
+                    // REFACTORED: Use Backend Logic (is_completed flag)
+                    // We still calculate savedCount for the percentage label (UI only)
                     let savedCount = 0;
                     if (poly.coords && poly.coords.length > 0) {
                         savedCount = poly.coords.filter(c => {
@@ -2204,7 +2176,8 @@
                             return collectedCircles.has(key);
                         }).length;
                     }
-                    const isCompleted = savedCount >= poly.total_points;
+                    // Backend is the source of truth for completion
+                    const isCompleted = poly.is_completed === true;
 
                     // Create Large Promo Circle at polygon center (ONLY if not completed OR in debug mode)
                     // Create Large Promo Circle at polygon center (ONLY if not completed OR in debug mode)
@@ -2458,6 +2431,7 @@
                         coords: poly.coords, // Save coords for masking
                         current: savedCount, // Will usually be 0 unless random check luck
                         total: poly.total_points,
+                        isCompleted: isCompleted, // NEW: Store backend flag
                         layer: pLayer,
                         label: pLabel,
                         promo: pPromo, // Track promo for removal
@@ -2470,7 +2444,7 @@
 
                     // Immediate Completion Check (Restoration)
                     // Immediate Completion Check (Restoration)
-                    if (pState.current >= pState.total) {
+                    if (pState.isCompleted) {
                         console.log(`DEBUG: Restoring Completed Polygon ${poly.id} to Persistent Layer`);
                         // Move to Persistent Layer immediately
                         if (detailsLayer.hasLayer(pLayer)) detailsLayer.removeLayer(pLayer);
@@ -2516,7 +2490,7 @@
                 console.log("DEBUG: Checking for completed polygons to restore poster masks...");
                 let restoredMasksCount = 0;
                 polygonState.forEach(state => {
-                    if (state.current >= state.total && state.coords) {
+                    if (state.isCompleted && state.coords) {
                         console.log(`DEBUG: Restoring poster mask for completed polygon ${state.id}`);
                         revealPolygonPart(state.coords);
                         restoredMasksCount++;
@@ -3494,7 +3468,7 @@
                                 // User requested: "when in perimeter of polygon no visible circles left... disappear white lines in this perimeter"
                                 // This implies strict removal.
                             }
-
+    
                             // Hide green circles on this line
                             const greenCircles = greenCirclesByLine.get(String(lid));
                             if (greenCircles && !isPostersDebugActive) {
