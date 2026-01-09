@@ -60,10 +60,10 @@ function runUpdate() {
         console.log(`Git pull output: ${stdout}`);
         if (stderr) console.log(`Git pull stderr: ${stderr}`);
 
-        // Step 2: docker compose up
-        console.log('Running: docker compose -p crazywalk-game -f docker-compose.prod.yml up -d --build app');
+        // Step 2: docker-compose up
+        console.log('Running: docker-compose -p crazywalk-game -f docker-compose.prod.yml up -d --build app');
         exec(
-            'docker compose -p crazywalk-game -f docker-compose.prod.yml up -d --build app',
+            'docker-compose -p crazywalk-game -f docker-compose.prod.yml up -d --build app',
             { cwd: WORK_DIR },
             (error, stdout, stderr) => {
                 if (error) {
