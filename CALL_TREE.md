@@ -1,127 +1,11 @@
 # Project Function Analysis
 
-Generated on: 2026-01-09T06:54:37.890Z
+Generated on: 2026-01-09T21:52:51.013Z
 
 ## Entry Points / Root Functions
-root: loadGameDataWithKey [src/public/js/map-logic.js]
-  calls: saveLocationState [src/controllers/locationController.js]
-    calls: getRedisClient [src/services/redis.service.js]
-  calls: getLocationKey [src/public/js/map-logic.js]
-  calls: renderGameElements [src/public/js/map-logic.js]
-    calls: initPosterGrid [src/public/js/map-logic.js]
-      calls: updatePosterSVG [src/public/js/map-logic.js]
-        calls: cleanupContainer [src/public/js/map-logic.js]
-    calls: showError [src/public/js/map-logic.js]
-      calls: revealContent [CORE/FRONTEND/A_home_page/index.html]
-    calls: generateUID [src/public/js/map-logic.js]
-    calls: resetSelection [src/public/js/map-logic.js]
-    calls: attachDebugClick [src/public/js/map-logic.js]
-      calls: resetSelection [src/public/js/map-logic.js]
-    calls: revealPolygonPart [src/public/js/map-logic.js]
-    calls: setSnapLines [CORE/FRONTEND/B_map_page/components/map_controls.js]
-    calls: updateAndSaveUserPosition [src/public/js/map-logic.js]
-      calls: updateUserPosition [CORE/FRONTEND/B_map_page/components/map_controls.js]
-        calls: getSnappedPosition [CORE/FRONTEND/B_map_page/components/map_controls.js]
-          calls: distSq [CORE/FRONTEND/B_map_page/components/map_controls.js]
-    calls: mapCircleToPolys [src/public/js/map-logic.js]
-    calls: addToMap [src/public/js/map-logic.js]
-      calls: mapCircleToPolys [src/public/js/map-logic.js]
-    calls: setDebugMaps [src/public/js/map-logic.js]
-    calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js]
-    calls: findNearestActiveCircle [src/public/js/map-logic.js]
-    calls: updateGraph [CORE/FRONTEND/B_map_page/components/map_controls.js]
-      calls: getNode [CORE/FRONTEND/B_map_page/components/map_controls.js]
-      calls: distToSegmentSq [CORE/FRONTEND/B_map_page/components/map_controls.js]
-      calls: getProjectedDist [CORE/FRONTEND/B_map_page/components/map_controls.js]
-      calls: bindKeys [CORE/FRONTEND/B_map_page/components/map_controls.js]
-        calls: getDirection [CORE/FRONTEND/B_map_page/components/map_controls.js]
-        calls: moveSelection [CORE/FRONTEND/B_map_page/components/map_controls.js]
-    calls: applyCollectedState [src/public/js/map-logic.js]
-      calls: updatePolygonVisuals [src/public/js/map-logic.js]
-        calls: saveLocationState [src/controllers/locationController.js]
-          calls: getRedisClient [src/services/redis.service.js]
-        calls: revealPolygonPart [src/public/js/map-logic.js]
-      calls: updateMaskPaths [src/public/js/map-logic.js]
-    calls: updateMaskPaths [src/public/js/map-logic.js]
-    calls: setupProgressHiding [src/public/js/map-logic.js]
-      calls: checkAndHide [src/public/js/map-logic.js]
-        calls: findNearestActiveCircle [src/public/js/map-logic.js]
-        calls: saveGlobalState [src/public/js/map-logic.js]
-          calls: saveGameState [src/controllers/gameController.js]
-            calls: getRedisClient [src/services/redis.service.js]
-        calls: updatePolygonVisuals [src/public/js/map-logic.js]
-          calls: saveLocationState [src/controllers/locationController.js]
-            calls: getRedisClient [src/services/redis.service.js]
-          calls: revealPolygonPart [src/public/js/map-logic.js]
-        calls: saveLocationState [src/controllers/locationController.js]
-          calls: getRedisClient [src/services/redis.service.js]
-        calls: loadGameData [src/public/js/map-logic.js]
-          calls: getLocationKey [src/public/js/map-logic.js]
-          calls: saveGlobalState [src/public/js/map-logic.js]
-            calls: saveGameState [src/controllers/gameController.js]
-              calls: getRedisClient [src/services/redis.service.js]
-          calls: renderGameElements [src/public/js/map-logic.js] (circular)
-          calls: revealMap [src/public/js/map-logic.js]
-          calls: showError [src/public/js/map-logic.js]
-            calls: revealContent [CORE/FRONTEND/A_home_page/index.html]
-        calls: debouncedSavePosition [src/public/js/map-logic.js]
-          calls: saveGlobalState [src/public/js/map-logic.js]
-            calls: saveGameState [src/controllers/gameController.js]
-              calls: getRedisClient [src/services/redis.service.js]
-    calls: updateDebugBoxIntersections [src/public/js/map-logic.js]
-      calls: lineIntersectsRect [src/public/js/map-logic.js]
-        calls: doSegmentsIntersect [src/public/js/map-logic.js]
-          calls: ccw [src/public/js/map-logic.js]
-    calls: saveGlobalState [src/public/js/map-logic.js]
-      calls: saveGameState [src/controllers/gameController.js]
-        calls: getRedisClient [src/services/redis.service.js]
-    calls: updatePostersVisibility [src/public/js/map-logic.js]
-      calls: updatePosterSVG [src/public/js/map-logic.js]
-        calls: cleanupContainer [src/public/js/map-logic.js]
-      calls: toggleHiddenDebug [src/public/js/map-logic.js]
-    calls: initTopBarEvents [src/public/js/map-logic.js]
-      calls: updateDebugBoxIntersections [src/public/js/map-logic.js]
-        calls: lineIntersectsRect [src/public/js/map-logic.js]
-          calls: doSegmentsIntersect [src/public/js/map-logic.js]
-            calls: ccw [src/public/js/map-logic.js]
-      calls: resetWhiteLineColors [src/public/js/map-logic.js]
-      calls: resetSelection [src/public/js/map-logic.js]
-      calls: updatePostersVisibility [src/public/js/map-logic.js]
-        calls: updatePosterSVG [src/public/js/map-logic.js]
-          calls: cleanupContainer [src/public/js/map-logic.js]
-        calls: toggleHiddenDebug [src/public/js/map-logic.js]
-    calls: initializeGame [src/public/js/map-logic.js]
-      calls: loadGlobalState [src/public/js/map-logic.js]
-      calls: renderFromSavedState [src/public/js/map-logic.js]
-        calls: renderGameElements [src/public/js/map-logic.js] (circular)
-        calls: updateAndSaveUserPosition [src/public/js/map-logic.js]
-          calls: updateUserPosition [CORE/FRONTEND/B_map_page/components/map_controls.js]
-            calls: getSnappedPosition [CORE/FRONTEND/B_map_page/components/map_controls.js]
-              calls: distSq [CORE/FRONTEND/B_map_page/components/map_controls.js]
-      calls: revealMap [src/public/js/map-logic.js]
-      calls: loadGameData [src/public/js/map-logic.js]
-        calls: getLocationKey [src/public/js/map-logic.js]
-        calls: saveGlobalState [src/public/js/map-logic.js]
-          calls: saveGameState [src/controllers/gameController.js]
-            calls: getRedisClient [src/services/redis.service.js]
-        calls: renderGameElements [src/public/js/map-logic.js] (circular)
-        calls: revealMap [src/public/js/map-logic.js]
-        calls: showError [src/public/js/map-logic.js]
-          calls: revealContent [CORE/FRONTEND/A_home_page/index.html]
-  calls: revealMap [src/public/js/map-logic.js]
-  calls: showError [src/public/js/map-logic.js]
-    calls: revealContent [CORE/FRONTEND/A_home_page/index.html]
----
-root: processCoordinates [src/public/js/map-logic.js]
-  calls: findNearestActiveCircle [src/public/js/map-logic.js]
-  calls: updateAndSaveUserPosition [src/public/js/map-logic.js]
-    calls: updateUserPosition [CORE/FRONTEND/B_map_page/components/map_controls.js]
-      calls: getSnappedPosition [CORE/FRONTEND/B_map_page/components/map_controls.js]
-        calls: distSq [CORE/FRONTEND/B_map_page/components/map_controls.js]
----
 root: register [src/controllers/authController.js]
-  calls: readUsers [src/routes/auth.js]
-  calls: appendUser [src/routes/auth.js]
+  calls: readUsers [src/controllers/authController.js]
+  calls: appendUser [src/controllers/authController.js]
 ---
 root: locate [src/controllers/locationController.js]
   calls: getCityFromCoords [src/services/nominatim.service.js]
@@ -142,7 +26,7 @@ root: constructor [src/public/js/game-api.js]
     calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js]
 ---
 root: login [src/controllers/authController.js]
-  calls: readUsers [src/routes/auth.js]
+  calls: readUsers [src/controllers/authController.js]
 ---
 root: getGameState [src/controllers/gameController.js]
   calls: loadFromRedis [src/services/redis.service.js]
@@ -250,16 +134,6 @@ root: getLocationState [src/controllers/locationController.js]
 ---
 root: handleLogin [CORE/FRONTEND/A_home_page/login.html]
 ---
-root: loadVersionBadge [src/public/js/map-logic.js]
----
-root: isUIInteraction [src/public/js/map-logic.js]
----
-root: addPolygonToMask [src/public/js/map-logic.js]
----
-root: getAssignedGif [src/public/js/map-logic.js]
----
-root: closeMenu [src/public/js/map-logic.js]
----
 root: getPromos [src/controllers/gameController.js]
 ---
 root: getIpLocation [src/controllers/locationController.js]
@@ -272,6 +146,8 @@ root: notFoundHandler [src/middleware/errorHandler.js]
 ---
 root: requestLogger [src/middleware/requestLogger.js]
 ---
+root: closeMenu [src/public/js/map-logic.js]
+---
 root: retryStrategy [src/services/redis.service.js]
 ---
 
@@ -279,8 +155,10 @@ root: retryStrategy [src/services/redis.service.js]
 > [!WARNING]
 > These functions are defined but not called within the analyzed files. Verify if they are used dynamically or in external systems before deleting.
 
-- `setKeyboardEnabled` ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `resetView` ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
 - `shutdown` ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
-- `deleteFromRedis` ([redis.service.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\services\redis.service.js))
-- `isConnected` ([redis.service.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\services\redis.service.js))
+- `loadVersionBadge` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `isUIInteraction` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `addPolygonToMask` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `processCoordinates` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `loadGameDataWithKey` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `getAssignedGif` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))

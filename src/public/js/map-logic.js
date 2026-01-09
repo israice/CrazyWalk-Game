@@ -272,18 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
         originalStyles = [];
     };
 
-
-
-    // UI BLOCK CHECKER
-    const isUIInteraction = (e) => {
-        const target = e.target;
-        if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button')) {
-            return true;
-        }
-        return false;
-    };
-
-
     // ------------------------------------------------
 
     // Initialize Layer Groups
@@ -762,33 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const addPolygonToMask = (coords) => {
-        if (!revealMask) return;
-
-        // We need to project lat/lon to pixel coordinates for the SVG mask
-        // BUT Leaflet's L.SVG works better for this.
-        // Simpler approach: Use a CSS mask-image with a dynamic SVG.
-        // Since Leaflet uses its own panes and transformation, a global SVG is hard to align.
-
-        // REVISED PLAN: Use an L.SVG overlay for the mask that covers the same bounds as the posters.
-        // OR even simpler: Just use the polygons themselves as containers for the image background.
-        // But user wants a SEAMLESS canvas.
-
-        // Let's use the simplest reliable method: Each completed polygon gets an 'image-reveal' style.
-        // We'll use a CSS background with background-attachment: fixed (or simulated via SVG patterns).
-    };
-
     // --- END POSTER GRID LOGIC ---
-
-    // Safety Reveal
-    /* REMOVED: Safety reveal is dangerous if data is missing. We want STRICT validation.
-    setTimeout(() => {
-        if (!hasRevealed) {
-            console.warn("DEBUG: Safety Reveal Triggered (Data took too long)");
-            revealMap();
-        }
-    }, 30000);
-    */
 
     const showError = (msg) => {
         loadingGif.style.display = 'none';
@@ -805,49 +767,6 @@ document.addEventListener('DOMContentLoaded', () => {
         retryBtn.onclick = () => {
             window.location.reload();
         };
-    };
-
-    // Reusable function to process coordinates (Logic)
-    const processCoordinates = (lat, lon, accuracy, label) => {
-        console.log(`DEBUG: [Map Page] Processing ${label} Position: ${lat}, ${lon} (Acc: ${accuracy}m)`);
-
-        // --- SNAP TO NEAREST CIRCLE ---
-        if (window.findNearestActiveCircle) {
-            const snapped = window.findNearestActiveCircle(lat, lon);
-            if (snapped) {
-                // 1 degree lat approx 111km -> 111139 meters
-                console.log(`DEBUG: Snapping to circle at ${snapped.lat}, ${snapped.lon} (dist: ${(snapped.dist * 111139).toFixed(1)}m)`);
-                lat = snapped.lat;
-                lon = snapped.lon;
-            } else {
-                console.log("DEBUG: No snap target found. Using raw GPS.");
-            }
-        }
-
-        if (label === 'LOW_ACCURACY' && hasPreciseFix) {
-            console.log("DEBUG: Ignoring Low Accuracy update (Precise already found).");
-            return;
-        }
-
-        if (label === 'HIGH_ACCURACY') {
-            hasPreciseFix = true;
-        }
-
-        // Use Controls to update position (Enforces map follow rules)
-        updateAndSaveUserPosition(userMarker, lat, lon);
-
-        // Quality State: 'NONE', 'LOW', 'HIGH'
-        // Allows upgrading to High Accuracy if Low was loaded first.
-        if (!window.loadedQuality) window.loadedQuality = 'NONE';
-
-
-
-
-        // Background: Send to server
-        fetch(`/api/locate?lat=${lat}&lon=${lon}`)
-            .then(res => res.json())
-            .then(data => console.log("DEBUG: Server ack:", data))
-            .catch(err => console.warn("DEBUG: Server sync failed (non-critical):", err));
     };
 
     const loadGameData = async (lat, lon, forceRebuild = false, mode = 'initial') => {
@@ -1062,60 +981,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     };
 
-    // Special version that uses explicit location key for cache lookup (for returning to saved locations)
-    const loadGameDataWithKey = async (lat, lon, explicitLocationKey) => {
-        console.log("GPS: ========================================");
-        console.log(`GPS: Loading with explicit key: ${explicitLocationKey}`);
-        console.log("GPS: ========================================");
-
-        // SAVE current location state before switching
-        if (currentLocationKey && collectedCircles.size > 0) {
-            console.log(`DEBUG: Saving state for ${currentLocationKey} before switching...`);
-            await saveLocationState();
-        }
-
-        // Use explicit key if provided, otherwise calculate
-        const targetLocationKey = explicitLocationKey || getLocationKey(lat, lon);
-        console.log(`DEBUG: Switching to location key: ${targetLocationKey}`);
-        currentLocationKey = targetLocationKey;
-        collectedCircles = new Set();
-
-        // Show Loading GIF
-        loadingGif.style.display = 'block';
-        loadingGif.style.opacity = '1';
-        mapElement.style.opacity = '0.3';
-        hasRevealed = false;
-
-        // CHECK CACHE with explicit key
-        if (gameDataCache.has(targetLocationKey)) {
-            console.log(`GPS: *** USING CACHED DATA for key ${targetLocationKey} ***`);
-            const cachedData = gameDataCache.get(targetLocationKey);
-            await renderGameElements(cachedData);
-            revealMap();
-            return;
-        }
-
-        // No cache, fetch new data
-        console.log(`GPS: Cache miss for ${targetLocationKey}, fetching fresh data...`);
-        const url = `/api/game_data?lat=${lat}&lon=${lon}&rebuild=false&_t=${Date.now()}`;
-
-        fetch(url)
-            .then(res => res.json())
-            .then(async data => {
-                if (data.error || !data.polygons?.length) {
-                    showError("Failed to load map data");
-                    return;
-                }
-                gameDataCache.set(targetLocationKey, data);
-                await renderGameElements(data);
-                revealMap();
-            })
-            .catch(err => {
-                console.error("GPS: NETWORK ERROR:", err);
-                showError("CONNECTION ERROR");
-            });
-    };
-
     const renderGameElements = async (data, mode = 'initial') => {
 
         console.log("DEBUG: Starting Render with Progress Tracking...");
@@ -1226,16 +1091,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         };
-
-        /* REMOVED: Moved to start of renderGameElements
-        if (data.poster_grid && data.poster_grid.length > 0) {
-            currentPosterGrid = data.poster_grid;
-            console.log(`DEBUG: Stored ${currentPosterGrid.length} posters from server`);
-        } else {
-            console.log("DEBUG: No poster_grid data received from server");
-            currentPosterGrid = null;
-        }
-        */
 
         // --- 1. UID/ID MAPPING (Foreign Key Normalization) ---
         const lineIdMap = new Map(); // Old ID (number) -> New UID (string)
@@ -2020,31 +1875,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // PROMO: Fetch list of GIFS
         // PROMO: Fetch list of GIFS (Removed: Now using global promoGifCache)
-        // We rely on promoGifCache being populated.
-
-        // Helper to pick random GIF with persistence
-        // Helper to pick random GIF with persistence
-        // Helper to pick random GIF with persistence (REDIS Version)
-        const getAssignedGif = (polyId) => {
-            if (promoGifCache.length === 0) return null;
-
-            if (!polyId) return null;
-
-            // Use Global Map (Synced with Redis)
-            if (promoGifAssignments.has(String(polyId))) {
-                return promoGifAssignments.get(String(polyId));
-            }
-
-            // Assign new random GIF
-            const idx = Math.floor(Math.random() * promoGifCache.length);
-            const newGif = promoGifCache[idx];
-
-            // Save to Map (will be pushed to server on next Save)
-            promoGifAssignments.set(String(polyId), newGif);
-            console.log(`DEBUG: Assigned NEW GIF for ${polyId}: ${newGif}`);
-            return newGif;
-        };
-
         // 2. Polygons (Init State)
         // Backend now filters data for initial mode, so we can use it directly
         let localPolys = data.polygons || [];
@@ -3694,7 +3524,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(err => console.error('Error loading top bar:', err));
 
     // Initial Auto-Start
-    // isGpsActive = false; // REMOVED
 
     // CRITICAL: Initialize game - check Redis for saved state first, otherwise generate fresh
     const initializeGame = async () => {
@@ -3745,7 +3574,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeGame();
 
     const initTopBarEvents = () => {
-        // const gpsBtn = document.getElementById('gps-btn'); // REMOVED
         const debugBtn = document.getElementById('debug-btn');
         const menuBtn = document.getElementById('menu-btn');
         const topBar = document.getElementById('top-bar');

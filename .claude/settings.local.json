@@ -10,7 +10,8 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(node --check:*)",
-      "Bash(dir \"c:\\\\0_PROJECTS\\\\CrazyWalk-Game\" /b /s)"
+      "Bash(dir \"c:\\\\0_PROJECTS\\\\CrazyWalk-Game\" /b /s)",
+      "Bash(dir /s /b \"C:\\\\0_PROJECTS\\\\CrazyWalk-Game\\\\src\")"
     ]
   }
 }
