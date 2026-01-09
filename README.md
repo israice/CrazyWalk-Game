@@ -371,7 +371,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.36 - docker prod with new node changes test 6"
+  git commit -m "v0.0.37 - docker prod with new node changes test 7"
   git push
   ```
 
