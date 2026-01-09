@@ -122,11 +122,12 @@ app.use('/js', express.static(path.join(__dirname, 'src', 'public', 'js')));
 
 const frontendPath = path.join(__dirname, FRONTEND_DIR);
 if (fs.existsSync(frontendPath)) {
+    // Serve the entire frontend directory as static
     app.use(express.static(frontendPath));
 
     // Serve index.html for root
     app.get('/', (req, res) => {
-        res.sendFile(path.join(frontendPath, 'index.html'));
+        res.sendFile(path.join(frontendPath, 'A_home_page', 'index.html'));
     });
 } else {
     console.error(`CRITICAL: Frontend directory does not exist: ${frontendPath}`);
