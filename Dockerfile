@@ -1,26 +1,16 @@
-FROM python:3.10-slim
-
-# Install system dependencies for Shapely/GEOS
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libgeos-dev \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:20-slim
 
 WORKDIR /app
 
-# Upgrade pip to avoid segfaults and ensure compatibility
-RUN python -m pip install --upgrade pip setuptools wheel
-
-COPY requirements.txt .
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN npm ci --only=production
 
-# Re-install shapely from source with explicit no-binary if needed (keeping original intent)
-RUN pip install --no-cache-dir --no-binary shapely shapely
-
+# Copy application code
 COPY . .
 
 EXPOSE 8000
 
-CMD ["python", "server.py"]
+CMD ["node", "server.js"]

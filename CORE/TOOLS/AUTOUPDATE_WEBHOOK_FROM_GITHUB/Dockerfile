@@ -1,7 +1,6 @@
-FROM python:3.11-slim
+FROM node:20-slim
 
 # Install git and docker CLI
-# Docker Compose V2 is now included as a plugin in docker CLI
 RUN apt-get update && apt-get install -y \
     git \
     docker.io \
@@ -14,13 +13,8 @@ EXPOSE 9000
 
 WORKDIR /app
 
-# We don't strictly need to COPY if we mount the volume, but it's good for standalone builds.
-# However, since we mount the root to /app, this file will be shadowed unless we change the destination.
-# But the CMD will run the script from the mounted volume.
-COPY AUTOUPDATE_WEBHOOK_FROM_GITHUB.py .
+# Copy webhook script
+COPY webhook.js .
 
-# The CMD needs to point to the script location relative to /app (which is the project root)
-# Since we are moving the script to CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB/
-# And we mount .:/app
-# The script will be at /app/CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB/AUTOUPDATE_WEBHOOK_FROM_GITHUB.py
-CMD ["python", "CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB/AUTOUPDATE_WEBHOOK_FROM_GITHUB.py"]
+# The CMD runs the script from the mounted volume
+CMD ["node", "CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js"]

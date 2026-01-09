@@ -8,7 +8,6 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6500
-      - PYTHONDONTWRITEBYTECODE=1
     networks:
       - pc2-net
 

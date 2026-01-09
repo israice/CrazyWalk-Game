@@ -349,6 +349,7 @@
     - added sposorship prices to polygons
   - [x] v0.0.33 - added user registration and login page
   - [x] v0.0.34 - changed to node js from python
+    - docker prod test with new node changes
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -367,7 +368,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.34 - changed to node js from python"
+  git commit -m "v0.0.34 - docker prod test with new node changes"
   git push
   ```
 
