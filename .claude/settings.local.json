@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(redis-cli:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(node --check:*)"
+    ]
+  }
+}
