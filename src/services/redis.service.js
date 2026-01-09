@@ -90,35 +90,7 @@ async function loadFromRedis(key) {
   return null;
 }
 
-/**
- * Delete a key from Redis
- * @param {string} key - Redis key
- * @returns {Promise<boolean>} Success status
- */
-async function deleteFromRedis(key) {
-  try {
-    const client = getRedisClient();
-    await client.del(key);
-    return true;
-  } catch (err) {
-    console.error(`REDIS: Failed to delete ${key}: ${err.message}`);
-    return false;
-  }
-}
 
-/**
- * Check if Redis is connected
- * @returns {Promise<boolean>}
- */
-async function isConnected() {
-  try {
-    const client = getRedisClient();
-    await client.ping();
-    return true;
-  } catch (err) {
-    return false;
-  }
-}
 
 // Re-export REDIS_KEYS for backward compatibility
 module.exports = {
@@ -126,8 +98,6 @@ module.exports = {
   flushDatabase,
   saveToRedis,
   loadFromRedis,
-  deleteFromRedis,
-  isConnected,
   // Backward compatibility exports
   KEY_RED_LINES: REDIS_KEYS.RED_LINES,
   KEY_BLUE_CIRCLES: REDIS_KEYS.BLUE_CIRCLES,

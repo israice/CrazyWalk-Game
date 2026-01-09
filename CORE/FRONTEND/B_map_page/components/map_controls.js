@@ -83,8 +83,7 @@ class MapControls {
         // This closes the gap between Polygon visibility (Min 18) and Label visibility.
         this.addVisibilityRule(labelsLayer, null, 17.99);
 
-        // 3. Apply Mobile Rotation Drag Patch
-        this.applyMobileRotationPatch();
+
 
         // 4. Listen for Zoom Events to enforce visibility rules
         this.map.on('zoomend', () => this.checkVisibility());
@@ -104,10 +103,6 @@ class MapControls {
         console.log(`Controls: Loaded ${this.snapLines.length} lines for snapping.`);
     }
 
-    setKeyboardEnabled(enabled) {
-        this.keyboardEnabled = enabled;
-        console.log(`Controls: Keyboard controls ${enabled ? 'ENABLED' : 'DISABLED'}`);
-    }
 
     /**
      * Calculates the closest point on the white lines.
@@ -210,13 +205,9 @@ class MapControls {
     updateUserPosition(marker, lat, lon) {
         const snappedPos = this.getSnappedPosition(lat, lon);
         marker.setLatLng(snappedPos);
-        // GPS Active logic removed
         this.lastPosition = snappedPos;
     }
 
-    resetView(lat, lon) {
-        this.map.setView([lat, lon], this.config.defaultZoom);
-    }
 
     /**
      * Build navigation graph with STRICT topology.
@@ -623,10 +614,7 @@ class MapControls {
         }
     }
 
-    applyMobileRotationPatch() {
-        // Mobile rotation patch removed - no longer needed as screen rotation was disabled
-        console.log("MapControls: Mobile rotation patch disabled (rotation removed).");
-    }
+
 }
 
 window.MapControls = MapControls;

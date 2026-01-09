@@ -213,7 +213,7 @@
 
   ```Powershell
   Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard de8b98f
+  git reset --hard d4f780c
   git clean -fd
   Copy-Item $env:TEMP\.env.backup .env -Force
   git push origin master --force
@@ -351,6 +351,7 @@
   - [x] v0.0.34 - changed to node js from python
     - docker prod test with new node changes
     - docker prod with new node changes test 2
+    - docker prod with new node changes test 3
     - 
 
   - ### Next Tasks
@@ -370,7 +371,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.34 - docker prod with new node changes test 2"
+  git commit -m "v0.0.34 - docker prod with new node changes test 3"
   git push
   ```
 

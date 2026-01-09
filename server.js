@@ -11,8 +11,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 // Import routes
-const apiRoutes = require('./src/routes/api');
-const authRoutes = require('./src/routes/auth');
+const { apiRoutes, authRoutes } = require('./src/routes');
 
 // Import Redis utilities
 const { getRedisClient, flushDatabase } = require('./src/services/redis');
@@ -119,6 +118,8 @@ app.get('/GAME_PROMOS/:filename', (req, res) => {
 });
 
 // Serve static frontend files
+app.use('/js', express.static(path.join(__dirname, 'src', 'public', 'js')));
+
 const frontendPath = path.join(__dirname, FRONTEND_DIR);
 if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath));
