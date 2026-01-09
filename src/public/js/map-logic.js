@@ -1,3 +1,34 @@
+// ========== MODULE IMPORTS ==========
+// Phase 1: Pure Utilities
+import { getLocationKey, parseLocationKey, getCoordinateKey, parseCoordinateKey } from './modules/utils/CoordinateUtils.js';
+import { generateUID, createUIDMaps } from './modules/utils/UIDGenerator.js';
+import { euclideanDistance, isWithinDistance } from './modules/utils/GeometryUtils.js';
+import { showError } from './modules/ui/ErrorDisplay.js';
+
+// Phase 2: UI Components
+import { initTopBarEvents } from './modules/ui/TopBarHandler.js';
+import { resetSelection, addToSelection, getSelectedLayers, clearSelection } from './modules/ui/DebugMode.js';
+
+// Phase 3: State Management
+import { gameState, resetGameState, getCurrentPosition, setCurrentPosition, isCircleCollected, collectCircle, isCircleExpanded, markCircleExpanded } from './modules/state/GameState.js';
+
+// Phase 4: Rendering
+import { PosterRenderer } from './modules/rendering/PosterRenderer.js';
+
+// Phase 5: API & State Persistence
+import { loadGlobalState, loadLocationState } from './modules/api/StateLoader.js';
+import { StateSaver } from './modules/api/StateSaver.js';
+import { renderFromSavedState } from './modules/api/StateRestorer.js';
+
+// Phase 6: Event Handlers
+import { setupMovementHandlers } from './modules/events/MovementHandlers.js';
+import { setupDebugHandlers } from './modules/events/DebugHandlers.js';
+
+// Phase 7: Debug Tools
+import { lineIntersectsRect, updateDebugBoxIntersections, resetWhiteLineColors } from './modules/debug/IntersectionDebug.js';
+
+// Phase 8: Progress & Logic
+import { setupProgressHiding, findNearestActiveCircle } from './modules/logic/ProgressManager.js';
 
 // Version Badge Loader - Fetches version from README.md
 (async function loadVersionBadge() {
@@ -29,61 +60,41 @@
 document.addEventListener('DOMContentLoaded', () => {
     const mapElement = document.getElementById('map');
     const loadingGif = document.getElementById('loading-gif');
-    let hasRevealed = false;
+
+    // ========== STATE VARIABLES ==========
+    // Note: All state variables now managed in modules/state/GameState.js
+    // Access via: gameState.collectedCircles, gameState.isDebugActive, etc.
+    // Helpers: isCircleCollected(key), collectCircle(key), setCurrentPosition(lat, lon), etc.
 
     // Default coordinates
     const DEFAULT_LAT = 32.05688;
     const DEFAULT_LON = 34.76878;
-    let isGpsActive = false;
-    let hasPreciseFix = false;
-    let isDebugActive = false; // New Debug State
-    let isPostersDebugActive = false;
 
-    // Location State Persistence
-    let collectedCircles = new Set(); // Tracks hidden circle keys: "lat,lon"
-    let currentLocationKey = null;    // Current location rounded key: "lat_lon"
-    const gameDataCache = new Map();  // Caches game data per location key
-    let currentUserPosition = null;   // Current user position {lat, lon}
-    const expandedCircles = new Set(); // Track circles that have triggered expansion
-    let isRestoringState = false;     // Flag to prevent saving during restoration
-    let restoredBlueCircles = [];     // Restored blue circles from saved state
+    // Note: getLocationKey now imported from modules/utils/CoordinateUtils.js
 
-    // PROMO GIF Global Cache
-    let promoGifCache = []; // Loaded once on startup
-    let promoGifAssignments = new Map(); // PolyID -> GifFilename (Synced with Server)
-
-    // Global Game State (for Redis persistence)
-    let currentCircleUid = null;  // UID of circle where player marker is currently positioned
-    let cachedGameData = null;    // Complete game data for saving to Redis (accumulated)
-
-    // Helper: Generate location key from coordinates (round to ~100m precision)
-    const getLocationKey = (lat, lon) => {
-        return `${lat.toFixed(3)}_${lon.toFixed(3)}`;
-    };
 
     const updateAndSaveUserPosition = (marker, lat, lon) => {
         // Update position via controls
         controls.updateUserPosition(marker, lat, lon);
 
-        // Save current position to state
-        currentUserPosition = { lat, lon };
+        // Save current position to gameState
+        setCurrentPosition(lat, lon);
         console.log(`DEBUG: Saved user position: ${lat}, ${lon}`);
     };
 
-    // Debounced save for position
-    let saveDebounceTimer = null;
-    const SAVE_DEBOUNCE_MS = 2000; // 2 seconds
+    // Initialize StateSaver with 2 second debounce
+    const stateSaver = new StateSaver(2000);
 
     const debouncedSavePosition = () => {
-        if (saveDebounceTimer) {
-            clearTimeout(saveDebounceTimer);
-        }
-
-        saveDebounceTimer = setTimeout(async () => {
+        stateSaver.debouncedSave(async () => {
             console.log('DEBUG: Saving position to Redis (debounced)...');
-            await saveGlobalState();
+            await stateSaver.saveGlobalState({
+                gameState,
+                visiblePolygonIds,
+                currentPosterGrid: posterRenderer ? posterRenderer.getPosterGrid() : null
+            });
             console.log('DEBUG: Position saved successfully');
-        }, SAVE_DEBOUNCE_MS);
+        });
     };
 
 
@@ -95,8 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/promos');
             if (res.ok) {
-                promoGifCache = await res.json();
-                console.log(`DEBUG: Loaded ${promoGifCache.length} promo GIFs globally`);
+                gameState.promoGifCache = await res.json();
+                console.log(`DEBUG: Loaded ${gameState.promoGifCache.length} promo GIFs globally`);
             }
         } catch (e) {
             console.warn("DEBUG: Failed to load promo GIFs", e);
@@ -105,130 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPromoGifs(); // Trigger load immediately
 
     // ========== GLOBAL STATE FUNCTIONS ==========
+    // Note: loadGlobalState, saveGlobalState, and renderFromSavedState are now imported from modules/api/
 
-    // Load complete game state from Redis (all geometry + progress)
-    const loadGlobalState = async () => {
-        return await window.gameAPI.loadGameState();
-    };
-
-    // Save complete game state to Redis (all geometry + progress)
-    const saveGlobalState = async () => {
-        if (!cachedGameData || !cachedGameData.polygons || cachedGameData.polygons.length === 0) {
-            console.log('GLOBAL_STATE: No data to save (empty cachedGameData)');
-            return;
-        }
-
-        // Build complete state
-        const state = {
-            // Geometry (accumulated from cachedGameData)
-            polygons: cachedGameData.polygons || [],
-            white_lines: cachedGameData.white_lines || [],
-            green_circles: cachedGameData.green_circles || [],
-            blue_circles: cachedGameData.blue_circles || [],
-            poster_grid: cachedGameData.poster_grid || currentPosterGrid || [],
-            groups: cachedGameData.groups || [],
-
-            // Progress
-            collected_circles: Array.from(collectedCircles),
-            visible_polygon_ids: Array.from(visiblePolygonIds),
-            expanded_circles: Array.from(expandedCircles),
-
-            // Position
-            user_position: currentUserPosition,
-            current_circle_uid: currentCircleUid,
-
-            // GIF assignments
-            promo_gif_map: Object.fromEntries(promoGifAssignments)
-        };
-
-        const result = await window.gameAPI.saveGameState(state);
-        if (result) {
-            console.log(`GLOBAL_STATE: Saved - ${result.saved_polygons} polygons, ${result.saved_lines} lines, circle_uid=${currentCircleUid}`);
-        }
-    };
-
-    // Render game from saved state (without regeneration)
-    const renderFromSavedState = async (state) => {
-        console.log('GLOBAL_STATE: Rendering from saved state...');
-
-        // Restore progress Sets
-        collectedCircles.clear();
-        (state.collected_circles || []).forEach(c => collectedCircles.add(c));
-
-        visiblePolygonIds.clear();
-        (state.visible_polygon_ids || []).forEach(id => visiblePolygonIds.add(id));
-
-        expandedCircles.clear();
-        (state.expanded_circles || []).forEach(c => expandedCircles.add(c));
-
-        // Restore GIF assignments
-        if (state.promo_gif_map) {
-            promoGifAssignments = new Map(Object.entries(state.promo_gif_map));
-        }
-
-        // Restore user position
-        if (state.user_position) {
-            currentUserPosition = state.user_position;
-
-            // FIX: Move marker IMMEDIATELY to saved position BEFORE rendering
-            // This prevents any logic inside renderGameElements from seeing DEFAULT position
-            console.log(`GLOBAL_STATE: Pre-positioning marker at saved position: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
-            userMarker.setLatLng([currentUserPosition.lat, currentUserPosition.lon]);
-            map.setView([currentUserPosition.lat, currentUserPosition.lon], 18);
-        }
-
-        // Restore circle UID
-        if (state.current_circle_uid) {
-            currentCircleUid = state.current_circle_uid;
-        }
-
-        // Store poster grid
-        if (state.poster_grid) {
-            currentPosterGrid = state.poster_grid;
-        }
-
-        // Cache the data for future saves
-        cachedGameData = {
-            polygons: state.polygons,
-            white_lines: state.white_lines,
-            green_circles: state.green_circles,
-            blue_circles: state.blue_circles,
-            poster_grid: state.poster_grid,
-            groups: state.groups
-        };
-
-        // Build game data object for renderGameElements
-        const gameData = {
-            polygons: state.polygons,
-            white_lines: state.white_lines,
-            green_circles: state.green_circles,
-            blue_circles: state.blue_circles,
-            poster_grid: state.poster_grid,
-            groups: state.groups,
-            red_lines: []
-        };
-
-        console.log(`GLOBAL_STATE: Restoring ${gameData.polygons.length} polygons, ${collectedCircles.size} collected circles`);
-
-        // Render everything - marker is already at correct position from above
-        await renderGameElements(gameData, 'restore');
-
-        // Refine position to exact circle center if UID is available
-        if (currentCircleUid && window.allItems) {
-            const circleData = window.allItems.get(currentCircleUid);
-            if (circleData && circleData.lat !== undefined && circleData.lon !== undefined) {
-                console.log(`GLOBAL_STATE: Refining marker to saved circle center ${currentCircleUid}`);
-                updateAndSaveUserPosition(userMarker, circleData.lat, circleData.lon);
-                map.setView([circleData.lat, circleData.lon], 18);
-            } else {
-                console.log(`GLOBAL_STATE: Circle ${currentCircleUid} not found in items, keeping position at ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
-            }
-        } else if (currentUserPosition) {
-            console.log(`GLOBAL_STATE: No circle UID saved, marker remains at position ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
-        }
-
-        return true;
-    };
 
     // Initialize Map via MapControls (Centralized Logic)
     const controls = new MapControls('map', [DEFAULT_LAT, DEFAULT_LON], {
@@ -262,15 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _greenCirclesByLine = null;
     let _polygonState = null;
 
-    const resetSelection = () => {
-        selectedLayers.forEach((layer, i) => {
-            if (layer && originalStyles[i] && typeof layer.setStyle === 'function') {
-                layer.setStyle(originalStyles[i]);
-            }
-        });
-        selectedLayers = [];
-        originalStyles = [];
-    };
+    // Note: resetSelection now imported from modules/ui/DebugMode.js
 
     // ------------------------------------------------
 
@@ -279,10 +160,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailsLayer = L.layerGroup(); // Don't add to map yet - wait until all elements loaded
     const expandedLayer = L.layerGroup(); // Separate layer for expanded polygons (can be cleared independently)
     let expandedItemUids = new Set(); // Track UIDs of items in expandedLayer
-    let expandedCircleCoords = new Set(); // Track coordinates of expanded circles (for collectedCircles cleanup)
+    let expandedCircleCoords = new Set(); // Track coordinates of expanded circles (for gameState.collectedCircles cleanup)
     let clearedCircleCoords = new Set(); // Track coordinates that were intentionally cleared (don't reload from server)
     const completedPolygonsLayer = L.layerGroup().addTo(map); // Always visible layer for completed zones
     const postersLayer = L.layerGroup().addTo(map); // Background posters
+
+    // Initialize PosterRenderer
+    const posterRenderer = new PosterRenderer(map, postersLayer, gameState);
 
     // Global circle layer tracking (persist across expand mode)
     const circleLayerMap = new Map(); // coord key -> layer (persists across renders)
@@ -332,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userMarker.setLatLng([lat, lon]);
 
         // Update current position
-        currentUserPosition = { lat, lon };
+        gameState.currentUserPosition = { lat, lon };
 
         // Update circle UID if we moved to a blue circle
         const coordKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
@@ -342,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (item.lat !== undefined && item.lon !== undefined) {
                     const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
                     if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
-                        currentCircleUid = uid;
+                        gameState.currentCircleUid = uid;
                         console.log(`DEBUG: Moved to blue circle ${uid}`);
                         break;
                     }
@@ -358,8 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reveal Map Logic (Visual Transition)
     const topBarContainer = document.getElementById('top-bar-container');
     const revealMap = () => {
-        if (hasRevealed) return;
-        hasRevealed = true;
+        if (gameState.hasRevealed) return;
+        gameState.hasRevealed = true;
         console.log("DEBUG: Revealing Map...");
 
 
@@ -374,400 +258,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 600);
     };
 
+
     // --- POSTER GRID LOGIC ---
-    const posters = [];
-    const REVEAL_MASK_SVG_ID = 'poster-reveal-mask';
-    let revealMask = null;
-    let revealMaskPath = null;
-    let posterSvgOverlay = null; // SVG overlay for posters
+    // Moved to modules/rendering/PosterRenderer.js
+    // Usage: posterRenderer.initPosterGrid(), posterRenderer.updatePosterSVG(), etc.
 
-    let currentPosterGrid = null; // Store poster grid from server (4 posters)
+    // Note: showError now imported from modules/ui/ErrorDisplay.js
 
-    const initPosterGrid = (data, mode = 'initial') => {
-        const isExpanding = mode === 'expand';
-        console.log(`DEBUG: Initializing Poster Grid (mode=${mode}, isExpanding=${isExpanding})...`);
+    // Note: showError now imported from modules/ui/ErrorDisplay.js
 
-        // During expansion, preserve existing overlay to prevent flicker
-        if (!isExpanding) {
-            if (posterSvgOverlay) {
-                console.log("DEBUG: Removing existing poster SVG overlay");
-                posterSvgOverlay.remove();
-                posterSvgOverlay = null;
-            }
-            postersLayer.clearLayers();
-            posters.length = 0;
-        } else {
-            console.log("DEBUG: Expansion mode - preserving existing poster overlay");
-        }
-
-        if (!currentPosterGrid || currentPosterGrid.length === 0) {
-            console.log("DEBUG: No poster_grid from server");
-            return;
-        }
-
-        console.log(`DEBUG: Using server poster grid with ${currentPosterGrid.length} posters`);
-
-        // Find overall bounds for SVG overlay using both posters and polygons
-        let minLat = Infinity, maxLat = -Infinity;
-        let minLon = Infinity, maxLon = -Infinity;
-
-        currentPosterGrid.forEach(poster => {
-            minLat = Math.min(minLat, poster.min_lat);
-            maxLat = Math.max(maxLat, poster.max_lat);
-            minLon = Math.min(minLon, poster.min_lon);
-            maxLon = Math.max(maxLon, poster.max_lon);
-        });
-
-        // Crucial: Expand bounds to include all polygons to prevent clipping
-        if (data && data.polygons) {
-            data.polygons.forEach(poly => {
-                poly.coords.forEach(coord => {
-                    minLat = Math.min(minLat, coord[0]);
-                    maxLat = Math.max(maxLat, coord[0]);
-                    minLon = Math.min(minLon, coord[1]);
-                    maxLon = Math.max(maxLon, coord[1]);
-                });
-            });
-        }
-
-        // Add 5% buffer to prevent edge artifacts
-        const latBuffer = (maxLat - minLat) * 0.05;
-        const lonBuffer = (maxLon - minLon) * 0.05;
-        minLat -= latBuffer; maxLat += latBuffer;
-        minLon -= lonBuffer; maxLon += lonBuffer;
-
-        console.log(`DEBUG: SVG Expanded area (with buffer): lat(${minLat.toFixed(5)}, ${maxLat.toFixed(5)}), lon(${minLon.toFixed(5)}, ${maxLon.toFixed(5)})`);
-
-        const svgBounds = L.latLngBounds(
-            [minLat, minLon],  // Southwest corner
-            [maxLat, maxLon]   // Northeast corner
-        );
-
-        // EXPANSION MODE: Update existing overlay bounds instead of recreating
-        if (isExpanding && posterSvgOverlay) {
-            console.log("DEBUG: Expanding existing poster overlay bounds...");
-
-            // Get current bounds
-            const currentBounds = posterSvgOverlay.getBounds();
-
-            // Extend current bounds to include new bounds
-            const extendedBounds = L.latLngBounds(
-                [Math.min(currentBounds.getSouth(), minLat), Math.min(currentBounds.getWest(), minLon)],
-                [Math.max(currentBounds.getNorth(), maxLat), Math.max(currentBounds.getEast(), maxLon)]
-            );
-
-            console.log(`DEBUG: Extended bounds: lat(${extendedBounds.getSouth().toFixed(5)}, ${extendedBounds.getNorth().toFixed(5)}), lon(${extendedBounds.getWest().toFixed(5)}, ${extendedBounds.getEast().toFixed(5)})`);
-
-            // Update overlay bounds (this preserves the mask!)
-            posterSvgOverlay.setBounds(extendedBounds);
-
-            // Posters array is already populated - just update the SVG
-            updatePosterSVG();
-            return;
-        }
-
-        // INITIAL MODE: Create new SVG overlay
-        const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-        svgElement.style.position = "absolute";
-        svgElement.style.top = "0";
-        svgElement.style.left = "0";
-        svgElement.style.width = "100%";
-        svgElement.style.height = "100%";
-        svgElement.style.pointerEvents = "none";
-        svgElement.setAttribute("viewBox", "0 0 1000 1000");
-        svgElement.setAttribute("preserveAspectRatio", "none");
-        svgElement.innerHTML = `
-                <defs>
-                    <mask id="poster-reveal-mask">
-                        <rect width="1000" height="1000" fill="black"/>
-                        <g id="mask-paths-container" fill="white"></g>
-                    </mask>
-                </defs>
-                <g id="debug-poster-bg" style="display:none; opacity: 0.4; pointer-events: none;"></g>
-                <g id="poster-images-container" mask="url(#poster-reveal-mask)"></g>
-                <g id="debug-poster-overlay" style="display:none; pointer-events: none;"></g>
-            `;
-
-        // Add to map pane with correct bounds
-        posterSvgOverlay = L.svgOverlay(svgElement, svgBounds, {
-            interactive: false,
-            pane: 'postersPane'
-        }).addTo(map);
-
-        revealMask = svgElement.querySelector('#mask-paths-container');
-        const imagesContainer = svgElement.querySelector('#poster-images-container');
-
-        // Create posters from server data
-        currentPosterGrid.forEach(poster => {
-            const bounds = [
-                [poster.min_lat, poster.min_lon],
-                [poster.max_lat, poster.max_lon]
-            ];
-
-            posters.push({
-                bounds,
-                id: poster.id,
-                imageUrl: poster.image_url
-            });
-
-            console.log(`DEBUG: Poster ${poster.id}: lat(${poster.min_lat.toFixed(5)}, ${poster.max_lat.toFixed(5)}), lon(${poster.min_lon.toFixed(5)}, ${poster.max_lon.toFixed(5)})`);
-
-            if (poster.position === 5) {
-                const poster5CenterLat = (poster.min_lat + poster.max_lat) / 2;
-                const poster5CenterLon = (poster.min_lon + poster.max_lon) / 2;
-                const userPos = userMarker.getLatLng();
-                console.log(`DEBUG: ========== POSTER #5 CENTER CHECK ==========`);
-                console.log(`DEBUG: Poster #5 center: ${poster5CenterLat.toFixed(6)}, ${poster5CenterLon.toFixed(6)}`);
-                console.log(`DEBUG: User marker pos:  ${userPos.lat.toFixed(6)}, ${userPos.lng.toFixed(6)}`);
-                console.log(`DEBUG: Difference: lat=${Math.abs(poster5CenterLat - userPos.lat).toFixed(6)}, lon=${Math.abs(poster5CenterLon - userPos.lng).toFixed(6)}`);
-                console.log(`DEBUG: =============================================`);
-            }
-        });
-
-        console.log(`DEBUG: Created ${posters.length} poster overlays`);
-        updatePosterSVG();
-    };
-
-    const updatePosterSVG = () => {
-        if (!posterSvgOverlay) return;
-
-        const svg = posterSvgOverlay.getElement();
-        if (!svg) return;
-
-        const imagesContainer = svg.querySelector('#poster-images-container');
-        const bgContainer = svg.querySelector('#debug-poster-bg');
-        const overlayContainer = svg.querySelector('#debug-poster-overlay');
-
-        if (!imagesContainer || !bgContainer || !overlayContainer) return;
-
-        // --- DOM RECONCILIATION ---
-        // Do NOT clear innerHTML. Instead, diff and update.
-
-        // Get SVG bounds (geographic coordinates)
-        const svgBounds = posterSvgOverlay.getBounds();
-        const svgMinLat = svgBounds.getSouth();
-        const svgMaxLat = svgBounds.getNorth();
-        const svgMinLon = svgBounds.getWest();
-        const svgMaxLon = svgBounds.getEast();
-
-        const latRange = svgMaxLat - svgMinLat;
-        const lonRange = svgMaxLon - svgMinLon;
-
-        const activePosterIds = new Set();
-
-        posters.forEach(p => {
-            activePosterIds.add(p.id);
-
-            const posterMinLat = p.bounds[0][0];
-            const posterMinLon = p.bounds[0][1];
-            const posterMaxLat = p.bounds[1][0];
-            const posterMaxLon = p.bounds[1][1];
-
-            const x = ((posterMinLon - svgMinLon) / lonRange) * 1000;
-            const y = ((svgMaxLat - posterMaxLat) / latRange) * 1000;
-            const width = ((posterMaxLon - posterMinLon) / lonRange) * 1000;
-            const height = ((posterMaxLat - posterMinLat) / latRange) * 1000;
-
-            if (width <= 0 || height <= 0) {
-                return;
-            }
-
-            // 1. Background Image (Ghost)
-            const bgId = `poster-bg-${p.id}`;
-            let bgImage = bgContainer.querySelector(`#${bgId}`);
-            if (!bgImage) {
-                bgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                bgImage.setAttribute("id", bgId);
-                bgImage.setAttribute("preserveAspectRatio", "none");
-                bgContainer.appendChild(bgImage);
-            }
-            // Update attributes (efficiently)
-            if (bgImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") !== p.imageUrl) {
-                bgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-            }
-            bgImage.setAttribute("x", x);
-            bgImage.setAttribute("y", y);
-            bgImage.setAttribute("width", width);
-            bgImage.setAttribute("height", height);
-
-            // 2. Main Game Image
-            const imgId = `poster-img-${p.id}`;
-            let mainImage = imagesContainer.querySelector(`#${imgId}`);
-            if (!mainImage) {
-                mainImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                mainImage.setAttribute("id", imgId);
-                mainImage.setAttribute("opacity", "1.0");
-                mainImage.setAttribute("preserveAspectRatio", "none");
-                imagesContainer.appendChild(mainImage);
-            }
-            if (mainImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") !== p.imageUrl) {
-                mainImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-            }
-            mainImage.setAttribute("x", x);
-            mainImage.setAttribute("y", y);
-            mainImage.setAttribute("width", width);
-            mainImage.setAttribute("height", height);
-
-            // 3. Debug Overlay
-            if (isPostersDebugActive) {
-                // For debug overlay, simpler to clear and redraw just for this poster? 
-                // Or we can group them too. Let's group them by poster ID using a group <g>.
-                const debugGroupId = `poster-debug-${p.id}`;
-                let debugGroup = overlayContainer.querySelector(`#${debugGroupId}`);
-
-                if (!debugGroup) {
-                    debugGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-                    debugGroup.setAttribute("id", debugGroupId);
-                    overlayContainer.appendChild(debugGroup);
-
-                    // Contents (created once)
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute("fill", "none");
-                    rect.setAttribute("stroke", "red");
-                    rect.setAttribute("stroke-width", "3");
-                    debugGroup.appendChild(rect);
-
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute("fill", "yellow");
-                    text.setAttribute("font-size", "13");
-                    text.setAttribute("font-weight", "bold");
-                    text.setAttribute("text-anchor", "middle");
-                    text.setAttribute("dominant-baseline", "middle");
-                    text.textContent = `#${p.id}`;
-                    debugGroup.appendChild(text);
-                }
-
-                // Update Group Contents
-                const rect = debugGroup.querySelector('rect');
-                const text = debugGroup.querySelector('text');
-
-                rect.setAttribute("x", x);
-                rect.setAttribute("y", y);
-                rect.setAttribute("width", width);
-                rect.setAttribute("height", height);
-
-                text.setAttribute("x", x + width / 2);
-                text.setAttribute("y", y + height / 2);
-            }
-        });
-
-        // Cleanup Stale Nodes
-        // Helper to remove stale children
-        const cleanupContainer = (container, prefix) => {
-            Array.from(container.children).forEach(child => {
-                const id = child.getAttribute("id");
-                if (id && id.startsWith(prefix)) {
-                    const posterId = id.replace(prefix, '');
-                    if (!activePosterIds.has(posterId)) {
-                        child.remove();
-                    }
-                }
-            });
-        };
-
-        cleanupContainer(bgContainer, 'poster-bg-');
-        cleanupContainer(imagesContainer, 'poster-img-');
-        cleanupContainer(overlayContainer, 'poster-debug-');
-
-        console.log(`DEBUG: Updated poster layers (Diff Update)`);
-    };
-
-    const updatePostersVisibility = () => {
-        if (posterSvgOverlay) {
-            const svg = posterSvgOverlay.getElement();
-            if (svg) {
-                const bgContainer = svg.querySelector('#debug-poster-bg');
-                const overlayContainer = svg.querySelector('#debug-poster-overlay');
-                const imagesContainer = svg.querySelector('#poster-images-container');
-
-                // Main container ALWAYS masked
-                if (imagesContainer) {
-                    imagesContainer.setAttribute('mask', 'url(#poster-reveal-mask)');
-                }
-
-                // Toggle debug layers
-                const display = isPostersDebugActive ? 'inline' : 'none';
-                if (bgContainer) bgContainer.style.display = display;
-                if (overlayContainer) overlayContainer.style.display = display;
-            }
-        }
-        updatePosterSVG();
-        toggleHiddenDebug(isPostersDebugActive);
-    };
-
-    const toggleHiddenDebug = (show) => {
-        if (!_circleLayerMap || !_polygonState || !_lineLayerMap) return;
-
-        console.log(`DEBUG: Toggling hidden elements: ${show ? 'SHOW ALL' : 'RESTORE HIDDEN'}`);
-
-        // 1. Handle Collected Circles
-        collectedCircles.forEach(key => {
-            const layer = _circleLayerMap.get(key);
-            if (layer) {
-                if (show) {
-                    // Reveal
-                    const isBlue = layer.options.color === 'blue' || (layer.options.fillColor === '#00ccff');
-                    layer.setStyle({
-                        opacity: 1,
-                        fillOpacity: isBlue ? 0.8 : 1
-                    });
-
-                    // Restore Blue Circle Tooltip (Number)
-                    if (layer.connections !== undefined && !layer.getTooltip()) {
-                        layer.bindTooltip(String(layer.connections), {
-                            permanent: true,
-                            direction: 'center',
-                            className: 'circle-label'
-                        });
-                    }
-                } else {
-                    // Re-hide
-                    layer.setStyle({ opacity: 0, fillOpacity: 0 });
-
-                    // Remove tooltip again if it was restored
-                    if (layer.getTooltip()) {
-                        layer.unbindTooltip();
-                    }
-                }
-            }
-        });
-
-        // 2. Handle Lines from Completed Polygons
-        _polygonState.forEach(state => {
-            if (state.current >= state.total && state.lines) {
-                state.lines.forEach(lid => {
-                    const lineLayer = _lineLayerMap.get(String(lid));
-                    if (lineLayer) {
-                        if (show) {
-                            lineLayer.setStyle({ opacity: 1, fillOpacity: 1 }); // Lines usually opacity 1
-                        } else {
-                            lineLayer.setStyle({ opacity: 0, fillOpacity: 0 });
-                        }
-                    }
-                });
-            }
-        });
-    };
-
-    // --- END POSTER GRID LOGIC ---
-
-    const showError = (msg) => {
-        loadingGif.style.display = 'none';
-        mapElement.style.display = 'none';
-        if (topBarContainer) topBarContainer.style.display = 'none';
-
-        const errorScreen = document.getElementById('error-screen');
-        const errorMessage = document.getElementById('error-message');
-        const retryBtn = document.getElementById('retry-btn');
-
-        errorScreen.style.display = 'flex';
-        errorMessage.innerHTML = msg;
-
-        retryBtn.onclick = () => {
-            window.location.reload();
-        };
-    };
 
     const loadGameData = async (lat, lon, forceRebuild = false, mode = 'initial') => {
         console.log("GPS: ========================================");
@@ -777,19 +276,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update to new location key
         const newLocationKey = getLocationKey(lat, lon);
-        console.log(`DEBUG: Location key: current=${currentLocationKey}, new=${newLocationKey}, mode=${mode}`);
+        console.log(`DEBUG: Location key: current=${gameState.currentLocationKey}, new=${newLocationKey}, mode=${mode}`);
 
         // RESTORE STATE FIRST (in initial mode only) - BEFORE checking location switch
-        // This ensures we have collectedCircles/visiblePolygonIds populated before making decisions
+        // This ensures we have gameState.collectedCircles/visiblePolygonIds populated before making decisions
         if (mode !== 'expand') {
             // Set flag to prevent saving during restoration
-            isRestoringState = true;
-            console.log(`DEBUG: 🔒 Setting isRestoringState = true (prevent saves during restoration)`);
+            gameState.isRestoringState = true;
+            console.log(`DEBUG: 🔒 Setting gameState.isRestoringState = true (prevent saves during restoration)`);
 
             // Restore state from Redis (server) ONLY - no client-side storage
             try {
                 console.log(`DEBUG: Attempting to restore state from Redis for location: ${newLocationKey}`);
-                const serverState = await loadLocationState(newLocationKey);
+                const serverState = await window.gameAPI.loadLocationState(newLocationKey);
 
                 if (serverState && serverState.visible_polygon_ids && serverState.visible_polygon_ids.length > 0) {
                     console.log(`DEBUG: ✓ Found saved state in Redis: ${serverState.visible_polygon_ids.length} polygons, ${serverState.collected_circles.length} circles`);
@@ -801,42 +300,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Restore expanded circles
                     if (serverState.expanded_circles && serverState.expanded_circles.length > 0) {
-                        expandedCircles.clear();
-                        serverState.expanded_circles.forEach(coord => expandedCircles.add(coord));
-                        console.log(`DEBUG: Restored ${expandedCircles.size} expanded circles from Redis`);
+                        gameState.expandedCircles.clear();
+                        serverState.expanded_circles.forEach(coord => gameState.expandedCircles.add(coord));
+                        console.log(`DEBUG: Restored ${gameState.expandedCircles.size} expanded circles from Redis`);
                     }
 
                     // Restore collected circles
                     if (serverState.collected_circles && serverState.collected_circles.length > 0) {
-                        collectedCircles.clear();
-                        serverState.collected_circles.forEach(coord => collectedCircles.add(coord));
-                        console.log(`DEBUG: Restored ${collectedCircles.size} collected circles from Redis`);
+                        gameState.collectedCircles.clear();
+                        serverState.collected_circles.forEach(coord => gameState.collectedCircles.add(coord));
+                        console.log(`DEBUG: Restored ${gameState.collectedCircles.size} collected circles from Redis`);
                     }
 
                     // Restore blue circles
                     if (serverState.blue_circles && serverState.blue_circles.length > 0) {
-                        restoredBlueCircles = serverState.blue_circles;
-                        console.log(`DEBUG: Restored ${restoredBlueCircles.length} blue circles from Redis`);
+                        gameState.restoredBlueCircles = serverState.blue_circles;
+                        console.log(`DEBUG: Restored ${gameState.restoredBlueCircles.length} blue circles from Redis`);
                     } else {
-                        restoredBlueCircles = [];
+                        gameState.restoredBlueCircles = [];
                     }
 
                     // Restore user position
                     if (serverState.user_position && serverState.user_position.lat !== undefined) {
-                        currentUserPosition = serverState.user_position;
-                        console.log(`DEBUG: Restored user position from Redis: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
+                        gameState.currentUserPosition = serverState.user_position;
+                        console.log(`DEBUG: Restored user position from Redis: ${gameState.currentUserPosition.lat}, ${gameState.currentUserPosition.lon}`);
                     }
                 } else {
                     console.log(`DEBUG: No saved state found in Redis for location: ${newLocationKey}`);
-                    restoredBlueCircles = [];
+                    gameState.restoredBlueCircles = [];
                 }
             } catch (e) {
                 console.warn("DEBUG: Failed to load state from Redis:", e);
-                restoredBlueCircles = [];
+                gameState.restoredBlueCircles = [];
             }
         } else {
             // Expand mode - clear restored blue circles
-            restoredBlueCircles = [];
+            gameState.restoredBlueCircles = [];
         }
 
 
@@ -844,33 +343,37 @@ document.addEventListener('DOMContentLoaded', () => {
         // In INITIAL mode, save old location and switch to new
         if (mode !== 'expand') {
             // Check if we're actually switching location or just reloading same location
-            const isSameLocation = (currentLocationKey === newLocationKey);
+            const isSameLocation = (gameState.currentLocationKey === newLocationKey);
 
             if (!isSameLocation) {
                 // SAVE current location state before switching to new location
-                if (currentLocationKey && collectedCircles.size > 0) {
-                    console.log(`DEBUG: Saving state for ${currentLocationKey} before switching...`);
+                if (gameState.currentLocationKey && gameState.collectedCircles.size > 0) {
+                    console.log(`DEBUG: Saving state for ${gameState.currentLocationKey} before switching...`);
                     await saveGlobalState();
                 }
 
                 // Switch to new location
-                console.log(`DEBUG: Switching location: ${currentLocationKey} -> ${newLocationKey}`);
-                currentLocationKey = newLocationKey;
-                // DON'T clear collectedCircles here - we just restored them above!
-                // collectedCircles = new Set(); // ← REMOVED
+                console.log(`DEBUG: Switching location: ${gameState.currentLocationKey} -> ${newLocationKey}`);
+                gameState.currentLocationKey = newLocationKey;
+                // DON'T clear gameState.collectedCircles here - we just restored them above!
+                // gameState.collectedCircles = new Set(); // ← REMOVED
             } else {
-                // Same location - keep collectedCircles (page reload scenario)
-                console.log(`DEBUG: Same location (${currentLocationKey}) - keeping collected circles in memory`);
+                // Same location - keep gameState.collectedCircles (page reload scenario)
+                console.log(`DEBUG: Same location (${gameState.currentLocationKey}) - keeping collected circles in memory`);
             }
         } else {
             // EXPAND mode: Keep same location key, just save current progress
-            console.log(`DEBUG: Expansion mode - Keeping location key ${currentLocationKey}`);
-            console.log(`DEBUG: Retaining ${collectedCircles.size} collected circles in memory.`);
+            console.log(`DEBUG: Expansion mode - Keeping location key ${gameState.currentLocationKey}`);
+            console.log(`DEBUG: Retaining ${gameState.collectedCircles.size} collected circles in memory.`);
 
             // Save progress to current location (not switching)
-            if (currentLocationKey && collectedCircles.size > 0) {
-                console.log(`DEBUG: Saving expanded state for ${currentLocationKey}...`);
-                await saveGlobalState();
+            if (gameState.currentLocationKey && gameState.collectedCircles.size > 0) {
+                console.log(`DEBUG: Saving expanded state for ${gameState.currentLocationKey}...`);
+                await stateSaver.saveGlobalState({
+                    gameState,
+                    visiblePolygonIds,
+                    currentPosterGrid: posterRenderer ? posterRenderer.getPosterGrid() : null
+                });
             }
         }
 
@@ -880,16 +383,16 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingGif.style.display = 'block';
             loadingGif.style.opacity = '1';
             mapElement.style.opacity = '0.3';
-            hasRevealed = false;
+            gameState.hasRevealed = false;
         } else {
             console.log("GPS: Expansion mode - keeping map visible.");
         }
 
         // CHECK CACHE first (unless force rebuild OR expansion)
         // Expansion always fetches fresh data to merge
-        if (mode !== 'expand' && !forceRebuild && gameDataCache.has(newLocationKey)) {
+        if (mode !== 'expand' && !forceRebuild && gameState.gameDataCache.has(newLocationKey)) {
             console.log(`GPS: Using CACHED data for location ${newLocationKey}`);
-            const cachedData = gameDataCache.get(newLocationKey);
+            const cachedData = gameState.gameDataCache.get(newLocationKey);
             await renderGameElements(cachedData, mode);
             revealMap();
             return;
@@ -942,21 +445,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`GPS: ========================================`);
 
                 // CACHE the data for this location
-                gameDataCache.set(newLocationKey, data);
+                gameState.gameDataCache.set(newLocationKey, data);
                 console.log(`DEBUG: Cached game data for location ${newLocationKey}`);
 
                 // ACCUMULATE to global cached data for Redis persistence
-                if (mode === 'expand' && cachedGameData) {
+                if (mode === 'expand' && gameState.cachedGameData) {
                     // Merge new data with existing
-                    cachedGameData.polygons = [...(cachedGameData.polygons || []), ...(data.polygons || [])];
-                    cachedGameData.white_lines = [...(cachedGameData.white_lines || []), ...(data.white_lines || [])];
-                    cachedGameData.green_circles = [...(cachedGameData.green_circles || []), ...(data.green_circles || [])];
-                    cachedGameData.blue_circles = [...(cachedGameData.blue_circles || []), ...(data.blue_circles || [])];
+                    gameState.cachedGameData.polygons = [...(gameState.cachedGameData.polygons || []), ...(data.polygons || [])];
+                    gameState.cachedGameData.white_lines = [...(gameState.cachedGameData.white_lines || []), ...(data.white_lines || [])];
+                    gameState.cachedGameData.green_circles = [...(gameState.cachedGameData.green_circles || []), ...(data.green_circles || [])];
+                    gameState.cachedGameData.blue_circles = [...(gameState.cachedGameData.blue_circles || []), ...(data.blue_circles || [])];
                     // Keep original poster_grid
-                    console.log(`DEBUG: Accumulated expand data - now ${cachedGameData.polygons.length} total polygons`);
+                    console.log(`DEBUG: Accumulated expand data - now ${gameState.cachedGameData.polygons.length} total polygons`);
                 } else {
                     // Initial load - replace all
-                    cachedGameData = {
+                    gameState.cachedGameData = {
                         polygons: data.polygons || [],
                         white_lines: data.white_lines || [],
                         green_circles: data.green_circles || [],
@@ -964,14 +467,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         poster_grid: data.poster_grid || [],
                         groups: data.groups || []
                     };
-                    console.log(`DEBUG: Set initial cachedGameData - ${cachedGameData.polygons.length} polygons`);
+                    console.log(`DEBUG: Set initial gameState.cachedGameData - ${gameState.cachedGameData.polygons.length} polygons`);
                 }
 
                 await renderGameElements(data, mode);
                 revealMap();
 
                 // Save to global Redis state after rendering
-                await saveGlobalState();
+                await stateSaver.saveGlobalState({
+                    gameState,
+                    visiblePolygonIds,
+                    currentPosterGrid: posterRenderer ? posterRenderer.getPosterGrid() : null
+                });
             })
             .catch(err => {
                 console.error("GPS: ========================================");
@@ -987,16 +494,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- 0. INITIALIZE POSTERS & MASK EARLY ---
         // Store poster grid from server if present
+        // --- 0. INITIALIZE POSTERS & MASK EARLY ---
+        // Store poster grid from server if present
         if (data.poster_grid && data.poster_grid.length > 0) {
-            currentPosterGrid = data.poster_grid;
-            console.log(`DEBUG: Stored ${currentPosterGrid.length} posters from server`);
+            posterRenderer.setPosterGrid(data.poster_grid);
+            console.log(`DEBUG: Stored ${data.poster_grid.length} posters from server`);
         } else {
             console.log("DEBUG: No poster_grid data received from server");
-            currentPosterGrid = null;
+            posterRenderer.setPosterGrid(null);
         }
 
         // Initialize poster grid UI and revealMask object
-        initPosterGrid(data, mode);
+        posterRenderer.initPosterGrid(data, mode);
 
         // Clear layers based on mode
         if (mode !== 'expand') {
@@ -1036,274 +545,60 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- 0.5 PREPARE DATA ARRAYS EARLY ---
         // Merge restored blue circles with backend data BEFORE processing
         let localBlueCircles = data.blue_circles || [];
-        if (mode === 'initial' && restoredBlueCircles.length > 0) {
+        if (mode === 'initial' && gameState.restoredBlueCircles.length > 0) {
             // Create a map of existing blue circles from backend by coordinates
             const backendBlueCoords = new Set(
                 localBlueCircles.map(bc => `${bc.lat.toFixed(7)},${bc.lon.toFixed(7)}`)
             );
 
             // Add restored blue circles that are NOT in backend response
-            restoredBlueCircles.forEach(restoredCircle => {
+            gameState.restoredBlueCircles.forEach(restoredCircle => {
                 const coordKey = `${restoredCircle.lat.toFixed(7)},${restoredCircle.lon.toFixed(7)}`;
                 if (!backendBlueCoords.has(coordKey)) {
                     localBlueCircles.push(restoredCircle);
                 }
             });
 
-            console.log(`DEBUG: Merged blue circles - Backend: ${data.blue_circles?.length || 0}, Restored: ${restoredBlueCircles.length}, Total: ${localBlueCircles.length}`);
+            console.log(`DEBUG: Merged blue circles - Backend: ${data.blue_circles?.length || 0}, Restored: ${gameState.restoredBlueCircles.length}, Total: ${localBlueCircles.length}`);
         }
 
-        // --- HELPER: UPDATE MASK PORTS ---
-        // Defined early to be available for applyCollectedState
-        const updateMaskPaths = () => {
-            if (!revealMask || !posterSvgOverlay) return;
-
-            const svgBounds = posterSvgOverlay.getBounds();
-            const svgMinLat = svgBounds.getSouth();
-            const svgMaxLat = svgBounds.getNorth();
-            const svgMinLon = svgBounds.getWest();
-            const svgMaxLon = svgBounds.getEast();
-            const latRange = svgMaxLat - svgMinLat;
-            const lonRange = svgMaxLon - svgMinLon;
-
-            // Rebuild all paths in the mask
-            revealMask.innerHTML = '';
-            polygonState.forEach(state => {
-                if (state.current >= state.total && state.coords) {
-                    try {
-                        const points = state.coords.map(p => {
-                            if (!Array.isArray(p) || p.length < 2) return null;
-                            // Scale coordinates to 0-1000 range relative to SVG bounds
-                            const x = ((p[1] - svgMinLon) / lonRange) * 1000;
-                            const y = ((svgMaxLat - p[0]) / latRange) * 1000;
-                            return `${x.toFixed(2)},${y.toFixed(2)}`;
-                        }).filter(Boolean).join(' ');
-
-                        const pathData = points ? `M ${points} Z` : '';
-                        if (pathData) {
-                            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                            path.setAttribute("d", pathData);
-                            revealMask.appendChild(path);
-                        }
-                    } catch (e) {
-                        console.warn(`Failed to update mask for polygon ${state.id}:`, e);
-                    }
-                }
-            });
-        };
+        // Helper to update mask paths moved to PosterRenderer
+        // Access via posterRenderer.updateMaskPaths()
 
         // --- 1. UID/ID MAPPING (Foreign Key Normalization) ---
-        const lineIdMap = new Map(); // Old ID (number) -> New UID (string)
+        // Note: generateUID and createUIDMaps now imported from modules/utils/UIDGenerator.js
 
-        const generateUID = (prefix) => {
-            return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
-        };
+        // Create UID maps using the extracted module
+        const { lineIdMap, polyIdMap } = createUIDMaps(data, window.allItems, mode);
 
-        // A. Process White Lines (Dependencies for Polygons/Circles)
+        // Update window.allItems with processed data
         if (data.white_lines) {
             data.white_lines.forEach(line => {
-                const originalId = line.id;
-
-                // Check if line already exists by start/end coordinates (reuse UID in expand mode)
-                let existingLine = null;
-                if (line.start && line.end && line.start.length === 2 && line.end.length === 2) {
-                    const lineKey = `${line.start[0].toFixed(7)},${line.start[1].toFixed(7)}_${line.end[0].toFixed(7)},${line.end[1].toFixed(7)}`;
-
-                    // Search for existing line with same coordinates in window.allItems
-                    for (const [uid, item] of window.allItems.entries()) {
-                        if (item.start && item.end && item.start.length === 2 && item.end.length === 2) {
-                            const itemLineKey = `${item.start[0].toFixed(7)},${item.start[1].toFixed(7)}_${item.end[0].toFixed(7)},${item.end[1].toFixed(7)}`;
-                            if (itemLineKey === lineKey && uid.startsWith('WHITE_LINE_')) {
-                                existingLine = { uid, item };
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (existingLine) {
-                    // Reuse existing UID
-                    line.uid = existingLine.uid;
-                    line.id = existingLine.uid;
-                } else {
-                    // Generate new UID
-                    line.uid = generateUID('WHITE_LINE');
-                    line.id = line.uid; // Swap ID for consistency in app logic
-                }
-
-                line.original_id = originalId; // Keep for reference if needed
-
-                if (originalId !== undefined) {
-                    lineIdMap.set(Number(originalId), line.uid);
-                    lineIdMap.set(String(originalId), line.uid); // String safety
-                }
-
                 window.allItems.set(line.uid, line);
-                // Track expanded items (only if new)
-                if (mode === 'expand' && !existingLine) {
+                if (mode === 'expand' && !expandedItemUids.has(line.uid)) {
                     expandedItemUids.add(line.uid);
                 }
             });
         }
 
-        // B. Process Green Circles (Depend on Lines)
         if (data.green_circles) {
             data.green_circles.forEach(circle => {
-                // Check if circle already exists by coordinates (reuse UID in expand mode)
-                const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
-                let existingCircle = null;
-
-                // Search for existing circle with same coordinates in window.allItems
-                for (const [uid, item] of window.allItems.entries()) {
-                    if (item.lat !== undefined && item.lon !== undefined) {
-                        const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                        if (itemKey === coordKey && uid.startsWith('GREEN_CIRCLE_')) {
-                            existingCircle = { uid, item };
-                            break;
-                        }
-                    }
-                }
-
-                if (existingCircle) {
-                    // Reuse existing UID
-                    circle.uid = existingCircle.uid;
-                    circle.id = existingCircle.uid;
-                } else {
-                    // Create new UID
-                    circle.uid = generateUID('GREEN_CIRCLE');
-                    circle.id = circle.uid;
-                }
-
-                // Update Reference (Foreign Key)
-                if (circle.line_id !== undefined) {
-                    const newRef = lineIdMap.get(circle.line_id);
-                    if (newRef) {
-                        circle.line_id = newRef;
-                    } else {
-                        console.warn(`Ref Error: Green Circle ${circle.uid} points to unknown line ${circle.line_id}`);
-                    }
-                }
-
                 window.allItems.set(circle.uid, circle);
-                // Track expanded items (only if new)
-                if (mode === 'expand' && !existingCircle) {
+                if (mode === 'expand' && !expandedItemUids.has(circle.uid)) {
                     expandedItemUids.add(circle.uid);
                 }
             });
         }
 
-        // C. Process Polygons (Depend on Lines)
-        const polyIdMap = new Map(); // Old ID (poly_X) -> New UID (POLYGON_xxx)
         if (data.polygons) {
             data.polygons.forEach(poly => {
-                const originalId = poly.id; // Save original BACKEND ID (e.g., "poly_4055291218")
-
-                // UNIFIED ID SCHEME:
-                // Check if polygon already exists by center coordinates (reuse UID in expand mode)
-                let existingPoly = null;
-                if (poly.center && poly.center.length === 2) {
-                    const centerKey = `${poly.center[0].toFixed(7)},${poly.center[1].toFixed(7)}`;
-
-                    // Search for existing polygon with same center in window.allItems
-                    for (const [uid, item] of window.allItems.entries()) {
-                        if (item.center && item.center.length === 2) {
-                            const itemCenterKey = `${item.center[0].toFixed(7)},${item.center[1].toFixed(7)}`;
-                            if (itemCenterKey === centerKey && uid.startsWith('POLYGON_')) {
-                                existingPoly = { uid, item };
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (existingPoly) {
-                    // Reuse existing UID
-                    poly.uid = existingPoly.uid;
-                    poly.id = existingPoly.uid;
-                    poly.backendId = existingPoly.item.backendId || originalId; // Preserve backend ID
-                } else {
-                    // Generate random UID for polygons
-                    poly.uid = generateUID('POLYGON');
-                    poly.id = poly.uid; // UNIFIED.
-                    poly.backendId = originalId; // Store original backend ID for restoration
-                }
-
-                // Store mapping for later use
-                if (originalId !== undefined) {
-                    polyIdMap.set(String(originalId), poly.uid);
-                }
-
-                // Map Wrapper: Update boundary references
-                if (poly.boundary_white_lines) {
-                    poly.boundary_white_lines = poly.boundary_white_lines.map(oldId => {
-                        const newId = lineIdMap.get(oldId);
-                        return newId || oldId;
-                    });
-                }
-
                 window.allItems.set(poly.uid, poly);
-                // Track expanded items (only if new)
-                if (mode === 'expand' && !existingPoly) {
+                if (mode === 'expand' && !expandedItemUids.has(poly.uid)) {
                     expandedItemUids.add(poly.uid);
                 }
             });
         }
 
-        // D. Process Blue Circles
-        if (localBlueCircles && localBlueCircles.length > 0) {
-            localBlueCircles.forEach(circle => {
-                // Check if circle already exists by coordinates (reuse UID in expand mode)
-                const coordKey = `${circle.lat.toFixed(6)},${circle.lon.toFixed(6)}`;
-                let existingCircle = null;
-
-                // Search for existing circle with same coordinates in window.allItems
-                for (const [uid, item] of window.allItems.entries()) {
-                    if (item.lat !== undefined && item.lon !== undefined) {
-                        const itemKey = `${item.lat.toFixed(6)},${item.lon.toFixed(6)}`;
-                        if (itemKey === coordKey && uid.startsWith('BLUE_CIRCLE_')) {
-                            existingCircle = { uid, item };
-                            break;
-                        }
-                    }
-                }
-
-                if (existingCircle) {
-                    // Reuse existing UID
-                    circle.uid = existingCircle.uid;
-                    circle.id = existingCircle.uid;
-                } else {
-                    // Create new UID
-                    circle.uid = generateUID('BLUE_CIRCLE');
-                    circle.id = circle.uid;
-                }
-
-                // Update connected_polygon_ids to use new UIDs
-                if (circle.connected_polygon_ids) {
-                    circle.connected_polygon_ids = circle.connected_polygon_ids.map(oldId => {
-                        const newId = polyIdMap.get(String(oldId));
-                        return newId || oldId;
-                    });
-                }
-
-                window.allItems.set(circle.uid, circle);
-                // Track expanded items (only if new)
-                if (mode === 'expand' && !existingCircle) {
-                    expandedItemUids.add(circle.uid);
-                }
-            });
-        }
-
-        // D2. Update White Lines connected_polygon_ids
-        if (data.white_lines) {
-            data.white_lines.forEach(line => {
-                if (line.connected_polygon_ids) {
-                    line.connected_polygon_ids = line.connected_polygon_ids.map(oldId => {
-                        const newId = polyIdMap.get(String(oldId));
-                        return newId || oldId;
-                    });
-                }
-            });
-        }
 
         // E. Count Blue Circles per Polygon (match coords)
         if (data.polygons && localBlueCircles && localBlueCircles.length > 0) {
@@ -1431,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const attachDebugClick = (layer, data, type) => {
             layer.on('click', (e) => {
-                if (!isDebugActive) return;
+                if (!gameState.isDebugActive) return;
                 L.DomEvent.stopPropagation(e);
 
                 // Highlight Logic (Safely)
@@ -1635,12 +930,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 let status = 'Visible';
 
                 if (type.includes('Green Circle') || type.includes('Blue Circle')) {
-                    // Check if this circle's coordinates are in collectedCircles
+                    // Check if this circle's coordinates are in gameState.collectedCircles
                     const lat = data.lat || (data.center && data.center[0]);
                     const lon = data.lon || (data.center && data.center[1]);
                     if (lat !== undefined && lon !== undefined) {
                         const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
-                        if (collectedCircles && collectedCircles.has(key)) {
+                        if (gameState.collectedCircles && gameState.collectedCircles.has(key)) {
                             status = 'Collected';
                         }
                     }
@@ -1683,7 +978,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Calculate which posters intersect with this polygon
                     const intersectingPosters = [];
-                    if (currentPosterGrid && data.coords && data.coords.length > 0) {
+                    const grid = posterRenderer.getPosterGrid();
+                    if (grid && data.coords && data.coords.length > 0) {
                         // Get polygon bounds
                         let polyMinLat = Infinity, polyMaxLat = -Infinity;
                         let polyMinLon = Infinity, polyMaxLon = -Infinity;
@@ -1695,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
 
                         // Check intersection with each poster
-                        currentPosterGrid.forEach(poster => {
+                        grid.forEach(poster => {
                             const intersects = !(polyMaxLat < poster.min_lat ||
                                 polyMinLat > poster.max_lat ||
                                 polyMaxLon < poster.min_lon ||
@@ -1867,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Map click to clear selection
         map.on('click', () => {
-            if (isDebugActive) {
+            if (gameState.isDebugActive) {
                 resetSelection();
                 map.closePopup();
             }
@@ -1931,12 +1227,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const offsetY = -Math.sin(angle) * radius_px; // Negative because screen Y is inverted
 
             // Check if polygon is already completed (all circles collected)
-            // DYNAMIC CALCULATION: Count how many poly coordinates are in collectedCircles
+            // DYNAMIC CALCULATION: Count how many poly coordinates are in gameState.collectedCircles
             let savedCount = 0;
             if (poly.coords && poly.coords.length > 0) {
                 savedCount = poly.coords.filter(c => {
                     const key = `${c[0].toFixed(6)},${c[1].toFixed(6)}`;
-                    return collectedCircles.has(key);
+                    return gameState.collectedCircles.has(key);
                 }).length;
             }
             const isCompleted = savedCount >= poly.total_points;
@@ -1945,7 +1241,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Create Large Promo Circle at polygon center (ONLY if not completed OR in debug mode)
             const gifFile = poly.promo_gif;
             let pPromo = null;
-            if (gifFile && (!isCompleted || isPostersDebugActive)) {
+            if (gifFile && (!isCompleted || gameState.isPostersDebugActive)) {
                 pPromo = L.marker([centerPos[0], centerPos[1]], {
                     icon: L.divIcon({
                         className: 'poly-promo',
@@ -2066,7 +1362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Create Small Percentage Circle on circumference of large circle (ONLY if not completed OR in debug mode)
             let pLabel = null;
-            if (!isCompleted || isPostersDebugActive) {
+            if (!isCompleted || gameState.isPostersDebugActive) {
                 // Calculate initial percentage from saved progress
                 const initialPercent = poly.total_points > 0 ? Math.floor((savedCount / poly.total_points) * 100) : 0;
                 pLabel = L.marker([centerPos[0], centerPos[1]], {
@@ -2304,7 +1600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             const currentPos = userMarker.getLatLng();
-            updateAndSaveUserPosition(userMarker, currentPos.lat, currentPos.lng, isGpsActive);
+            updateAndSaveUserPosition(userMarker, currentPos.lat, currentPos.lng, gameState.isGpsActive);
 
             // POST-INIT: Hide lines for restored completed polygons
             // DISABLE HIDING per user request (Keep white lines visible)
@@ -2401,7 +1697,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mainColor = isSaturated ? '#ff7b00' : 'blue';       // Orange vs Blue
                 const fillColor = isSaturated ? '#ffa600' : '#00ccff';    // Light Orange vs Light Blue
 
-                const isCollected = collectedCircles.has(key);
+                const isCollected = gameState.collectedCircles.has(key);
 
                 // Track expanded circle coordinates
                 if (mode === 'expand') {
@@ -2412,14 +1708,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     radius: 8,
                     color: mainColor,
                     fillColor: fillColor,
-                    fillOpacity: isCollected && !isPostersDebugActive ? 0 : 0.8,
-                    opacity: isCollected && !isPostersDebugActive ? 0 : 1, // Start hidden if collected!
+                    fillOpacity: isCollected && !gameState.isPostersDebugActive ? 0 : 0.8,
+                    opacity: isCollected && !gameState.isPostersDebugActive ? 0 : 1, // Start hidden if collected!
                     interactive: !isCollected, // Disable interaction if collected
                     pane: 'blueCirclesPane' // Render in dedicated pane above white lines
                 }).addTo(targetLayer);
 
                 // If collected but debug active, style accordingly
-                if (isCollected && isPostersDebugActive) {
+                if (isCollected && gameState.isPostersDebugActive) {
                     marker.setStyle({ color: '#555', opacity: 0.5 });
                 }
 
@@ -2667,7 +1963,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return; // Skip rendering
                 }
 
-                const isCollected = collectedCircles.has(coordKey);
+                const isCollected = gameState.collectedCircles.has(coordKey);
 
                 // Track expanded circle coordinates
                 if (mode === 'expand') {
@@ -2679,14 +1975,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     radius: 4,
                     color: 'green',
                     fillColor: '#00ff00',
-                    fillOpacity: isCollected && !isPostersDebugActive ? 0 : 1,
-                    opacity: isCollected && !isPostersDebugActive ? 0 : 1,
+                    fillOpacity: isCollected && !gameState.isPostersDebugActive ? 0 : 1,
+                    opacity: isCollected && !gameState.isPostersDebugActive ? 0 : 1,
                     interactive: false,
                     pane: 'blueCirclesPane'
                 }).addTo(targetLayer);
 
                 // If collected but debug, style
-                if (isCollected && isPostersDebugActive) {
+                if (isCollected && gameState.isPostersDebugActive) {
                     visual.setStyle({ color: '#555', opacity: 0.5 });
                 }
 
@@ -2834,42 +2130,16 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`GPS: Visibility check complete. Current zoom: ${currentZoom}. detailsLayer has ${detailsLayer.getLayers().length} layers.`);
         console.log(`GPS: Polygons visible at zoom >= 18. Current: ${currentZoom >= 18 ? 'YES' : 'NO'}`);
 
-        // --- SNAP LOGIC EXPORT & INITIAL SNAP ---
-        // Defined BEFORE setupProgressHiding so it can be used immediately
-        window.findNearestActiveCircle = (userLat, userLon) => {
-            let nearest = null;
-            let minDist = Infinity;
-            const SNAP_DIST_DEG = 0.001; // Increased to ~100 meters
+        // Snap logic is now imported from ProgressManager.js
 
-            circleLayerMap.forEach((layer, key) => {
-                const [cLat, cLon] = key.split(',').map(Number);
-                const dist = Math.sqrt(Math.pow(cLat - userLat, 2) + Math.pow(cLon - userLon, 2));
-
-                if (dist < SNAP_DIST_DEG) {
-                    // console.log(`DEBUG: Candidate circle at ${cLat},${cLon} dist: ${dist}`);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = { lat: cLat, lon: cLon, dist: dist, key: key };
-                    }
-                }
-            });
-
-            if (nearest) {
-                console.log(`DEBUG: Found Nearest Circle: ${nearest.lat},${nearest.lon} (Dist: ${nearest.dist})`);
-            } else {
-                console.log(`DEBUG: No circle found within ${SNAP_DIST_DEG} degrees.`);
-            }
-
-            return nearest;
-        };
 
         // INITIAL SNAP CHECK
         // If we have a saved user position, restore it directly (even if circle not visible)
         // Otherwise, snap to nearest active circle
-        if (currentUserPosition && currentUserPosition.lat !== undefined && mode === 'initial') {
-            console.log(`DEBUG: Restoring saved user position: ${currentUserPosition.lat}, ${currentUserPosition.lon}`);
-            userMarker.setLatLng([currentUserPosition.lat, currentUserPosition.lon]);
-            updateAndSaveUserPosition(userMarker, currentUserPosition.lat, currentUserPosition.lon, false);
+        if (gameState.currentUserPosition && gameState.currentUserPosition.lat !== undefined && mode === 'initial') {
+            console.log(`DEBUG: Restoring saved user position: ${gameState.currentUserPosition.lat}, ${gameState.currentUserPosition.lon}`);
+            userMarker.setLatLng([gameState.currentUserPosition.lat, gameState.currentUserPosition.lon]);
+            updateAndSaveUserPosition(userMarker, gameState.currentUserPosition.lat, gameState.currentUserPosition.lon, false);
         }
 
         // ALWAYS snap to nearest active circle on initial load (force centering)
@@ -2877,12 +2147,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mode === 'initial') {
             console.log(`DEBUG: Mode is 'initial' - SNAP logic will execute`);
             const currentPos = userMarker.getLatLng();
-            const initialSnap = window.findNearestActiveCircle(currentPos.lat, currentPos.lng);
+            const initialSnap = findNearestActiveCircle(currentPos.lat, currentPos.lng, circleLayerMap);
             if (initialSnap) {
                 console.log(`DEBUG: Initial Snap triggered! Moving from ${currentPos.lat},${currentPos.lng} to ${initialSnap.lat},${initialSnap.lon}`);
                 // Move marker directly
                 userMarker.setLatLng([initialSnap.lat, initialSnap.lon]);
-                updateAndSaveUserPosition(userMarker, initialSnap.lat, initialSnap.lon, (isGpsActive && window.loadedQuality !== 'NONE'));
+                updateAndSaveUserPosition(userMarker, initialSnap.lat, initialSnap.lon, (gameState.isGpsActive && window.loadedQuality !== 'NONE'));
             }
         } else if (mode === 'restore') {
             // Debug logging to confirm SNAP is skipped during restoration
@@ -2906,11 +2176,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const target = circleLayerMap.get(key);
 
                 // Ensure it's in our memory tracking
-                collectedCircles.add(key);
+                gameState.collectedCircles.add(key);
 
                 if (target) {
                     // Check visibility rules
-                    const shouldHide = !isPostersDebugActive;
+                    const shouldHide = !gameState.isPostersDebugActive;
                     if (shouldHide && target.options.opacity !== 0) {
                         target.setStyle({ opacity: 0, fillOpacity: 0 });
                     }
@@ -2946,37 +2216,49 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`DEBUG: Applied state. Completed polygons: ${completedAndMasked}`);
 
             // FORCE MASK UPDATE NOW (Synchronous)
-            updateMaskPaths();
+            posterRenderer.updateMaskPaths();
         };
 
         // 1. SYNC APPLY: Apply what we already have in memory (Important for Expansion!)
         // Reset polygon counts first (globally for this render)
-        // We'll recalculate from scratch based on collectedCircles
+        // We'll recalculate from scratch based on gameState.collectedCircles
         polygonState.forEach(state => state.current = 0);
 
-        if (collectedCircles.size > 0) {
-            console.log(`DEBUG: Sync applying ${collectedCircles.size} memory-cached circles...`);
-            applyCollectedState(collectedCircles);
+        if (gameState.collectedCircles.size > 0) {
+            console.log(`DEBUG: Sync applying ${gameState.collectedCircles.size} memory-cached circles...`);
+            applyCollectedState(gameState.collectedCircles);
         } else {
             // Even if empty, update mask (it might be empty)
-            updateMaskPaths();
+            posterRenderer.updateMaskPaths();
         }
 
         // MOVED FROM ABOVE: Setup hiding logic (and run initial check)
         // We do this AFTER state application so that the initial check (which might collect a new circle)
         // adds to the already-restored count, rather than being wiped by the reset loop.
-        setupProgressHiding(circleLayerMap, circleToPolyMap, polygonState, lineLayerMap, blueCircleLayerMap);
+        setupProgressHiding({
+            layerMap: circleLayerMap,
+            circleMap: circleToPolyMap,
+            polyState: polygonState,
+            lineMap: lineLayerMap,
+            blueMap: blueCircleLayerMap,
+            userMarker,
+            stateSaver,
+            posterRenderer,
+            onExpand: (lat, lon) => loadGameData(lat, lon, false, 'expand'),
+            debouncedSavePosition,
+            updatePolygonVisuals
+        });
 
         // 2. ASYNC FETCH: Fetch from server/localstorage to catch up anything missing
         console.log("DEBUG: Async restoration skipped (Legacy logic removed).");
 
-        map.on('viewreset move zoom', updateMaskPaths);
+        map.on('viewreset move zoom', () => posterRenderer.updateMaskPaths());
 
         // Initial mask update (Important for expansion mode when bounds change!)
-        updateMaskPaths();
+        posterRenderer.updateMaskPaths();
 
         // Update debug box intersections if debug mode is active
-        if (isDebugActive) {
+        if (gameState.isDebugActive) {
             console.log('DEBUG: renderGameElements complete - updating debug box intersections');
             updateDebugBoxIntersections();
         }
@@ -2984,7 +2266,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save state after rendering (especially important for expand mode)
         if (mode === 'expand') {
             console.log('DEBUG: Expand complete - saving state...');
-            await saveGlobalState();
+            await stateSaver.saveGlobalState({
+                gameState,
+                visiblePolygonIds,
+                currentPosterGrid: posterRenderer ? posterRenderer.getPosterGrid() : null
+            });
         }
 
         // Add layers to map AFTER all elements are loaded (synchronous rendering)
@@ -3000,9 +2286,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Removed: initPosterGrid() call at end (already done at start)
 
         // Clear restoration flag - state is now fully restored
-        if (isRestoringState) {
-            isRestoringState = false;
-            console.log(`DEBUG: 🔓 Setting isRestoringState = false (restoration complete, saves now allowed)`);
+        if (gameState.isRestoringState) {
+            gameState.isRestoringState = false;
+            console.log(`DEBUG: 🔓 Setting gameState.isRestoringState = false (restoration complete, saves now allowed)`);
         }
     };
 
@@ -3014,150 +2300,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    const setupProgressHiding = (layerMap, circleMap, polyState, lineMap, blueMap) => {
-        const checkAndHide = () => {
-            const pos = userMarker.getLatLng();
-            const exactKey = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+    // setupProgressHiding moved to modules/logic/ProgressManager.js
 
-            console.log(`DEBUG: CheckAndHide checking pos: ${exactKey}`);
-
-            let target = layerMap.get(exactKey);
-
-            // Fallback: Fuzzy search if exact match misses (due to float drift or manual snap differences)
-            if (!target && window.findNearestActiveCircle) {
-                const nearest = window.findNearestActiveCircle(pos.lat, pos.lng);
-                // Strict threshold for "arrived" (e.g. < 10cm or just exact snap check with epsilon)
-                if (nearest && nearest.dist < 0.000001) {
-                    const fuzzyKey = `${nearest.lat.toFixed(6)},${nearest.lon.toFixed(6)}`;
-                    console.log(`DEBUG: Exact match failed, but found fuzzy match: ${fuzzyKey} (dist: ${nearest.dist})`);
-                    target = layerMap.get(fuzzyKey);
-                }
-            }
-
-
-            let targetKey = null;
-
-            if (target) {
-                // GLOBAL STATE TRACKING: Update current circle UID
-                if (target.uid) {
-                    if (currentCircleUid !== target.uid) {
-                        console.log(`GLOBAL_STATE: Player moved to circle ${target.uid}`);
-                        currentCircleUid = target.uid;
-
-                        // Save state immediately when reaching a new circle
-                        if (!isRestoringState) {
-                            saveGlobalState();
-                        }
-                    }
-                }
-
-                // Re-calculate targetKey (since target might be from fuzzy match)
-                targetKey = exactKey;
-                // If exact match failed, we need to recover the key from the target... 
-                // Actually, we can just re-run the logic or check if we have the key.
-                // Ideally we should have stored the found key. 
-
-                // Let's re-run the fuzzy logic to be safe and simple
-                if (target !== layerMap.get(exactKey) && window.findNearestActiveCircle) {
-                    const nearest = window.findNearestActiveCircle(pos.lat, pos.lng);
-                    if (nearest) targetKey = `${nearest.lat.toFixed(6)},${nearest.lon.toFixed(6)}`;
-                }
-
-                const isCollected = collectedCircles.has(targetKey);
-                if (!isCollected) {
-                    console.log(`DEBUG: COLLECTED CIRCLE at ${exactKey}`);
-
-                    // 1. Mark Collected
-                    collectedCircles.add(targetKey);
-
-                    // 2. Save to Redis (server) - no client-side storage
-                    // Note: saveLocationState is called periodically and on key events
-                    if (!isRestoringState) {
-                        console.log(`DEBUG: Collected circle at ${targetKey}, will persist to Redis`);
-                    }
-
-
-                    // 3. Persist Server (Debounced/Throttled usually, but here immediate-ish)
-                    // Note: frequent saves might spam server.
-                    // Optimized: saveLocationState is simple fetch. 
-
-                    // 4. Hide Visual (Unless Debug Posters Active)
-                    if (!isPostersDebugActive) {
-                        target.setStyle({ opacity: 0, fillOpacity: 0 });
-                    } else {
-                        target.setStyle({ color: '#555', opacity: 0.5 }); // Visual Feedback in Debug
-                    }
-
-                    // Safe Tooltip Check (Must be a function and truthy)
-                    if (typeof target.getTooltip === 'function' && target.getTooltip()) {
-                        target.unbindTooltip(); // Permanently remove label
-                    }
-
-                    // UPDATE PROGRESS
-                    // We need the key to look up relevantPolys
-                    const relevantPolys = circleMap.get(targetKey);
-                    if (relevantPolys) {
-                        relevantPolys.forEach(pid => {
-                            const state = polyState.get(pid);
-                            if (state && state.current < state.total) {
-                                state.current++;
-                                updatePolygonVisuals(state, lineMap);
-                            }
-                        });
-                    }
-                }
-            }
-
-            // MAP EXPANSION CHECK (Blue Circles)
-            // This runs for ANY move (GPS or Manual)
-            // We check if targetKey (exact or fuzzy) is a blue circle
-            let finalTargetKey = target ? `${userMarker.getLatLng().lat.toFixed(6)},${userMarker.getLatLng().lng.toFixed(6)}` : null;
-            if (target && target._latlng) {
-                // Use target's latlng for precision key reconstruction or rely on layerMap keys
-                // Actually targetKey variable is available in scope above.
-            }
-
-            // We use 'targetKey' variable from above scope.
-            // However, we need to ensure targetKey is valid even if !target (but we only care if target exists?)
-            // Actually, we care if we reached a blue circle. Blue circles are in layerMap.
-            // So if (target) is true, we found SOMETHING.
-
-            if (target && blueMap && blueMap.has(targetKey)) {
-                // Check if Saturated (Orange) - If so, NO EXPANSION
-                if (target.isSaturated) {
-                    // console.log(`DEBUG: Reached Saturated Circle ${targetKey} -> No Expansion.`);
-                }
-                else if (!expandedCircles.has(targetKey)) {
-                    console.log(`DEBUG: Reached new Blue Circle ${targetKey} -> Triggering Map Expansion...`);
-                    expandedCircles.add(targetKey);
-
-                    // State will be saved to Redis after expansion completes via saveLocationState()
-
-                    const [latStr, lonStr] = targetKey.split(',');
-                    loadGameData(parseFloat(latStr), parseFloat(lonStr), false, 'expand');
-                }
-
-            }
-
-            // Trigger debounced save after any movement (unless restoring state)
-            if (!isRestoringState && target) {
-                debouncedSavePosition();
-            }
-
-        };
-
-        // Remove old handler if exists (not strictly needed since we rebuild, but good practice)
-        if (userMarker._hideHandler) {
-            userMarker.off('move', userMarker._hideHandler);
-        }
-
-        // Initial check
-        checkAndHide();
-
-        // Bind
-        userMarker._hideHandler = checkAndHide;
-        userMarker.on('move', checkAndHide);
-    };
 
     const updatePolygonVisuals = (state, lineMap) => {
         const pct = Math.floor((state.current / state.total) * 100);
@@ -3201,13 +2345,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Reveal poster part
             console.log(`DEBUG: Calling revealPolygonPart for polygon ${state.id}`);
             console.log(`DEBUG: Polygon coords:`, state.coords);
-            revealPolygonPart(state.coords);
-            console.log(`DEBUG: Current clipPath paths count:`, revealMask ? revealMask.children.length : 'no mask');
+            posterRenderer.revealPolygonPart(state.coords);
+            console.log(`DEBUG: Polygon part revealed.`);
+
 
             // 2. Remove/Hide Label from map (could be in detailsLayer or expandedLayer)
             // In debug mode, keep label visible but update it to show 100%
             if (state.label) {
-                if (!isPostersDebugActive) {
+                if (!gameState.isPostersDebugActive) {
                     // Normal mode: remove label
                     if (detailsLayer.hasLayer(state.label)) {
                         detailsLayer.removeLayer(state.label);
@@ -3221,7 +2366,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // In debug mode: label stays visible with 100%
             }
             if (state.promo) {
-                if (!isPostersDebugActive) {
+                if (!gameState.isPostersDebugActive) {
                     // Normal mode: remove promo
                     if (detailsLayer.hasLayer(state.promo)) {
                         detailsLayer.removeLayer(state.promo);
@@ -3252,10 +2397,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         // User requested: "when in perimeter of polygon no visible circles left... disappear white lines in this perimeter"
                         // This implies strict removal.
                     }
-
+    
                     // Hide green circles on this line
                     const greenCircles = greenCirclesByLine.get(String(lid));
-                    if (greenCircles && !isPostersDebugActive) {
+                    if (greenCircles && !gameState.isPostersDebugActive) {
                         greenCircles.forEach(circleLayer => {
                             if (typeof circleLayer.setStyle === 'function') {
                                 circleLayer.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -3271,7 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.coords.forEach(coord => {
                     const key = `${coord[0].toFixed(6)},${coord[1].toFixed(6)}`;
                     const circleLayer = circleLayerMap.get(key);
-                    if (circleLayer && !isPostersDebugActive) {
+                    if (circleLayer && !gameState.isPostersDebugActive) {
                         // Hide the circle completely
                         if (typeof circleLayer.setStyle === 'function') {
                             circleLayer.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -3313,204 +2458,25 @@ document.addEventListener('DOMContentLoaded', () => {
         map.panTo([lat, lon]);
     });
 
-    // Function to check if a line segment intersects with a rectangle (debug box)
-    const lineIntersectsRect = (lineStart, lineEnd, rectBounds) => {
-        // lineStart, lineEnd = [lat, lng]
-        // rectBounds = { north, south, east, west }
+    // Debug functions moved to modules/debug/IntersectionDebug.js
 
-        // Rectangle corners
-        const rectCorners = [
-            [rectBounds.north, rectBounds.west],  // Top-left
-            [rectBounds.north, rectBounds.east],  // Top-right
-            [rectBounds.south, rectBounds.east],  // Bottom-right
-            [rectBounds.south, rectBounds.west]   // Bottom-left
-        ];
-
-        const rectEdges = [
-            [rectCorners[0], rectCorners[1]], // Top edge
-            [rectCorners[1], rectCorners[2]], // Right edge
-            [rectCorners[2], rectCorners[3]], // Bottom edge
-            [rectCorners[3], rectCorners[0]]  // Left edge
-        ];
-
-        // Check if line endpoints are inside rectangle
-        const p1Inside = lineStart[0] >= rectBounds.south && lineStart[0] <= rectBounds.north &&
-            lineStart[1] >= rectBounds.west && lineStart[1] <= rectBounds.east;
-        const p2Inside = lineEnd[0] >= rectBounds.south && lineEnd[0] <= rectBounds.north &&
-            lineEnd[1] >= rectBounds.west && lineEnd[1] <= rectBounds.east;
-
-        if (p1Inside || p2Inside) {
-            console.log(`  Point inside: p1=${p1Inside}, p2=${p2Inside}`);
-            return true;
-        }
-
-        // Check line-line intersection for each rectangle edge
-        const doSegmentsIntersect = (p1, p2, p3, p4) => {
-            // p1,p2 = line segment, p3,p4 = rectangle edge
-            // Using CCW algorithm
-            const ccw = (A, B, C) => {
-                return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0]);
-            };
-            const result = ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
-            return result;
-        };
-
-        for (let i = 0; i < rectEdges.length; i++) {
-            const edge = rectEdges[i];
-            if (doSegmentsIntersect(lineStart, lineEnd, edge[0], edge[1])) {
-                console.log(`  Intersects edge ${i}: ${edge[0]} -> ${edge[1]}`);
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    // Function to update white line colors based on debug box intersections
-    const updateDebugBoxIntersections = () => {
-        if (!_polygonState || !_lineLayerMap) return;
-
-        console.log('DEBUG: Checking debug box intersections...');
-
-        _polygonState.forEach(state => {
-            if (!state.debugBox || !state.lines) return;
-
-            const map = state.debugBox._map;
-            if (!map) return;
-
-            // Get debug box center (polygon center) and icon properties
-            const boxCenter = state.debugBox.getLatLng();
-            const icon = state.debugBox.options.icon;
-            const iconSize = icon.options.iconSize; // [width, height]
-            const iconAnchor = icon.options.iconAnchor; // [x, y] from top-left to center point
-
-            // Calculate the four corners of the debug box in lat/lng
-            // iconAnchor tells us where the center point is within the icon
-            // So the box extends from center - anchor to center + (size - anchor)
-
-            const centerPoint = map.latLngToLayerPoint(boxCenter);
-
-            // Calculate pixel bounds
-            const topLeftPx = {
-                x: centerPoint.x - iconAnchor[0],
-                y: centerPoint.y - iconAnchor[1]
-            };
-            const bottomRightPx = {
-                x: topLeftPx.x + iconSize[0],
-                y: topLeftPx.y + iconSize[1]
-            };
-
-            // Convert to lat/lng
-            const topLeft = map.layerPointToLatLng([topLeftPx.x, topLeftPx.y]);
-            const bottomRight = map.layerPointToLatLng([bottomRightPx.x, bottomRightPx.y]);
-            const topRight = map.layerPointToLatLng([bottomRightPx.x, topLeftPx.y]);
-            const bottomLeft = map.layerPointToLatLng([topLeftPx.x, bottomRightPx.y]);
-
-            const rectBounds = {
-                north: Math.max(topLeft.lat, topRight.lat, bottomLeft.lat, bottomRight.lat),
-                south: Math.min(topLeft.lat, topRight.lat, bottomLeft.lat, bottomRight.lat),
-                east: Math.max(topLeft.lng, topRight.lng, bottomLeft.lng, bottomRight.lng),
-                west: Math.min(topLeft.lng, topRight.lng, bottomLeft.lng, bottomRight.lng)
-            };
-
-            console.log(`DEBUG: Box bounds for polygon at (${boxCenter.lat}, ${boxCenter.lng}):`, rectBounds);
-
-            // Check each boundary line
-            state.lines.forEach(lineId => {
-                const lineComposite = _lineLayerMap.get(String(lineId));
-                if (!lineComposite || !lineComposite.visual) return;
-
-                const lineLatLngs = lineComposite.visual.getLatLngs();
-
-                // Check each segment of the polyline
-                let intersects = false;
-                for (let i = 0; i < lineLatLngs.length - 1; i++) {
-                    const start = [lineLatLngs[i].lat, lineLatLngs[i].lng];
-                    const end = [lineLatLngs[i + 1].lat, lineLatLngs[i + 1].lng];
-
-                    if (lineIntersectsRect(start, end, rectBounds)) {
-                        intersects = true;
-                        console.log(`DEBUG: Line segment [${start}] -> [${end}] intersects box`);
-                        break;
-                    }
-                }
-
-                // Change color if intersects
-                if (intersects) {
-                    lineComposite.visual.setStyle({ color: 'blue' });
-                    console.log(`DEBUG: Line ${lineId} intersects with debug box - colored blue`);
-                }
-            });
-        });
-    };
-
-    // Function to reset all white lines to original color
-    const resetWhiteLineColors = () => {
-        if (!_lineLayerMap) return;
-
-        console.log('DEBUG: Resetting white line colors...');
-
-        _lineLayerMap.forEach((lineComposite, lineId) => {
-            if (lineComposite && lineComposite.visual) {
-                lineComposite.visual.setStyle({ color: 'white' });
-            }
-        });
-    };
 
     // Handle Debug Mode Toggles (via map_controls.js or top bar)
     document.addEventListener('debug-mode-change', (e) => {
-        isDebugActive = e.detail.active;
+        gameState.isDebugActive = e.detail.active;
         const postersBtn = document.getElementById('btn-debug-posters');
-        if (isDebugActive) {
+        if (gameState.isDebugActive) {
             postersBtn.style.display = 'flex';
         } else {
             postersBtn.style.display = 'none';
-            isPostersDebugActive = false;
+            gameState.isPostersDebugActive = false;
             postersBtn.classList.remove('active');
-            updatePostersVisibility();
+            posterRenderer.updatePostersVisibility();
         }
     });
 
-    // --- THE REVEAL MAGIC (SVG CLIP PATHS) ---
-    const revealPolygonPart = (coords) => {
-        console.log("REVEAL: revealPolygonPart called", { coords, revealMask });
-        if (!revealMask || !coords || !posterSvgOverlay) {
-            console.warn("REVEAL: Skipping - no mask, coords or overlay", { revealMask, coords });
-            return;
-        }
+    // REVEAL MAGIC moved to PosterRenderer.revealPolygonPart
 
-        try {
-            const svgBounds = posterSvgOverlay.getBounds();
-            const svgMinLat = svgBounds.getSouth();
-            const svgMaxLat = svgBounds.getNorth();
-            const svgMinLon = svgBounds.getWest();
-            const svgMaxLon = svgBounds.getEast();
-            const latRange = svgMaxLat - svgMinLat;
-            const lonRange = svgMaxLon - svgMinLon;
-
-            const points = coords.map(p => {
-                if (!Array.isArray(p) || p.length < 2) return null;
-                // Scale coordinates to 0-1000 range relative to SVG bounds
-                const x = ((p[1] - svgMinLon) / lonRange) * 1000;
-                const y = ((svgMaxLat - p[0]) / latRange) * 1000;
-                return `${x.toFixed(2)},${y.toFixed(2)}`;
-            }).filter(Boolean).join(' ');
-
-            const pathData = points ? `M ${points} Z` : '';
-
-            if (!pathData) {
-                console.warn("REVEAL: No valid pathData generated");
-                return;
-            }
-
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", pathData);
-            revealMask.appendChild(path);
-            console.log("REVEAL: Polygon added to mask. Total paths:", revealMask.children.length);
-        } catch (e) {
-            console.error("Failed to reveal polygon part:", e);
-        }
-    };
 
 
 
@@ -3519,7 +2485,21 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.text())
         .then(html => {
             document.getElementById('top-bar-container').innerHTML = html;
-            initTopBarEvents();
+
+            // Initialize top bar with proper configuration
+            initTopBarEvents({
+                onDebugToggle: (isActive) => {
+                    gameState.isDebugActive = isActive;
+                },
+                onPostersToggle: (isActive) => {
+                    gameState.isPostersDebugActive = isActive;
+                    posterRenderer.updatePostersVisibility();
+                },
+                updateDebugBoxIntersections,
+                resetWhiteLineColors,
+                resetSelection,
+                map
+            });
         })
         .catch(err => console.error('Error loading top bar:', err));
 
@@ -3540,15 +2520,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingGif.style.display = 'block';
                 loadingGif.style.opacity = '1';
                 mapElement.style.opacity = '0.3';
-                hasRevealed = false;
+                gameState.hasRevealed = false;
 
                 // Render from saved state
-                await renderFromSavedState(savedState);
+                await renderFromSavedState(savedState, {
+                    gameState,
+                    visiblePolygonIds,
+                    userMarker,
+                    map,
+                    renderGameElements,
+                    updateAndSaveUserPosition,
+                    setPosterGrid: (grid) => {
+                        if (posterRenderer) {
+                            posterRenderer.setPosterGrid(grid);
+                        }
+                    }
+                });
 
                 // Reveal map
                 revealMap();
 
-                console.log(`DEBUG: ✅ Game restored from Redis - ${savedState.polygons.length} polygons, marker at ${currentCircleUid || 'position'}`);
+                console.log(`DEBUG: ✅ Game restored from Redis - ${savedState.polygons.length} polygons, marker at ${gameState.currentCircleUid || 'position'}`);
                 return;
             }
 
@@ -3573,74 +2565,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start game initialization
     initializeGame();
 
-    const initTopBarEvents = () => {
-        const debugBtn = document.getElementById('debug-btn');
-        const menuBtn = document.getElementById('menu-btn');
-        const topBar = document.getElementById('top-bar');
+    // Initialize event handlers
+    setupMovementHandlers({
+        userMarker,
+        gameState,
+        debouncedSave: debouncedSavePosition
+    });
 
-        const closeMenu = () => {
-            if (topBar && topBar.classList.contains('expanded')) {
-                topBar.classList.remove('expanded');
-            }
-        };
+    setupDebugHandlers({
+        gameState,
+        updatePostersVisibility: () => posterRenderer.updatePostersVisibility()
+    });
 
-        // Get .black-square for background change
-        const blackSquare = document.querySelector('.black-square');
-
-        if (debugBtn) {
-            debugBtn.addEventListener('click', () => {
-                isDebugActive = !isDebugActive;
-                if (isDebugActive) {
-                    console.log("DEBUG: Debug Mode ENABLED");
-                    debugBtn.classList.add('active');
-                    // Add Class to Body for global styling
-                    document.body.classList.add('debug-mode');
-
-                    // Check for debug box intersections with white lines
-                    updateDebugBoxIntersections();
-
-                } else {
-                    console.log("DEBUG: Debug Mode DISABLED");
-                    debugBtn.classList.remove('active');
-                    // Remove Class
-                    document.body.classList.remove('debug-mode');
-
-                    // Reset all white lines to original color
-                    resetWhiteLineColors();
-
-                    map.closePopup();
-                    resetSelection();
-                }
-
-                // Dispatch event for posters button visibility
-                document.dispatchEvent(new CustomEvent('debug-mode-change', {
-                    detail: { active: isDebugActive }
-                }));
-            });
-        }
-
-
-
-
-
-
-        if (menuBtn && topBar) {
-            menuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                topBar.classList.toggle('expanded');
-            });
-        }
-
-        // POSTERS Button Handler (now in top bar)
-        const btnDebugPosters = document.getElementById('btn-debug-posters');
-        if (btnDebugPosters) {
-            btnDebugPosters.addEventListener('click', () => {
-                isPostersDebugActive = !isPostersDebugActive;
-                btnDebugPosters.classList.toggle('active', isPostersDebugActive);
-                updatePostersVisibility();
-            });
-        }
-
-        mapElement.addEventListener('click', closeMenu);
-    };
+    // Initialize top bar events (now using module)
+    initTopBarEvents({
+        onDebugToggle: (isActive) => {
+            gameState.isDebugActive = isActive;
+        },
+        onPostersToggle: (isActive) => {
+            gameState.isPostersDebugActive = isActive;
+            posterRenderer.updatePostersVisibility();
+        },
+        updateDebugBoxIntersections: () => updateDebugBoxIntersections(polygonState, lineLayerMap),
+        resetWhiteLineColors: () => resetWhiteLineColors(lineLayerMap),
+        resetSelection,
+        map
+    });
 });
+
+

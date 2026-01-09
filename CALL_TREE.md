@@ -1,6 +1,6 @@
 # Project Function Analysis
 
-Generated on: 2026-01-09T21:52:51.013Z
+Generated on: 2026-01-09T23:15:55.192Z
 
 ## Entry Points / Root Functions
 root: register [src/controllers/authController.js]
@@ -146,8 +146,6 @@ root: notFoundHandler [src/middleware/errorHandler.js]
 ---
 root: requestLogger [src/middleware/requestLogger.js]
 ---
-root: closeMenu [src/public/js/map-logic.js]
----
 root: retryStrategy [src/services/redis.service.js]
 ---
 
@@ -157,8 +155,4 @@ root: retryStrategy [src/services/redis.service.js]
 
 - `shutdown` ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
 - `loadVersionBadge` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `isUIInteraction` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `addPolygonToMask` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `processCoordinates` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `loadGameDataWithKey` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `getAssignedGif` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `resetWhiteLineColors` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
