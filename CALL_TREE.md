@@ -1,18 +1,17 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T02:21:26.297Z
+Generated on: 2026-01-10T03:21:05.386Z
 
 ## File Statistics
 > [!INFO]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 34 files, 7,671 lines, 257.2 KB
+**Total:** 33 files, 6,374 lines, 209.2 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
-| 1297 | 47.9 KB | `src/services/mapGenerator.js` |
 | 985 | 32.4 KB | `CORE/FRONTEND/A_home_page/index.html` |
 | 800 | 35.0 KB | `src/public/js/map-logic.js` |
 | 621 | 23.3 KB | `CORE/FRONTEND/B_map_page/components/map_controls.js` |
@@ -25,7 +24,7 @@ Generated on: 2026-01-10T02:21:26.297Z
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 29 | 5,924 | 197.3 KB |
+| .js | 28 | 4,627 | 149.4 KB |
 | .html | 5 | 1,747 | 59.8 KB |
 
 ---
@@ -61,21 +60,20 @@ root: getGameState [src/controllers/gameController.js] (12 lines)
     calls: getRedisClient [src/services/redis.service.js] (23 lines)
 ---
 root: getGameData [src/controllers/gameController.js] (28 lines)
-  calls: generateMap [src/services/mapGenerator.js] (435 lines)
+  calls: generateMap [src/services/map/index.js] (125 lines)
     calls: loadFromRedis [src/services/redis.service.js] (12 lines)
       calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: fetchRedLines [src/services/mapGenerator.js] (117 lines)
+    calls: fetchRedLines [src/services/map/roadFetcher.js] (31 lines)
       calls: buildOverpassQuery [src/services/map/roadFetcher.js] (11 lines)
       calls: raceOverpassServers [src/services/map/roadFetcher.js] (20 lines)
       calls: parseOverpassResponse [src/services/map/roadFetcher.js] (31 lines)
       calls: loadFromRedis [src/services/redis.service.js] (12 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: mergeRoadLines [src/services/map/roadFetcher.js] (31 lines)
-        calls: normalizePath [src/services/mapGenerator.js] (4 lines)
+        calls: normalizePath [src/services/map/roadFetcher.js] (4 lines)
       calls: saveToRedis [src/services/redis.service.js] (17 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: normalizePath [src/services/mapGenerator.js] (4 lines)
-    calls: identifyIntersections [src/services/mapGenerator.js] (71 lines)
+    calls: identifyIntersections [src/services/map/intersectionFinder.js] (20 lines)
       calls: loadFromRedis [src/services/redis.service.js] (12 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: buildAdjacencyFromRoads [src/services/map/intersectionFinder.js] (32 lines)
@@ -86,7 +84,7 @@ root: getGameData [src/controllers/gameController.js] (28 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: serializeAdjacency [src/services/map/intersectionFinder.js] (18 lines)
         calls: parseCoordKey [src/utils/geometry.js] (3 lines)
-    calls: createGraphElements [src/services/mapGenerator.js] (127 lines)
+    calls: createGraphElements [src/services/map/graphBuilder.js] (61 lines)
       calls: loadFromRedis [src/services/redis.service.js] (12 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: getRelevantNodes [src/services/map/graphBuilder.js] (11 lines)
@@ -101,8 +99,7 @@ root: getGameData [src/controllers/gameController.js] (28 lines)
         calls: haversineDistance [src/utils/geometry.js] (14 lines)
       calls: saveToRedis [src/services/redis.service.js] (17 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: haversineDistance [src/utils/geometry.js] (14 lines)
-    calls: findPolygons [src/services/mapGenerator.js] (240 lines)
+    calls: findPolygons [src/services/map/polygonFinder.js] (55 lines)
       calls: loadFromRedis [src/services/redis.service.js] (12 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: buildPlanarGraph [src/services/map/polygonFinder.js] (39 lines)
@@ -122,13 +119,10 @@ root: getGameData [src/controllers/gameController.js] (28 lines)
           calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: saveToRedis [src/services/redis.service.js] (17 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: calculatePolygonCentroid [src/utils/geometry.js] (44 lines)
-      calls: calculateLabelPosition [src/utils/geometry.js] (66 lines)
-        calls: lineSegmentIntersection [src/utils/geometry.js] (21 lines)
     calls: filterOrphanedElements [src/services/map/index.js] (13 lines)
     calls: calculatePolygonPoints [src/services/map/index.js] (38 lines)
       calls: roundCoord [src/utils/geometry.js] (3 lines)
-    calls: createGroups [src/services/mapGenerator.js] (63 lines)
+    calls: createGroups [src/services/map/groupCreator.js] (51 lines)
       calls: loadFromRedis [src/services/redis.service.js] (12 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: saveToRedis [src/services/redis.service.js] (17 lines)
@@ -148,7 +142,6 @@ root: getGameData [src/controllers/gameController.js] (28 lines)
       calls: roundCoord [src/utils/geometry.js] (3 lines)
     calls: saveToRedis [src/services/redis.service.js] (17 lines)
       calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: generateUid [src/utils/geometry.js] (3 lines)
 ---
 root: reverseProxy [src/controllers/locationController.js] (10 lines)
   calls: reverseGeocode [src/services/nominatim.service.js] (12 lines)
@@ -196,22 +189,20 @@ root: retryStrategy [src/services/redis.service.js] (5 lines)
 
 | Lines | Function | File |
 |------:|----------|------|
-| 435 | `generateMap` | services/mapGenerator.js |
-| 240 | `findPolygons` | services/mapGenerator.js |
 | 219 | `loadGameData` | js/map-logic.js |
 | 186 | `updateGraph` | components/map_controls.js |
-| 127 | `createGraphElements` | services/mapGenerator.js |
+| 125 | `generateMap` | map/index.js |
 | 118 | `moveSelection` | components/map_controls.js |
-| 117 | `fetchRedLines` | services/mapGenerator.js |
 | 112 | `calculateConnections` | map/index.js |
 | 95 | `createPosterGrid` | map/index.js |
 | 94 | `bindKeys` | components/map_controls.js |
 | 87 | `applyModeFiltering` | map/index.js |
 | 75 | `updatePolygonVisuals` | js/map-logic.js |
-| 71 | `identifyIntersections` | services/mapGenerator.js |
 | 66 | `calculateLabelPosition` | utils/geometry.js |
-| 63 | `createGroups` | services/mapGenerator.js |
 | 63 | `findMinimalCycles` | map/polygonFinder.js |
+| 61 | `createGraphElements` | map/graphBuilder.js |
 | 58 | `init` | components/map_controls.js |
 | 55 | `initializeGame` | js/map-logic.js |
+| 55 | `findPolygons` | map/polygonFinder.js |
 | 52 | `getSnappedPosition` | components/map_controls.js |
+| 51 | `createGroups` | map/groupCreator.js |

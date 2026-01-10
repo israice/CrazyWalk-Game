@@ -33,7 +33,6 @@ const filesToAnalyze = [
     'src/services/map/intersectionFinder.js',
     'src/services/map/polygonFinder.js',
     'src/services/map/roadFetcher.js',
-    'src/services/mapGenerator.js',
     'src/services/nominatim.service.js',
     'src/services/redis.js',
     'src/services/redis.service.js',
@@ -110,12 +109,12 @@ function analyzeFile(filePath) {
     const fullPath = path.join(projectRoot, filePath);
     if (!fs.existsSync(fullPath)) return;
     let content = fs.readFileSync(fullPath, 'utf8');
-    
+
     // Collect file statistics
     const stats = fs.statSync(fullPath);
     const lines = content.split('\n').length;
-    fileStats.set(filePath, { 
-        lines, 
+    fileStats.set(filePath, {
+        lines,
         bytes: stats.size,
         type: path.extname(filePath)
     });
@@ -211,7 +210,7 @@ for (const [filePath, stats] of fileStats) {
     totalStats.files++;
     totalStats.lines += stats.lines;
     totalStats.bytes += stats.bytes;
-    
+
     if (stats.lines >= 300 || stats.bytes >= 10240) {
         largeFiles.push({ path: filePath, ...stats });
     }
