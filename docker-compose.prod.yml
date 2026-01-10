@@ -1,20 +1,10 @@
 services:
-  app:
-    build: .
-    container_name: CrazyWalk-Frontend
-    restart: always
-    ports:
-      - "80:8000"
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6500
-    networks:
-      - pc2-net
-
+  # 1. Webhook - auto-update from GitHub
   webhook:
     build:
-      context: ./tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB/Dockerfile
+    container_name: crazywalk-webhook-update
     restart: always
     ports:
       - "9000:9000"
@@ -25,21 +15,55 @@ services:
       - .env
     environment:
       - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
-
     networks:
-      - pc2-net
+      - crazywalk-net
 
+  # 2. Redis - cache
   redis:
     image: redis:alpine
-    container_name: CrazyWalk-Redis
+    container_name: crazywalk-redis
     restart: always
     command: redis-server --port 6500
     ports:
       - "6500:6500"
     networks:
-      - pc2-net
+      - crazywalk-net
+    depends_on:
+      - webhook
+
+  # 3. Backend - API server (Node.js)
+  backend:
+    build:
+      context: .
+      dockerfile: tools/backend/Dockerfile
+    container_name: crazywalk-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6500
+    env_file:
+      - .env
+    networks:
+      - crazywalk-net
+    depends_on:
+      - redis
+
+  # 4. Frontend - static files (nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: tools/frontend/Dockerfile
+    container_name: crazywalk-frontend
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - crazywalk-net
+    depends_on:
+      - backend
 
 networks:
-  pc2-net:
-    external: true
-    name: pc2-net
+  crazywalk-net:
+    driver: bridge
