@@ -1526,7 +1526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pState.label = null;
 
                 // Reveal poster part
-                revealPolygonPart(pState.coords);
+                posterRenderer.revealPolygonPart(pState.coords);
 
                 // Hide lines (Deferred until lines are created? No, lines created later. 
                 // Wait, lines are created AFTER polygons in this loop order?
@@ -1549,7 +1549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         polygonState.forEach(state => {
             if (state.current >= state.total && state.coords) {
                 console.log(`DEBUG: Restoring poster mask for completed polygon ${state.id}`);
-                revealPolygonPart(state.coords);
+                posterRenderer.revealPolygonPart(state.coords);
                 restoredMasksCount++;
             }
         });
