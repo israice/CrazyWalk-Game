@@ -1,24 +1,5 @@
 services:
-  # 1. Webhook - auto-update from GitHub
-  webhook:
-    build:
-      context: .
-      dockerfile: tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB/Dockerfile
-    container_name: crazywalk-webhook-update
-    restart: always
-    ports:
-      - "9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - .:/app
-    env_file:
-      - .env
-    environment:
-      - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
-    networks:
-      - crazywalk-net
-
-  # 2. Redis - cache
+  # 1. Redis - cache (starts first, no dependencies)
   redis:
     image: redis:alpine
     container_name: crazywalk-redis
@@ -28,10 +9,8 @@ services:
       - "6500:6500"
     networks:
       - crazywalk-net
-    depends_on:
-      - webhook
 
-  # 3. Backend - API server (Node.js)
+  # 2. Backend - API server (Node.js)
   backend:
     build:
       context: .
@@ -50,7 +29,7 @@ services:
     depends_on:
       - redis
 
-  # 4. Frontend - static files (nginx)
+  # 3. Frontend - static files (nginx)
   frontend:
     build:
       context: .
@@ -63,6 +42,25 @@ services:
       - crazywalk-net
     depends_on:
       - backend
+
+  # 4. Webhook - auto-update from GitHub (independent)
+  webhook:
+    build:
+      context: .
+      dockerfile: tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB/Dockerfile
+    container_name: crazywalk-webhook-update
+    restart: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
+    networks:
+      - crazywalk-net
 
 networks:
   crazywalk-net:
