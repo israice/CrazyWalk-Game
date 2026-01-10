@@ -13,7 +13,7 @@ services:
 
   webhook:
     build:
-      context: ./CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB
+      context: ./tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB
       dockerfile: Dockerfile
     restart: always
     ports:
@@ -25,7 +25,7 @@ services:
       - .env
     environment:
       - AUTOUPDATE_WEBHOOK_FROM_GITHUB=${AUTOUPDATE_WEBHOOK_FROM_GITHUB}
-      - FRONTEND_INDEX_PAGE=CORE/FRONTEND
+
     networks:
       - pc2-net
 

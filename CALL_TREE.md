@@ -1,18 +1,18 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T06:44:23.029Z
+Generated on: 2026-01-10T07:01:24.222Z
 
 ## File Statistics
 > [!NOTE]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 91 files, 10,610 lines, 360.2 KB
+**Total:** 95 files, 10,764 lines, 363.9 KB
 
 ### Breakdown by File Type
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 88 | 10,331 | 348.4 KB |
+| .js | 92 | 10,485 | 352.1 KB |
 | .html | 3 | 279 | 11.7 KB |
 
 ---
@@ -130,6 +130,8 @@ Generated on: 2026-01-10T06:44:23.029Z
 ### rendering/RenderInitializer.js
 - 🔷 `../utils/UIDGenerator.js` → `createUIDMaps`
 - 🔷 `../ui/ErrorDisplay.js` → `showError`
+- 🔷 `./RenderDataEnricher.js` → `enrichBlueCircleCounts`, `enrichWhiteLineRelations`, `buildBlueCircleDataMap`, `ensureNeighborArrays`
+- 🔷 `./RenderDataManager.js` → `mergeBlueCircles`, `initGlobalStorage`, `updateGlobalStorage`
 
 ### ui/DebugHighlighter.js
 - 🔷 `./DebugMode.js` → `resetSelection`, `addToSelection`, `getSelectedLayers`
@@ -154,6 +156,10 @@ Generated on: 2026-01-10T06:44:23.029Z
 - 📦 `./api.routes` → `apiRoutes`
 - 📦 `./auth.routes` → `authRoutes`
 
+### map/cacheManager.js
+- 📦 `../../config` → `config`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+
 ### map/connectionCalculator.js
 - 📦 `../../utils/geometry` → `roundCoord`
 
@@ -169,18 +175,8 @@ Generated on: 2026-01-10T06:44:23.029Z
 - 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
 
 ### map/index.js
-- 📦 `../../config` → `config`
-- 📦 `../../config/constants` → `REDIS_KEYS`
-- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
-- 📦 `./roadFetcher` → `fetchRedLines`
-- 📦 `./intersectionFinder` → `identifyIntersections`
-- 📦 `./graphBuilder` → `createGraphElements`
-- 📦 `./polygonFinder` → `findPolygons`
-- 📦 `./groupCreator` → `createGroups`
-- 📦 `./connectionCalculator` → `calculateConnections`
-- 📦 `./posterGridCreator` → `createPosterGrid`
-- 📦 `./modeFilter` → `applyModeFiltering`
-- 📦 `./mapHelpers` → `filterOrphanedElements`, `calculatePolygonPoints`
+- 📦 `./cacheManager` → `checkCache`, `saveCache`
+- 📦 `./regionProcessor` → `processRegion`
 
 ### map/intersectionFinder.js
 - 📦 `../../config/constants` → `REDIS_KEYS`
@@ -215,6 +211,17 @@ Generated on: 2026-01-10T06:44:23.029Z
 - 📦 `fs` → `fs`
 - 📦 `../../config/constants` → `PATHS`
 - 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+
+### map/regionProcessor.js
+- 📦 `./roadFetcher` → `fetchRedLines`
+- 📦 `./intersectionFinder` → `identifyIntersections`
+- 📦 `./graphBuilder` → `createGraphElements`
+- 📦 `./polygonFinder` → `findPolygons`
+- 📦 `./groupCreator` → `createGroups`
+- 📦 `./connectionCalculator` → `calculateConnections`
+- 📦 `./posterGridCreator` → `createPosterGrid`
+- 📦 `./modeFilter` → `applyModeFiltering`
+- 📦 `./mapHelpers` → `filterOrphanedElements`, `calculatePolygonPoints`
 
 ### map/roadFetcher.js
 - 📦 `axios` → `axios`
@@ -297,95 +304,100 @@ root: getGameState [src/controllers/gameController.js] (12 lines) [C:2]
     calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
 root: getGameData [src/controllers/gameController.js] (28 lines) [C:6]
-  calls: generateMap [src/services/map/index.js] (125 lines) [C:15]
-    calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
-      calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-    calls: fetchRedLines [src/services/map/roadFetcher.js] (31 lines) [C:4]
-      calls: buildOverpassQuery [src/services/map/roadFetcher.js] (11 lines) [C:1]
-      calls: raceOverpassServers [src/services/map/roadFetcher.js] (20 lines) [C:2]
-      calls: parseOverpassResponse [src/services/map/roadFetcher.js] (31 lines) [C:8]
+  calls: generateMap [src/services/map/index.js] (44 lines) [C:8]
+    calls: checkCache [src/services/map/cacheManager.js] (14 lines) [C:6]
+      calls: getCacheKey [src/services/map/cacheManager.js] (5 lines) [C:1]
       calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
         calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: mergeRoadLines [src/services/map/roadFetcher.js] (31 lines) [C:7]
-        calls: normalizePath [src/services/map/roadFetcher.js] (4 lines) [C:1]
-      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-    calls: identifyIntersections [src/services/map/intersectionFinder.js] (20 lines) [C:2]
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: buildAdjacencyFromRoads [src/services/map/intersectionFinder.js] (32 lines) [C:7]
-        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: findIntersectionNodes [src/services/map/intersectionFinder.js] (19 lines) [C:3]
+    calls: processRegion [src/services/map/regionProcessor.js] (94 lines) [C:4]
+      calls: fetchRedLines [src/services/map/roadFetcher.js] (31 lines) [C:4]
+        calls: buildOverpassQuery [src/services/map/roadFetcher.js] (11 lines) [C:1]
+        calls: raceOverpassServers [src/services/map/roadFetcher.js] (20 lines) [C:2]
+        calls: parseOverpassResponse [src/services/map/roadFetcher.js] (31 lines) [C:8]
+        calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: mergeRoadLines [src/services/map/roadFetcher.js] (31 lines) [C:7]
+          calls: normalizePath [src/services/map/roadFetcher.js] (4 lines) [C:1]
+        calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: identifyIntersections [src/services/map/intersectionFinder.js] (20 lines) [C:2]
+        calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: buildAdjacencyFromRoads [src/services/map/intersectionFinder.js] (32 lines) [C:7]
+          calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+        calls: findIntersectionNodes [src/services/map/intersectionFinder.js] (19 lines) [C:3]
+          calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+        calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: serializeAdjacency [src/services/map/intersectionFinder.js] (18 lines) [C:4]
+          calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: createGraphElements [src/services/map/graphBuilder.js] (61 lines) [C:6]
+        calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: getRelevantNodes [src/services/map/graphBuilder.js] (11 lines) [C:3]
+          calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+        calls: rebuildAdjacencyMap [src/services/map/graphBuilder.js] (17 lines) [C:5]
+          calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
         calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: serializeAdjacency [src/services/map/intersectionFinder.js] (18 lines) [C:4]
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
-    calls: createGraphElements [src/services/map/graphBuilder.js] (61 lines) [C:6]
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: getRelevantNodes [src/services/map/graphBuilder.js] (11 lines) [C:3]
-        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: rebuildAdjacencyMap [src/services/map/graphBuilder.js] (17 lines) [C:5]
-        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: tracePath [src/services/map/graphBuilder.js] (37 lines) [C:5]
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
-        calls: haversineDistance [src/utils/geometry.js] (14 lines) [C:1]
-      calls: createGreenCirclesForPath [src/services/map/graphBuilder.js] (42 lines) [C:5]
-        calls: haversineDistance [src/utils/geometry.js] (14 lines) [C:1]
-      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-    calls: findPolygons [src/services/map/polygonFinder.js] (55 lines) [C:10]
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: buildPlanarGraph [src/services/map/planarGraphBuilder.js] (39 lines) [C:5]
-        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: findMinimalCycles [src/services/map/polygonFinder.js] (63 lines) [C:13]
-      calls: cycleToPolygonCoords [src/services/map/polygonFinder.js] (40 lines) [C:6]
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
-      calls: validatePolygonArea [src/services/map/polygonFinder.js] (22 lines) [C:6]
-      calls: createPolygonData [src/services/map/polygonFinder.js] (24 lines) [C:1]
-        calls: calculatePolygonCentroid [src/utils/geometry.js] (44 lines) [C:6]
-        calls: calculateLabelPosition [src/utils/geometry.js] (66 lines) [C:11]
-          calls: lineSegmentIntersection [src/utils/geometry.js] (21 lines) [C:3]
-      calls: assignPromoGifs [src/services/map/promoAssigner.js] (20 lines) [C:5]
+        calls: tracePath [src/services/map/graphBuilder.js] (37 lines) [C:5]
+          calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+          calls: haversineDistance [src/utils/geometry.js] (14 lines) [C:1]
+        calls: createGreenCirclesForPath [src/services/map/graphBuilder.js] (42 lines) [C:5]
+          calls: haversineDistance [src/utils/geometry.js] (14 lines) [C:1]
+        calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: findPolygons [src/services/map/polygonFinder.js] (55 lines) [C:10]
+        calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: buildPlanarGraph [src/services/map/planarGraphBuilder.js] (39 lines) [C:5]
+          calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+        calls: findMinimalCycles [src/services/map/polygonFinder.js] (63 lines) [C:13]
+        calls: cycleToPolygonCoords [src/services/map/polygonFinder.js] (40 lines) [C:6]
+          calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+        calls: validatePolygonArea [src/services/map/polygonFinder.js] (22 lines) [C:6]
+        calls: createPolygonData [src/services/map/polygonFinder.js] (24 lines) [C:1]
+          calls: calculatePolygonCentroid [src/utils/geometry.js] (44 lines) [C:6]
+          calls: calculateLabelPosition [src/utils/geometry.js] (66 lines) [C:11]
+            calls: lineSegmentIntersection [src/utils/geometry.js] (21 lines) [C:3]
+        calls: assignPromoGifs [src/services/map/promoAssigner.js] (20 lines) [C:5]
+          calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+            calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+          calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+            calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: filterOrphanedElements [src/services/map/mapHelpers.js] (13 lines) [C:1]
+      calls: calculatePolygonPoints [src/services/map/mapHelpers.js] (38 lines) [C:8]
+        calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+      calls: createGroups [src/services/map/groupCreator.js] (51 lines) [C:7]
         calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
           calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
         calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
           calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-    calls: filterOrphanedElements [src/services/map/mapHelpers.js] (13 lines) [C:1]
-    calls: calculatePolygonPoints [src/services/map/mapHelpers.js] (38 lines) [C:8]
-      calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
-    calls: createGroups [src/services/map/groupCreator.js] (51 lines) [C:7]
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: polygonToTurf [src/services/map/groupCreator.js] (10 lines) [C:3]
-      calls: dissolvePolygons [src/services/map/groupCreator.js] (18 lines) [C:5]
-      calls: findContainedPolygons [src/services/map/groupCreator.js] (13 lines) [C:4]
-    calls: calculateConnections [src/services/map/connectionCalculator.js] (24 lines) [C:1]
-      calls: buildNodeData [src/services/map/connectionCalculator.js] (16 lines) [C:4]
-      calls: filterBlueCircles [src/services/map/connectionCalculator.js] (11 lines) [C:1]
-      calls: mapLinesToPolygons [src/services/map/connectionCalculator.js] (15 lines) [C:5]
-      calls: enrichWhiteLines [src/services/map/connectionCalculator.js] (7 lines) [C:2]
-      calls: enrichGreenCircles [src/services/map/connectionCalculator.js] (7 lines) [C:2]
-      calls: enrichBlueCircles [src/services/map/connectionCalculator.js] (41 lines) [C:10]
+        calls: polygonToTurf [src/services/map/groupCreator.js] (10 lines) [C:3]
+        calls: dissolvePolygons [src/services/map/groupCreator.js] (18 lines) [C:5]
+        calls: findContainedPolygons [src/services/map/groupCreator.js] (13 lines) [C:4]
+      calls: calculateConnections [src/services/map/connectionCalculator.js] (24 lines) [C:1]
+        calls: buildNodeData [src/services/map/connectionCalculator.js] (16 lines) [C:4]
+        calls: filterBlueCircles [src/services/map/connectionCalculator.js] (11 lines) [C:1]
+        calls: mapLinesToPolygons [src/services/map/connectionCalculator.js] (15 lines) [C:5]
+        calls: enrichWhiteLines [src/services/map/connectionCalculator.js] (7 lines) [C:2]
+        calls: enrichGreenCircles [src/services/map/connectionCalculator.js] (7 lines) [C:2]
+        calls: enrichBlueCircles [src/services/map/connectionCalculator.js] (41 lines) [C:10]
+          calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+        calls: findPolygonNeighbors [src/services/map/connectionCalculator.js] (19 lines) [C:7]
+      calls: createPosterGrid [src/services/map/posterGridCreator.js] (95 lines) [C:14]
+        calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: generateUid [src/utils/geometry.js] (3 lines) [C:1]
+      calls: applyModeFiltering [src/services/map/modeFilter.js] (87 lines) [C:15]
         calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
-      calls: findPolygonNeighbors [src/services/map/connectionCalculator.js] (19 lines) [C:7]
-    calls: createPosterGrid [src/services/map/posterGridCreator.js] (95 lines) [C:14]
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
-        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+    calls: saveCache [src/services/map/cacheManager.js] (7 lines) [C:2]
+      calls: getCacheKey [src/services/map/cacheManager.js] (5 lines) [C:1]
       calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
         calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
-      calls: generateUid [src/utils/geometry.js] (3 lines) [C:1]
-    calls: applyModeFiltering [src/services/map/modeFilter.js] (87 lines) [C:15]
-      calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
-    calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
-      calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
 root: reverseProxy [src/controllers/locationController.js] (10 lines) [C:2]
   calls: reverseGeocode [src/services/nominatim.service.js] (12 lines) [C:2]
@@ -463,13 +475,12 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | Lines | Complexity | Function | File |
 |------:|-----------:|----------|------|
 | 157 | 24 | `generateMarkdownReport` | tools/markdown-generator.js |
-| 125 | 15 | `generateMap` | map/index.js |
-| 113 | 19 | `initializeRender` | rendering/RenderInitializer.js |
 | 101 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
 | 100 | 12 | `renderPolygons` | rendering/PolygonRenderer.js |
 | 98 | 14 | `main` | tools/analyze_calls.js |
 | 95 | 12 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 95 | 14 | `createPosterGrid` | map/posterGridCreator.js |
+| 94 | 4 | `processRegion` | map/regionProcessor.js |
 | 91 | 11 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
 | 91 | 18 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
 | 87 | 15 | `applyModeFiltering` | map/modeFilter.js |
@@ -482,6 +493,7 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | 71 | 9 | `renderWhiteLines` | rendering/WhiteLineRenderer.js |
 | 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
 | 67 | 11 | `initPosterGrid` | rendering/PosterRenderer.js |
+| 67 | 5 | `initializeRender` | rendering/RenderInitializer.js |
 | 67 | 6 | `generateJsonReport` | tools/json-generator.js |
 | 66 | 7 | `createPercentageLabel` | polygons/PolygonLabel.js |
 | 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
@@ -502,7 +514,6 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 |-----------:|------:|----------|------|
 | 24 | 157 | `generateMarkdownReport` | tools/markdown-generator.js |
 | 19 | 71 | `moveSelection` | map/KeyboardNavigation.js |
-| 19 | 113 | `initializeRender` | rendering/RenderInitializer.js |
 | 18 | 27 | `getDirection` | map/KeyboardNavigation.js |
 | 18 | 57 | `propagateCircleConnections` | rendering/CirclePropagation.js |
 | 18 | 91 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
@@ -511,7 +522,6 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | 16 | 68 | `applyCollectedState` | rendering/RenderFinalizer.js |
 | 15 | 39 | `updateAllCircleSaturation` | rendering/CirclePropagation.js |
 | 15 | 40 | `getElementStatus` | ui/DebugStatsBuilder.js |
-| 15 | 125 | `generateMap` | map/index.js |
 | 15 | 87 | `applyModeFiltering` | map/modeFilter.js |
 | 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
 | 14 | 98 | `main` | tools/analyze_calls.js |
@@ -529,6 +539,7 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | 11 | 66 | `calculateLabelPosition` | utils/geometry.js |
 | 11 | 38 | `runUpdate` | AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js |
 | 10 | 65 | `createGameDataLoader` | api/GameDataLoader.js |
+| 10 | 28 | `updateGlobalStorage` | rendering/RenderDataManager.js |
 | 10 | 39 | `handleRegister` | pages/login.js |
 | 10 | 41 | `enrichBlueCircles` | map/connectionCalculator.js |
 | 10 | 55 | `findPolygons` | map/polygonFinder.js |

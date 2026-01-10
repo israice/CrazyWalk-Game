@@ -18,4 +18,4 @@ WORKDIR /app
 COPY webhook.js .
 
 # The CMD runs the script from the mounted volume
-CMD ["node", "CORE/TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js"]
+CMD ["node", "tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js"]

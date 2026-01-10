@@ -349,11 +349,10 @@
     - added sposorship prices to polygons
   - [x] v0.0.33 - added user registration and login page
   - [x] v0.0.34 - changed to node js from python
-
     - docker prod test with new node changes
     - docker prod with new node changes test 2
     - docker prod with new node changes test 3
-    - refactor test 1
+  - [x] v0.0.35 - completed refactoring 
     -
 
   - ### Next Tasks
@@ -373,7 +372,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.38 - refactor test 15"
+  git commit -m "v0.0.35 - completed refactoring"
   git push
   ```
 

@@ -14,7 +14,7 @@ const EXCLUDED_DIRS = [
     'build',
     'coverage',
     '.agent',
-    'CORE/TOOLS'  // Exclude the tool itself
+    'tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB'  // Exclude the tool itself
 ];
 
 const INCLUDED_EXTENSIONS = ['.js', '.html'];
