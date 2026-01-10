@@ -1,19 +1,17 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T03:37:29.596Z
+Generated on: 2026-01-10T03:54:45.016Z
 
 ## File Statistics
 > [!INFO]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 33 files, 5,045 lines, 159.3 KB
+**Total:** 33 files, 4,214 lines, 128.6 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
-| 621 | 23.3 KB | `CORE/FRONTEND/B_map_page/components/map_controls.js` |
-| 551 | 19.0 KB | `src/services/map/index.js` |
 | 412 | 14.0 KB | `CORE/FRONTEND/A_home_page/login.html` |
 | 329 | 9.5 KB | `src/services/map/polygonFinder.js` |
 | 321 | 11.7 KB | `src/public/js/map-logic.js` |
@@ -23,8 +21,8 @@ Generated on: 2026-01-10T03:37:29.596Z
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 28 | 4,148 | 126.1 KB |
-| .html | 5 | 897 | 33.2 KB |
+| .js | 28 | 3,313 | 95.1 KB |
+| .html | 5 | 901 | 33.5 KB |
 
 ---
 
@@ -43,10 +41,10 @@ root: handleRegister [CORE/FRONTEND/A_home_page/login.html] (39 lines)
   calls: switchTab [CORE/FRONTEND/A_home_page/login.html] (23 lines)
 ---
 root: constructor [src/public/js/game-api.js] (4 lines)
-  calls: init [CORE/FRONTEND/B_map_page/components/map_controls.js] (58 lines)
+  calls: init [CORE/FRONTEND/B_map_page/components/map_controls.js] (47 lines)
     calls: addVisibilityRule [CORE/FRONTEND/B_map_page/components/map_controls.js] (5 lines)
-      calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (32 lines)
-    calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (32 lines)
+      calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines)
+    calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines)
 ---
 root: login [src/controllers/authController.js] (23 lines)
   calls: readUsers [src/controllers/authController.js] (18 lines)
@@ -115,9 +113,6 @@ root: getGameData [src/controllers/gameController.js] (28 lines)
           calls: getRedisClient [src/services/redis.service.js] (23 lines)
       calls: saveToRedis [src/services/redis.service.js] (17 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: filterOrphanedElements [src/services/map/index.js] (13 lines)
-    calls: calculatePolygonPoints [src/services/map/index.js] (38 lines)
-      calls: roundCoord [src/utils/geometry.js] (3 lines)
     calls: createGroups [src/services/map/groupCreator.js] (51 lines)
       calls: loadFromRedis [src/services/redis.service.js] (12 lines)
         calls: getRedisClient [src/services/redis.service.js] (23 lines)
@@ -126,16 +121,6 @@ root: getGameData [src/controllers/gameController.js] (28 lines)
       calls: polygonToTurf [src/services/map/groupCreator.js] (10 lines)
       calls: dissolvePolygons [src/services/map/groupCreator.js] (18 lines)
       calls: findContainedPolygons [src/services/map/groupCreator.js] (13 lines)
-    calls: calculateConnections [src/services/map/index.js] (112 lines)
-      calls: roundCoord [src/utils/geometry.js] (3 lines)
-    calls: createPosterGrid [src/services/map/index.js] (95 lines)
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: saveToRedis [src/services/redis.service.js] (17 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: generateUid [src/utils/geometry.js] (3 lines)
-    calls: applyModeFiltering [src/services/map/index.js] (87 lines)
-      calls: roundCoord [src/utils/geometry.js] (3 lines)
     calls: saveToRedis [src/services/redis.service.js] (17 lines)
       calls: getRedisClient [src/services/redis.service.js] (23 lines)
 ---
@@ -174,11 +159,15 @@ root: retryStrategy [src/services/redis.service.js] (5 lines)
 > These functions are defined but not called within the analyzed files. Verify if they are used dynamically or in external systems before deleting.
 
 - `setSnapLines` (6 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `updateGraph` (186 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
+- `updateGraph` (11 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
+- `bindKeys` (4 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
+- `moveSelection` (5 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
 - `shutdown` (7 lines) ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
 - `loadVersionBadge` (18 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
 - `revealMap` (9 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
 - `renderGameElements` (31 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `generateUid` (3 lines) ([geometry.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\utils\geometry.js))
+- `roundCoord` (3 lines) ([geometry.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\utils\geometry.js))
 
 ## Large Functions (50+ lines)
 > [!NOTE]
@@ -186,17 +175,9 @@ root: retryStrategy [src/services/redis.service.js] (5 lines)
 
 | Lines | Function | File |
 |------:|----------|------|
-| 186 | `updateGraph` | components/map_controls.js |
 | 125 | `generateMap` | map/index.js |
-| 118 | `moveSelection` | components/map_controls.js |
-| 112 | `calculateConnections` | map/index.js |
-| 95 | `createPosterGrid` | map/index.js |
-| 94 | `bindKeys` | components/map_controls.js |
-| 87 | `applyModeFiltering` | map/index.js |
 | 66 | `calculateLabelPosition` | utils/geometry.js |
 | 63 | `findMinimalCycles` | map/polygonFinder.js |
 | 61 | `createGraphElements` | map/graphBuilder.js |
-| 58 | `init` | components/map_controls.js |
 | 55 | `findPolygons` | map/polygonFinder.js |
-| 52 | `getSnappedPosition` | components/map_controls.js |
 | 51 | `createGroups` | map/groupCreator.js |
