@@ -373,7 +373,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.38 - refactor test 3"
+  git commit -m "v0.0.38 - refactor test 4"
   git push
   ```
 

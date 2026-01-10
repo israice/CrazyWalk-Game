@@ -1,6 +1,6 @@
 # Project Function Analysis
 
-Generated on: 2026-01-09T23:15:55.192Z
+Generated on: 2026-01-10T01:38:58.999Z
 
 ## Entry Points / Root Functions
 root: register [src/controllers/authController.js]
@@ -155,4 +155,3 @@ root: retryStrategy [src/services/redis.service.js]
 
 - `shutdown` ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
 - `loadVersionBadge` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `resetWhiteLineColors` ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
