@@ -191,34 +191,6 @@
   🐳 🧼 🧽 🪣 🪛 🪚 🪓 🪜 🪝 🪄
   🪟 🪠 🪪 🪫 🏧 💱 💲 🖧 🪬 🛍️
 
-  ## stop server
-
-  ```Bash
-  docker compose -f docker-compose.dev.yml down
-  docker compose -f docker-compose.prod.yml down
-  ```
-
-  ## start or update server
-
-  ```Bash
-  docker compose -f docker-compose.dev.yml up --build -d
-  docker compose -f docker-compose.prod.yml up --build -d
-  ```
-
-  ## hard reset and rollback to previous commit
-
-  ```Powershell
-  git log --oneline -n 10
-  ```
-
-  ```Powershell
-  Copy-Item .env $env:TEMP\.env.backup
-  git reset --hard d4f780c
-  git clean -fd
-  Copy-Item $env:TEMP\.env.backup .env -Force
-  git push origin master --force
-  ```
-
   </details>
 
 <!-- ---------------------- -->
@@ -352,8 +324,7 @@
     - docker prod test with new node changes
     - docker prod with new node changes test 2
     - docker prod with new node changes test 3
-  - [x] v0.0.35 - completed refactoring 
-    -
+  - [x] ## v0.0.35 - completed refactoring
 
   - ### Next Tasks
     - prod docker must to be fixed
@@ -372,18 +343,46 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.35 - test 3"
+  git commit -m "v0.0.36 - test 4"
   git push
   ```
 
   ## kill running
 
-Команды:
+  Команды:
 
-npm run dev
-npm start
+  npm run dev
+  npm start
 
-node tools\analyze_calls.js
+  node tools\analyze_calls.js
+
+  ## stop server
+
+  ```Bash
+  docker compose -f docker-compose.dev.yml down
+  docker compose -f docker-compose.prod.yml down
+  ```
+
+  ## start or update server
+
+  ```Bash
+  docker compose -f docker-compose.dev.yml up --build -d
+  docker compose -f docker-compose.prod.yml up --build -d
+  ```
+
+  ## hard reset and rollback to previous commit
+
+  ```Powershell
+  git log --oneline -n 10
+  ```
+
+  ```Powershell
+  Copy-Item .env $env:TEMP\.env.backup
+  git reset --hard d4f780c
+  git clean -fd
+  Copy-Item $env:TEMP\.env.backup .env -Force
+  git push origin master --force
+  ```
 
   </details>
 
