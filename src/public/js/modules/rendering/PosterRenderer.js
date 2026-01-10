@@ -3,7 +3,16 @@
  * 
  * Manages poster grid rendering, SVG overlays, and reveal masks.
  * Extracted from map-logic.js to improve code organization.
+ * 
+ * Refactored to act as a coordinator for:
+ * - PosterMaskController (Mask logic)
+ * - PosterSVGRenderer (DOM rendering)
+ * - PosterDebugController (Debug visibility)
  */
+
+import { PosterMaskController } from './posters/PosterMaskController.js';
+import { PosterSVGRenderer } from './posters/PosterSVGRenderer.js';
+import { PosterDebugController } from './posters/PosterDebugController.js';
 
 export class PosterRenderer {
     constructor(map, postersLayer, gameState) {
@@ -14,19 +23,21 @@ export class PosterRenderer {
         // Internal state
         this.posters = [];
         this.REVEAL_MASK_SVG_ID = 'poster-reveal-mask';
-        this.revealMask = null;
-        this.revealMaskPath = null;
+
+        // Sub-modules
+        this.maskController = null;
+        this.svgRenderer = new PosterSVGRenderer();
+        this.debugController = new PosterDebugController();
+
         this.posterSvgOverlay = null;
         this.currentPosterGrid = null;
 
-        // These will be set externally when needed
+        // External references (needed for debug controller)
         this._userMarker = null;
         this._circleLayerMap = null;
         this._polygonState = null;
         this._lineLayerMap = null;
     }
-
-
 
     /**
      * Initialize poster grid from server data
@@ -43,6 +54,7 @@ export class PosterRenderer {
                 console.log("DEBUG: Removing existing poster SVG overlay");
                 this.posterSvgOverlay.remove();
                 this.posterSvgOverlay = null;
+                this.maskController = null;
             }
             this.postersLayer.clearLayers();
             this.posters.length = 0;
@@ -145,8 +157,8 @@ export class PosterRenderer {
             pane: 'postersPane'
         }).addTo(this.map);
 
-        this.revealMask = svgElement.querySelector('#mask-paths-container');
-        const imagesContainer = svgElement.querySelector('#poster-images-container');
+        const maskElement = svgElement.querySelector('#mask-paths-container');
+        this.maskController = new PosterMaskController(maskElement);
 
         // Create posters from server data
         this.currentPosterGrid.forEach(poster => {
@@ -164,14 +176,7 @@ export class PosterRenderer {
             console.log(`DEBUG: Poster ${poster.id}: lat(${poster.min_lat.toFixed(5)}, ${poster.max_lat.toFixed(5)}), lon(${poster.min_lon.toFixed(5)}, ${poster.max_lon.toFixed(5)})`);
 
             if (poster.position === 5 && this._userMarker) {
-                const poster5CenterLat = (poster.min_lat + poster.max_lat) / 2;
-                const poster5CenterLon = (poster.min_lon + poster.max_lon) / 2;
-                const userPos = this._userMarker.getLatLng();
-                console.log(`DEBUG: ========== POSTER #5 CENTER CHECK ==========`);
-                console.log(`DEBUG: Poster #5 center: ${poster5CenterLat.toFixed(6)}, ${poster5CenterLon.toFixed(6)}`);
-                console.log(`DEBUG: User marker pos:  ${userPos.lat.toFixed(6)}, ${userPos.lng.toFixed(6)}`);
-                console.log(`DEBUG: Difference: lat=${Math.abs(poster5CenterLat - userPos.lat).toFixed(6)}, lon=${Math.abs(poster5CenterLon - userPos.lng).toFixed(6)}`);
-                console.log(`DEBUG: =============================================`);
+                this.#debugPosterCenter(poster);
             }
         });
 
@@ -180,235 +185,56 @@ export class PosterRenderer {
     }
 
     /**
-     * Update poster SVG elements (DOM reconciliation)
+     * Helper to debug specific poster centering
+     * @private
      */
-    updatePosterSVG() {
-        if (!this.posterSvgOverlay) return;
-
-        const svg = this.posterSvgOverlay.getElement();
-        if (!svg) return;
-
-        const imagesContainer = svg.querySelector('#poster-images-container');
-        const bgContainer = svg.querySelector('#debug-poster-bg');
-        const overlayContainer = svg.querySelector('#debug-poster-overlay');
-
-        if (!imagesContainer || !bgContainer || !overlayContainer) return;
-
-        // --- DOM RECONCILIATION ---
-        // Do NOT clear innerHTML. Instead, diff and update.
-
-        // Get SVG bounds (geographic coordinates)
-        const svgBounds = this.posterSvgOverlay.getBounds();
-        const svgMinLat = svgBounds.getSouth();
-        const svgMaxLat = svgBounds.getNorth();
-        const svgMinLon = svgBounds.getWest();
-        const svgMaxLon = svgBounds.getEast();
-
-        const latRange = svgMaxLat - svgMinLat;
-        const lonRange = svgMaxLon - svgMinLon;
-
-        const activePosterIds = new Set();
-
-        this.posters.forEach(p => {
-            activePosterIds.add(p.id);
-
-            const posterMinLat = p.bounds[0][0];
-            const posterMinLon = p.bounds[0][1];
-            const posterMaxLat = p.bounds[1][0];
-            const posterMaxLon = p.bounds[1][1];
-
-            const x = ((posterMinLon - svgMinLon) / lonRange) * 1000;
-            const y = ((svgMaxLat - posterMaxLat) / latRange) * 1000;
-            const width = ((posterMaxLon - posterMinLon) / lonRange) * 1000;
-            const height = ((posterMaxLat - posterMinLat) / latRange) * 1000;
-
-            if (width <= 0 || height <= 0) {
-                return;
-            }
-
-            // 1. Background Image (Ghost)
-            const bgId = `poster-bg-${p.id}`;
-            let bgImage = bgContainer.querySelector(`#${bgId}`);
-            if (!bgImage) {
-                bgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                bgImage.setAttribute("id", bgId);
-                bgImage.setAttribute("preserveAspectRatio", "none");
-                bgContainer.appendChild(bgImage);
-            }
-            // Update attributes (efficiently)
-            if (bgImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") !== p.imageUrl) {
-                bgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-            }
-            bgImage.setAttribute("x", x);
-            bgImage.setAttribute("y", y);
-            bgImage.setAttribute("width", width);
-            bgImage.setAttribute("height", height);
-
-            // 2. Main Game Image
-            const imgId = `poster-img-${p.id}`;
-            let mainImage = imagesContainer.querySelector(`#${imgId}`);
-            if (!mainImage) {
-                mainImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                mainImage.setAttribute("id", imgId);
-                mainImage.setAttribute("opacity", "1.0");
-                mainImage.setAttribute("preserveAspectRatio", "none");
-                imagesContainer.appendChild(mainImage);
-            }
-            if (mainImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") !== p.imageUrl) {
-                mainImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", p.imageUrl);
-            }
-            mainImage.setAttribute("x", x);
-            mainImage.setAttribute("y", y);
-            mainImage.setAttribute("width", width);
-            mainImage.setAttribute("height", height);
-
-            // 3. Debug Overlay
-            if (this.gameState.isPostersDebugActive) {
-                const debugGroupId = `poster-debug-${p.id}`;
-                let debugGroup = overlayContainer.querySelector(`#${debugGroupId}`);
-
-                if (!debugGroup) {
-                    debugGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-                    debugGroup.setAttribute("id", debugGroupId);
-                    overlayContainer.appendChild(debugGroup);
-
-                    // Contents (created once)
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute("fill", "none");
-                    rect.setAttribute("stroke", "red");
-                    rect.setAttribute("stroke-width", "3");
-                    debugGroup.appendChild(rect);
-
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute("fill", "yellow");
-                    text.setAttribute("font-size", "13");
-                    text.setAttribute("font-weight", "bold");
-                    text.setAttribute("text-anchor", "middle");
-                    text.setAttribute("dominant-baseline", "middle");
-                    text.textContent = `#${p.id}`;
-                    debugGroup.appendChild(text);
-                }
-
-                // Update Group Contents
-                const rect = debugGroup.querySelector('rect');
-                const text = debugGroup.querySelector('text');
-
-                rect.setAttribute("x", x);
-                rect.setAttribute("y", y);
-                rect.setAttribute("width", width);
-                rect.setAttribute("height", height);
-
-                text.setAttribute("x", x + width / 2);
-                text.setAttribute("y", y + height / 2);
-            }
-        });
-
-        // Cleanup Stale Nodes
-        this.#cleanupContainer(bgContainer, 'poster-bg-', activePosterIds);
-        this.#cleanupContainer(imagesContainer, 'poster-img-', activePosterIds);
-        this.#cleanupContainer(overlayContainer, 'poster-debug-', activePosterIds);
-
-        console.log(`DEBUG: Updated poster layers (Diff Update)`);
+    #debugPosterCenter(poster) {
+        const poster5CenterLat = (poster.min_lat + poster.max_lat) / 2;
+        const poster5CenterLon = (poster.min_lon + poster.max_lon) / 2;
+        const userPos = this._userMarker.getLatLng();
+        console.log(`DEBUG: ========== POSTER #5 CENTER CHECK ==========`);
+        console.log(`DEBUG: Poster #5 center: ${poster5CenterLat.toFixed(6)}, ${poster5CenterLon.toFixed(6)}`);
+        console.log(`DEBUG: User marker pos:  ${userPos.lat.toFixed(6)}, ${userPos.lng.toFixed(6)}`);
+        console.log(`DEBUG: Difference: lat=${Math.abs(poster5CenterLat - userPos.lat).toFixed(6)}, lon=${Math.abs(poster5CenterLon - userPos.lng).toFixed(6)}`);
+        console.log(`DEBUG: =============================================`);
     }
 
     /**
-     * Helper to remove stale children from container
-     * @private
+     * Update poster SVG elements (DOM reconciliation)
+     * Delegates to PosterSVGRenderer
      */
-    #cleanupContainer(container, prefix, activePosterIds) {
-        Array.from(container.children).forEach(child => {
-            const id = child.getAttribute("id");
-            if (id && id.startsWith(prefix)) {
-                const posterId = id.replace(prefix, '');
-                if (!activePosterIds.has(posterId)) {
-                    child.remove();
-                }
-            }
-        });
+    updatePosterSVG() {
+        if (!this.posterSvgOverlay) return;
+        this.svgRenderer.updatePosterSVG(this.posterSvgOverlay, this.posters, this.gameState.isPostersDebugActive);
     }
 
     /**
      * Update poster visibility based on debug mode
      */
     updatePostersVisibility() {
-        if (this.posterSvgOverlay) {
-            const svg = this.posterSvgOverlay.getElement();
-            if (svg) {
-                const bgContainer = svg.querySelector('#debug-poster-bg');
-                const overlayContainer = svg.querySelector('#debug-poster-overlay');
-                const imagesContainer = svg.querySelector('#poster-images-container');
-
-                // Main container ALWAYS masked
-                if (imagesContainer) {
-                    imagesContainer.setAttribute('mask', 'url(#poster-reveal-mask)');
-                }
-
-                // Toggle debug layers
-                const display = this.gameState.isPostersDebugActive ? 'inline' : 'none';
-                if (bgContainer) bgContainer.style.display = display;
-                if (overlayContainer) overlayContainer.style.display = display;
-            }
-        }
+        this.svgRenderer.updateVisibility(this.posterSvgOverlay, this.gameState.isPostersDebugActive);
         this.updatePosterSVG();
         this.toggleHiddenDebug(this.gameState.isPostersDebugActive);
     }
 
     /**
      * Toggle visibility of hidden/collected elements in debug mode
+     * Delegates to PosterDebugController
      * @param {boolean} show - Whether to show hidden elements
      */
     toggleHiddenDebug(show) {
         if (!this._circleLayerMap || !this._polygonState || !this._lineLayerMap) return;
 
-        console.log(`DEBUG: Toggling hidden elements: ${show ? 'SHOW ALL' : 'RESTORE HIDDEN'}`);
+        const layers = {
+            circleLayerMap: this._circleLayerMap,
+            lineLayerMap: this._lineLayerMap
+        };
+        const state = {
+            collectedCircles: this.gameState.collectedCircles,
+            polygonState: this._polygonState
+        };
 
-        // 1. Handle Collected Circles
-        this.gameState.collectedCircles.forEach(key => {
-            const layer = this._circleLayerMap.get(key);
-            if (layer) {
-                if (show) {
-                    // Reveal
-                    const isBlue = layer.options.color === 'blue' || (layer.options.fillColor === '#00ccff');
-                    layer.setStyle({
-                        opacity: 1,
-                        fillOpacity: isBlue ? 0.8 : 1
-                    });
-
-                    // Restore Blue Circle Tooltip (Number)
-                    if (layer.connections !== undefined && !layer.getTooltip()) {
-                        layer.bindTooltip(String(layer.connections), {
-                            permanent: true,
-                            direction: 'center',
-                            className: 'circle-label'
-                        });
-                    }
-                } else {
-                    // Re-hide
-                    layer.setStyle({ opacity: 0, fillOpacity: 0 });
-
-                    // Remove tooltip again if it was restored
-                    if (layer.getTooltip()) {
-                        layer.unbindTooltip();
-                    }
-                }
-            }
-        });
-
-        // 2. Handle Lines from Completed Polygons
-        this._polygonState.forEach(state => {
-            if (state.current >= state.total && state.lines) {
-                state.lines.forEach(lid => {
-                    const lineLayer = this._lineLayerMap.get(String(lid));
-                    if (lineLayer) {
-                        if (show) {
-                            lineLayer.setStyle({ opacity: 1, fillOpacity: 1 });
-                        } else {
-                            lineLayer.setStyle({ opacity: 0, fillOpacity: 0 });
-                        }
-                    }
-                });
-            }
-        });
+        this.debugController.toggleHiddenDebug(show, layers, state);
     }
 
     /**
@@ -416,42 +242,10 @@ export class PosterRenderer {
      * @param {Array<Array<number>>} coords - Polygon coordinates [[lat, lon], ...]
      */
     revealPolygonPart(coords) {
-        console.log("REVEAL: revealPolygonPart called", { coords, revealMask: this.revealMask });
-        if (!this.revealMask || !coords || !this.posterSvgOverlay) {
-            console.warn("REVEAL: Skipping - no mask, coords or overlay", { revealMask: this.revealMask, coords });
-            return;
-        }
-
-        try {
-            const svgBounds = this.posterSvgOverlay.getBounds();
-            const svgMinLat = svgBounds.getSouth();
-            const svgMaxLat = svgBounds.getNorth();
-            const svgMinLon = svgBounds.getWest();
-            const svgMaxLon = svgBounds.getEast();
-            const latRange = svgMaxLat - svgMinLat;
-            const lonRange = svgMaxLon - svgMinLon;
-
-            const points = coords.map(p => {
-                if (!Array.isArray(p) || p.length < 2) return null;
-                // Scale coordinates to 0-1000 range relative to SVG bounds
-                const x = ((p[1] - svgMinLon) / lonRange) * 1000;
-                const y = ((svgMaxLat - p[0]) / latRange) * 1000;
-                return `${x.toFixed(2)},${y.toFixed(2)}`;
-            }).filter(Boolean).join(' ');
-
-            const pathData = points ? `M ${points} Z` : '';
-
-            if (!pathData) {
-                console.warn("REVEAL: No valid pathData generated");
-                return;
-            }
-
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", pathData);
-            this.revealMask.appendChild(path);
-            console.log("REVEAL: Polygon added to mask. Total paths:", this.revealMask.children.length);
-        } catch (e) {
-            console.error("Failed to reveal polygon part:", e);
+        if (this.maskController && this.posterSvgOverlay) {
+            this.maskController.revealPolygonPart(coords, this.posterSvgOverlay.getBounds());
+        } else {
+            console.warn("REVEAL: Skipping - no mask controller or overlay");
         }
     }
 
@@ -459,40 +253,9 @@ export class PosterRenderer {
      * Rebuild all paths in the mask (used when restoring state)
      */
     updateMaskPaths() {
-        if (!this.revealMask || !this.posterSvgOverlay || !this._polygonState) return;
-
-        const svgBounds = this.posterSvgOverlay.getBounds();
-        const svgMinLat = svgBounds.getSouth();
-        const svgMaxLat = svgBounds.getNorth();
-        const svgMinLon = svgBounds.getWest();
-        const svgMaxLon = svgBounds.getEast();
-        const latRange = svgMaxLat - svgMinLat;
-        const lonRange = svgMaxLon - svgMinLon;
-
-        // Rebuild all paths in the mask
-        this.revealMask.innerHTML = '';
-        this._polygonState.forEach(state => {
-            if (state.current >= state.total && state.coords) {
-                try {
-                    const points = state.coords.map(p => {
-                        if (!Array.isArray(p) || p.length < 2) return null;
-                        // Scale coordinates to 0-1000 range relative to SVG bounds
-                        const x = ((p[1] - svgMinLon) / lonRange) * 1000;
-                        const y = ((svgMaxLat - p[0]) / latRange) * 1000;
-                        return `${x.toFixed(2)},${y.toFixed(2)}`;
-                    }).filter(Boolean).join(' ');
-
-                    const pathData = points ? `M ${points} Z` : '';
-                    if (pathData) {
-                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                        path.setAttribute("d", pathData);
-                        this.revealMask.appendChild(path);
-                    }
-                } catch (e) {
-                    console.warn(`Failed to update mask for polygon ${state.id}:`, e);
-                }
-            }
-        });
+        if (this.maskController && this.posterSvgOverlay && this._polygonState) {
+            this.maskController.updateMaskPaths(this._polygonState, this.posterSvgOverlay.getBounds());
+        }
     }
 
     /**
@@ -510,6 +273,4 @@ export class PosterRenderer {
     getPosterGrid() {
         return this.currentPosterGrid;
     }
-
-
 }

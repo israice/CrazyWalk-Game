@@ -1,29 +1,29 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T04:37:35.429Z
+Generated on: 2026-01-10T05:18:48.687Z
 
 ## File Statistics
 > [!NOTE]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 82 files, 10,772 lines, 371.1 KB
+**Total:** 85 files, 11,013 lines, 375.9 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
-| 538 | 22.1 KB | `src/public/js/modules/rendering/PosterRenderer.js` |
 | 395 | 14.9 KB | `src/public/js/modules/rendering/PolygonRenderer.js` |
 | 326 | 14.1 KB | `CORE/TOOLS/analyze_calls.js` |
+| 303 | 12.6 KB | `src/public/js/modules/rendering/CirclePropagation.js` |
 | 296 | 12.1 KB | `CORE/TOOLS/report-generator.js` |
-| 286 | 12.2 KB | `src/public/js/modules/rendering/CirclePropagation.js` |
+| 277 | 10.8 KB | `src/public/js/modules/rendering/PosterRenderer.js` |
 | 273 | 10.5 KB | `CORE/FRONTEND/B_map_page/components/top_bar.html` |
 
 ### Breakdown by File Type
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 77 | 10,206 | 348.3 KB |
+| .js | 80 | 10,447 | 353.1 KB |
 | .html | 5 | 566 | 22.8 KB |
 
 ---
@@ -144,6 +144,11 @@ Generated on: 2026-01-10T04:37:35.429Z
 - 🔷 `./GreenCircleRenderer.js` → `renderGreenCircles`
 - 🔷 `./CirclePropagation.js` → `propagateCircleConnections`, `updateEndpointPolygonIds`
 - 🔷 `./RenderFinalizer.js` → `finalizeRender`
+
+### rendering/PosterRenderer.js
+- 🔷 `./posters/PosterMaskController.js` → `PosterMaskController`
+- 🔷 `./posters/PosterSVGRenderer.js` → `PosterSVGRenderer`
+- 🔷 `./posters/PosterDebugController.js` → `PosterDebugController`
 
 ### rendering/RenderFinalizer.js
 - 🔷 `../logic/ProgressManager.js` → `setupProgressHiding`, `findNearestActiveCircle`
@@ -362,8 +367,15 @@ root: getGameData [src/controllers/gameController.js] (28 lines) [C:6]
       calls: polygonToTurf [src/services/map/groupCreator.js] (10 lines) [C:3]
       calls: dissolvePolygons [src/services/map/groupCreator.js] (18 lines) [C:5]
       calls: findContainedPolygons [src/services/map/groupCreator.js] (13 lines) [C:4]
-    calls: calculateConnections [src/services/map/connectionCalculator.js] (112 lines) [C:24]
-      calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+    calls: calculateConnections [src/services/map/connectionCalculator.js] (24 lines) [C:1]
+      calls: buildNodeData [src/services/map/connectionCalculator.js] (16 lines) [C:4]
+      calls: filterBlueCircles [src/services/map/connectionCalculator.js] (11 lines) [C:1]
+      calls: mapLinesToPolygons [src/services/map/connectionCalculator.js] (15 lines) [C:5]
+      calls: enrichWhiteLines [src/services/map/connectionCalculator.js] (7 lines) [C:2]
+      calls: enrichGreenCircles [src/services/map/connectionCalculator.js] (7 lines) [C:2]
+      calls: enrichBlueCircles [src/services/map/connectionCalculator.js] (41 lines) [C:10]
+        calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+      calls: findPolygonNeighbors [src/services/map/connectionCalculator.js] (19 lines) [C:7]
     calls: createPosterGrid [src/services/map/posterGridCreator.js] (95 lines) [C:14]
       calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
         calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
@@ -434,15 +446,9 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 > [!WARNING]
 > These functions are defined but not called within the analyzed files. Verify if they are used dynamically or in external systems before deleting.
 
-- `bindKeys` (4 lines) [C:1] ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `findClosestNode` (15 lines) [C:3] ([NavigationGraph.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\NavigationGraph.js))
 - `runUpdate` (38 lines) [C:11] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
 - `requestHandler` (29 lines) [C:3] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
 - `shutdown` (7 lines) [C:2] ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
-- `cancelPendingSave` (7 lines) [C:2] ([StateSaver.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\api\StateSaver.js))
-- `setDependencies` (2 lines) [C:1] ([PosterRenderer.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\rendering\PosterRenderer.js))
-- `getRevealMask` (4 lines) [C:1] ([PosterRenderer.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\rendering\PosterRenderer.js))
-- `getPosterSvgOverlay` (4 lines) [C:1] ([PosterRenderer.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\rendering\PosterRenderer.js))
 
 ## Large Functions (50+ lines)
 > [!NOTE]
@@ -450,19 +456,12 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 
 | Lines | Complexity | Function | File |
 |------:|-----------:|----------|------|
-| 187 | 34 | `createGameDataLoader` | api/GameDataLoader.js |
-| 175 | 40 | `createUIDMaps` | utils/UIDGenerator.js |
 | 169 | 24 | `generateMarkdownReport` | TOOLS/report-generator.js |
-| 167 | 32 | `loadGameData` | api/GameDataLoader.js |
-| 146 | 13 | `initPosterGrid` | rendering/PosterRenderer.js |
-| 132 | 38 | `checkAndHide` | logic/ProgressManager.js |
-| 129 | 18 | `updatePosterSVG` | rendering/PosterRenderer.js |
+| 140 | 13 | `initPosterGrid` | rendering/PosterRenderer.js |
 | 125 | 15 | `generateMap` | map/index.js |
 | 113 | 19 | `initializeRender` | rendering/RenderInitializer.js |
-| 112 | 24 | `calculateConnections` | map/connectionCalculator.js |
+| 101 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
 | 100 | 12 | `renderPolygons` | rendering/PolygonRenderer.js |
-| 100 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
-| 98 | 23 | `initTopBarEvents` | ui/TopBarHandler.js |
 | 95 | 14 | `main` | TOOLS/analyze_calls.js |
 | 95 | 12 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 95 | 14 | `createPosterGrid` | map/posterGridCreator.js |
@@ -470,8 +469,6 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 91 | 18 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
 | 87 | 15 | `applyModeFiltering` | map/modeFilter.js |
 | 84 | 4 | `renderGameElements` | rendering/index.js |
-| 81 | 21 | `performFinalSafetyCheck` | rendering/CirclePropagation.js |
-| 78 | 22 | `build` | components/NavigationGraph.js |
 | 76 | 6 | `createGameInitializer` | core/GameInitializer.js |
 | 76 | 12 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
 | 75 | 17 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
@@ -482,12 +479,12 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
 | 67 | 6 | `generateJsonReport` | TOOLS/report-generator.js |
 | 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
+| 65 | 10 | `createGameDataLoader` | api/GameDataLoader.js |
 | 64 | 6 | `createPercentageLabel` | rendering/PolygonRenderer.js |
 | 63 | 13 | `findMinimalCycles` | map/polygonFinder.js |
 | 61 | 6 | `createGraphElements` | map/graphBuilder.js |
 | 55 | 5 | `initializeGame` | core/GameInitializer.js |
 | 55 | 10 | `findPolygons` | map/polygonFinder.js |
-| 54 | 13 | `toggleHiddenDebug` | rendering/PosterRenderer.js |
 | 52 | 2 | `createPromoPopupContent` | rendering/PolygonRenderer.js |
 | 51 | 7 | `createGroups` | map/groupCreator.js |
 
@@ -497,20 +494,11 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 
 | Complexity | Lines | Function | File |
 |-----------:|------:|----------|------|
-| 40 | 175 | `createUIDMaps` | utils/UIDGenerator.js |
-| 38 | 132 | `checkAndHide` | logic/ProgressManager.js |
-| 34 | 187 | `createGameDataLoader` | api/GameDataLoader.js |
-| 32 | 167 | `loadGameData` | api/GameDataLoader.js |
 | 24 | 169 | `generateMarkdownReport` | TOOLS/report-generator.js |
-| 24 | 112 | `calculateConnections` | map/connectionCalculator.js |
-| 23 | 98 | `initTopBarEvents` | ui/TopBarHandler.js |
-| 22 | 78 | `build` | components/NavigationGraph.js |
-| 21 | 81 | `performFinalSafetyCheck` | rendering/CirclePropagation.js |
 | 19 | 71 | `moveSelection` | components/KeyboardNavigation.js |
 | 19 | 113 | `initializeRender` | rendering/RenderInitializer.js |
 | 18 | 27 | `getDirection` | components/KeyboardNavigation.js |
 | 18 | 91 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
-| 18 | 129 | `updatePosterSVG` | rendering/PosterRenderer.js |
 | 17 | 68 | `propagateNeighborUpdates` | rendering/CirclePropagation.js |
 | 17 | 75 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
 | 16 | 49 | `bind` | components/KeyboardNavigation.js |
@@ -521,8 +509,7 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 14 | 95 | `main` | TOOLS/analyze_calls.js |
 | 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
 | 13 | 24 | `showError` | ui/ErrorDisplay.js |
-| 13 | 146 | `initPosterGrid` | rendering/PosterRenderer.js |
-| 13 | 54 | `toggleHiddenDebug` | rendering/PosterRenderer.js |
+| 13 | 140 | `initPosterGrid` | rendering/PosterRenderer.js |
 | 13 | 47 | `highlightPolygon` | ui/DebugHighlighter.js |
 | 13 | 63 | `findMinimalCycles` | map/polygonFinder.js |
 | 12 | 76 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
@@ -530,9 +517,14 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 12 | 95 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 12 | 100 | `renderPolygons` | rendering/PolygonRenderer.js |
 | 11 | 38 | `runUpdate` | AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js |
+| 11 | 42 | `restoreState` | api/GameDataLoader.js |
 | 11 | 91 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
+| 11 | 46 | `recalculateBlueCircleStats` | rendering/CirclePropagation.js |
 | 11 | 37 | `highlightWhiteLine` | ui/DebugHighlighter.js |
 | 11 | 66 | `calculateLabelPosition` | utils/geometry.js |
 | 10 | 39 | `handleRegister` | A_home_page/login.js |
 | 10 | 26 | `parseArgs` | TOOLS/analyze_calls.js |
+| 10 | 65 | `createGameDataLoader` | api/GameDataLoader.js |
+| 10 | 32 | `rebuildConnectionsFromWhiteLines` | rendering/CirclePropagation.js |
+| 10 | 41 | `enrichBlueCircles` | map/connectionCalculator.js |
 | 10 | 55 | `findPolygons` | map/polygonFinder.js |
