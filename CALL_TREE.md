@@ -1,31 +1,30 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T03:21:05.386Z
+Generated on: 2026-01-10T03:37:29.596Z
 
 ## File Statistics
 > [!INFO]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 33 files, 6,374 lines, 209.2 KB
+**Total:** 33 files, 5,045 lines, 159.3 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
-| 985 | 32.4 KB | `CORE/FRONTEND/A_home_page/index.html` |
-| 800 | 35.0 KB | `src/public/js/map-logic.js` |
 | 621 | 23.3 KB | `CORE/FRONTEND/B_map_page/components/map_controls.js` |
 | 551 | 19.0 KB | `src/services/map/index.js` |
 | 412 | 14.0 KB | `CORE/FRONTEND/A_home_page/login.html` |
 | 329 | 9.5 KB | `src/services/map/polygonFinder.js` |
+| 321 | 11.7 KB | `src/public/js/map-logic.js` |
 | 273 | 10.5 KB | `CORE/FRONTEND/B_map_page/components/top_bar.html` |
 
 ### Breakdown by File Type
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 28 | 4,627 | 149.4 KB |
-| .html | 5 | 1,747 | 59.8 KB |
+| .js | 28 | 4,148 | 126.1 KB |
+| .html | 5 | 897 | 33.2 KB |
 
 ---
 
@@ -39,9 +38,6 @@ root: locate [src/controllers/locationController.js] (31 lines)
     calls: reverseGeocode [src/services/nominatim.service.js] (12 lines)
   calls: getCityCenter [src/services/nominatim.service.js] (14 lines)
     calls: searchPlace [src/services/nominatim.service.js] (11 lines)
----
-root: loadIPLocation [CORE/FRONTEND/A_home_page/index.html] (28 lines)
-  calls: revealContent [CORE/FRONTEND/A_home_page/index.html] (7 lines)
 ---
 root: handleRegister [CORE/FRONTEND/A_home_page/login.html] (39 lines)
   calls: switchTab [CORE/FRONTEND/A_home_page/login.html] (23 lines)
@@ -180,8 +176,9 @@ root: retryStrategy [src/services/redis.service.js] (5 lines)
 - `setSnapLines` (6 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
 - `updateGraph` (186 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
 - `shutdown` (7 lines) ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
-- `loadVersionBadge` (25 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `updatePolygonVisuals` (75 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `loadVersionBadge` (18 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `revealMap` (9 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
+- `renderGameElements` (31 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
 
 ## Large Functions (50+ lines)
 > [!NOTE]
@@ -189,7 +186,6 @@ root: retryStrategy [src/services/redis.service.js] (5 lines)
 
 | Lines | Function | File |
 |------:|----------|------|
-| 219 | `loadGameData` | js/map-logic.js |
 | 186 | `updateGraph` | components/map_controls.js |
 | 125 | `generateMap` | map/index.js |
 | 118 | `moveSelection` | components/map_controls.js |
@@ -197,12 +193,10 @@ root: retryStrategy [src/services/redis.service.js] (5 lines)
 | 95 | `createPosterGrid` | map/index.js |
 | 94 | `bindKeys` | components/map_controls.js |
 | 87 | `applyModeFiltering` | map/index.js |
-| 75 | `updatePolygonVisuals` | js/map-logic.js |
 | 66 | `calculateLabelPosition` | utils/geometry.js |
 | 63 | `findMinimalCycles` | map/polygonFinder.js |
 | 61 | `createGraphElements` | map/graphBuilder.js |
 | 58 | `init` | components/map_controls.js |
-| 55 | `initializeGame` | js/map-logic.js |
 | 55 | `findPolygons` | map/polygonFinder.js |
 | 52 | `getSnappedPosition` | components/map_controls.js |
 | 51 | `createGroups` | map/groupCreator.js |
