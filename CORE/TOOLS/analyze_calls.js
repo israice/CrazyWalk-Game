@@ -3,13 +3,6 @@
  * 
  * Использование:
  *   node analyze_calls.js [options]
- * 
- * Опции:
- *   --output=FILE      Имя выходного файла (по умолчанию: CALL_TREE.md)
- *   --min-lines=N      Минимум строк для отображения в Large Functions (по умолчанию: 50)
- *   --format=FORMAT    Формат вывода: md, json, или both (по умолчанию: md)
- *   --verbose          Подробный вывод в консоль
- *   --help             Показать справку
  */
 
 const fs = require('fs');
@@ -19,139 +12,14 @@ const path = require('path');
 const { analyzeJsContent, extractImports, PATTERNS } = require('./parsers');
 const { buildCallGraph, buildImportGraph, findRootsAndUnused } = require('./call-graph');
 const { generateMarkdownReport, generateJsonReport } = require('./report-generator');
+const { getFilesToAnalyze } = require('./file-scanner');
+const { parseArgs, showHelp } = require('./cli-handler');
 
 // ─────────────────────────────────────────────────────────────
 // Конфигурация
 // ─────────────────────────────────────────────────────────────
 
 const projectRoot = 'c:\\0_PROJECTS\\CrazyWalk-Game';
-
-// Директории для исключения из сканирования
-const EXCLUDED_DIRS = [
-    'node_modules',
-    '.git',
-    'dist',
-    'build',
-    'coverage',
-    '.agent',
-    'CORE/TOOLS'  // Исключаем сам анализатор
-];
-
-// Расширения файлов для анализа
-const INCLUDED_EXTENSIONS = ['.js', '.html'];
-
-/**
- * Рекурсивно сканирует директорию и возвращает все файлы
- */
-function scanDirectory(dir, relativePath = '') {
-    const files = [];
-    const fullPath = path.join(projectRoot, relativePath, dir);
-
-    if (!fs.existsSync(fullPath)) return files;
-
-    const entries = fs.readdirSync(fullPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-        const entryRelativePath = path.join(relativePath, dir, entry.name);
-
-        if (entry.isDirectory()) {
-            // Пропускаем исключённые директории
-            if (EXCLUDED_DIRS.some(excluded => entryRelativePath.includes(excluded))) {
-                continue;
-            }
-            files.push(...scanDirectory('', entryRelativePath));
-        } else if (entry.isFile()) {
-            const ext = path.extname(entry.name).toLowerCase();
-            if (INCLUDED_EXTENSIONS.includes(ext)) {
-                files.push(entryRelativePath.replace(/\\/g, '/'));
-            }
-        }
-    }
-
-    return files;
-}
-
-/**
- * Получить все файлы проекта для анализа
- */
-function getFilesToAnalyze() {
-    const files = [];
-
-    // Сканируем основные директории
-    const rootEntries = fs.readdirSync(projectRoot, { withFileTypes: true });
-
-    for (const entry of rootEntries) {
-        if (entry.isDirectory()) {
-            if (EXCLUDED_DIRS.includes(entry.name)) continue;
-            files.push(...scanDirectory(entry.name));
-        } else if (entry.isFile()) {
-            const ext = path.extname(entry.name).toLowerCase();
-            if (INCLUDED_EXTENSIONS.includes(ext)) {
-                files.push(entry.name);
-            }
-        }
-    }
-
-    return files;
-}
-
-// Автоматически сканируем проект
-const filesToAnalyze = getFilesToAnalyze();
-
-
-// ─────────────────────────────────────────────────────────────
-// CLI Парсинг
-// ─────────────────────────────────────────────────────────────
-
-function parseArgs() {
-    const args = process.argv.slice(2);
-    const options = {
-        output: 'CALL_TREE.md',
-        minLines: 50,
-        format: 'md',
-        verbose: false,
-        help: false
-    };
-
-    args.forEach(arg => {
-        if (arg.startsWith('--output=')) {
-            options.output = arg.split('=')[1];
-        } else if (arg.startsWith('--min-lines=')) {
-            options.minLines = parseInt(arg.split('=')[1]) || 50;
-        } else if (arg.startsWith('--format=')) {
-            options.format = arg.split('=')[1];
-        } else if (arg === '--verbose') {
-            options.verbose = true;
-        } else if (arg === '--help') {
-            options.help = true;
-        }
-    });
-
-    return options;
-}
-
-function showHelp() {
-    console.log(`
-Project Function Analyzer
-=========================
-
-Использование:
-  node analyze_calls.js [options]
-
-Опции:
-  --output=FILE      Имя выходного файла (по умолчанию: CALL_TREE.md)
-  --min-lines=N      Минимум строк для отображения в Large Functions (по умолчанию: 50)
-  --format=FORMAT    Формат вывода: md, json, или both (по умолчанию: md)
-  --verbose          Подробный вывод в консоль
-  --help             Показать эту справку
-
-Примеры:
-  node analyze_calls.js
-  node analyze_calls.js --format=json --output=analysis.json
-  node analyze_calls.js --min-lines=30 --verbose
-  node analyze_calls.js --format=both
-`);
-}
 
 // ─────────────────────────────────────────────────────────────
 // Кэширование файлов
@@ -240,6 +108,9 @@ function main() {
     console.log('═══════════════════════════════════════════════════════════');
     console.log(`Options: format=${options.format}, min-lines=${options.minLines}, verbose=${options.verbose}`);
     console.log('');
+
+    // Получаем файлы для анализа
+    const filesToAnalyze = getFilesToAnalyze(projectRoot);
 
     // Шаг 1: Анализ файлов
     console.log('📁 Analyzing files...');

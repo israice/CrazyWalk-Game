@@ -1,19 +1,17 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T05:18:48.687Z
+Generated on: 2026-01-10T05:26:41.525Z
 
 ## File Statistics
 > [!NOTE]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 85 files, 11,013 lines, 375.9 KB
+**Total:** 90 files, 11,088 lines, 378.0 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
-| 395 | 14.9 KB | `src/public/js/modules/rendering/PolygonRenderer.js` |
-| 326 | 14.1 KB | `CORE/TOOLS/analyze_calls.js` |
 | 303 | 12.6 KB | `src/public/js/modules/rendering/CirclePropagation.js` |
 | 296 | 12.1 KB | `CORE/TOOLS/report-generator.js` |
 | 277 | 10.8 KB | `src/public/js/modules/rendering/PosterRenderer.js` |
@@ -23,7 +21,7 @@ Generated on: 2026-01-10T05:18:48.687Z
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 80 | 10,447 | 353.1 KB |
+| .js | 85 | 10,522 | 355.2 KB |
 | .html | 5 | 566 | 22.8 KB |
 
 ---
@@ -38,6 +36,8 @@ Generated on: 2026-01-10T05:18:48.687Z
 - 📦 `./parsers` → `analyzeJsContent`, `extractImports`, `PATTERNS`
 - 📦 `./call-graph` → `buildCallGraph`, `buildImportGraph`, `findRootsAndUnused`
 - 📦 `./report-generator` → `generateMarkdownReport`, `generateJsonReport`
+- 📦 `./file-scanner` → `getFilesToAnalyze`
+- 📦 `./cli-handler` → `parseArgs`, `showHelp`
 
 ### AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js
 - 📦 `http` → `http`
@@ -45,6 +45,10 @@ Generated on: 2026-01-10T05:18:48.687Z
 - 📦 `child_process` → `exec`
 
 ### TOOLS/call-graph.js
+- 📦 `path` → `path`
+
+### TOOLS/file-scanner.js
+- 📦 `fs` → `fs`
 - 📦 `path` → `path`
 
 ### TOOLS/parsers.js
@@ -144,6 +148,11 @@ Generated on: 2026-01-10T05:18:48.687Z
 - 🔷 `./GreenCircleRenderer.js` → `renderGreenCircles`
 - 🔷 `./CirclePropagation.js` → `propagateCircleConnections`, `updateEndpointPolygonIds`
 - 🔷 `./RenderFinalizer.js` → `finalizeRender`
+
+### rendering/PolygonRenderer.js
+- 🔷 `./polygons/PolygonPromo.js` → `createPromoCircle`
+- 🔷 `./polygons/PolygonLabel.js` → `createPercentageLabel`
+- 🔷 `./polygons/PolygonCompletion.js` → `handleCompletedPolygon`, `restorePosterMasks`
 
 ### rendering/PosterRenderer.js
 - 🔷 `./posters/PosterMaskController.js` → `PosterMaskController`
@@ -462,7 +471,7 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 113 | 19 | `initializeRender` | rendering/RenderInitializer.js |
 | 101 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
 | 100 | 12 | `renderPolygons` | rendering/PolygonRenderer.js |
-| 95 | 14 | `main` | TOOLS/analyze_calls.js |
+| 98 | 14 | `main` | TOOLS/analyze_calls.js |
 | 95 | 12 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 95 | 14 | `createPosterGrid` | map/posterGridCreator.js |
 | 91 | 11 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
@@ -478,14 +487,14 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 68 | 17 | `propagateNeighborUpdates` | rendering/CirclePropagation.js |
 | 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
 | 67 | 6 | `generateJsonReport` | TOOLS/report-generator.js |
+| 66 | 7 | `createPercentageLabel` | polygons/PolygonLabel.js |
 | 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
 | 65 | 10 | `createGameDataLoader` | api/GameDataLoader.js |
-| 64 | 6 | `createPercentageLabel` | rendering/PolygonRenderer.js |
 | 63 | 13 | `findMinimalCycles` | map/polygonFinder.js |
 | 61 | 6 | `createGraphElements` | map/graphBuilder.js |
 | 55 | 5 | `initializeGame` | core/GameInitializer.js |
 | 55 | 10 | `findPolygons` | map/polygonFinder.js |
-| 52 | 2 | `createPromoPopupContent` | rendering/PolygonRenderer.js |
+| 52 | 2 | `createPromoPopupContent` | polygons/PolygonPromo.js |
 | 51 | 7 | `createGroups` | map/groupCreator.js |
 
 ## High Complexity Functions (10+)
@@ -506,7 +515,7 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 15 | 40 | `getElementStatus` | ui/DebugStatsBuilder.js |
 | 15 | 125 | `generateMap` | map/index.js |
 | 15 | 87 | `applyModeFiltering` | map/modeFilter.js |
-| 14 | 95 | `main` | TOOLS/analyze_calls.js |
+| 14 | 98 | `main` | TOOLS/analyze_calls.js |
 | 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
 | 13 | 24 | `showError` | ui/ErrorDisplay.js |
 | 13 | 140 | `initPosterGrid` | rendering/PosterRenderer.js |
@@ -523,7 +532,7 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 11 | 37 | `highlightWhiteLine` | ui/DebugHighlighter.js |
 | 11 | 66 | `calculateLabelPosition` | utils/geometry.js |
 | 10 | 39 | `handleRegister` | A_home_page/login.js |
-| 10 | 26 | `parseArgs` | TOOLS/analyze_calls.js |
+| 10 | 26 | `parseArgs` | TOOLS/cli-handler.js |
 | 10 | 65 | `createGameDataLoader` | api/GameDataLoader.js |
 | 10 | 32 | `rebuildConnectionsFromWhiteLines` | rendering/CirclePropagation.js |
 | 10 | 41 | `enrichBlueCircles` | map/connectionCalculator.js |
