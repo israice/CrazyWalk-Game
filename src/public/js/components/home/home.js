@@ -4,6 +4,7 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
     const cityLabel = document.getElementById('city-label');
+    console.log("DEBUG: home.js loaded - checking redirects");
     const mapElement = document.getElementById('map');
     const loadingGif = document.getElementById('loading-gif');
     const uiOverlay = document.getElementById('ui-overlay');
@@ -96,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!("geolocation" in navigator)) {
             console.error("DEBUG: Geolocation not supported");
             // Still navigate to map, will use IP-based location there
-            window.location.href = '/B_map_page/index.html';
+            window.location.href = '/map.html';
             return;
         }
 
@@ -117,13 +118,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('gps_enabled', 'true');
 
                 // Navigate to map page
-                window.location.href = '/B_map_page/index.html';
+                window.location.href = '/map.html';
             },
             (error) => {
                 console.warn("DEBUG: GPS Error:", error.message);
                 // GPS failed, but still allow navigation - map will use IP or default
                 sessionStorage.setItem('gps_enabled', 'false');
-                window.location.href = '/B_map_page/index.html';
+                window.location.href = '/map.html';
             },
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
         );
@@ -147,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // LOGIN Button - Navigation handled by inline onclick
-    document.querySelector('.btn-login').onclick = () => window.location.href = '/A_home_page/login.html';
+    document.querySelector('.btn-login').onclick = () => window.location.href = '/login.html';
 
     // Initial load - use IP-based location (no permission popup)
     setTimeout(loadIPLocation, 1000);

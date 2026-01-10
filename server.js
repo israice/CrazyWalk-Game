@@ -18,7 +18,7 @@ const { getRedisClient, flushDatabase } = require('./src/services/redis');
 
 // Configuration
 const PORT = parseInt(process.env.SERVER_PORT || '8000', 10);
-const FRONTEND_DIR = process.env.FRONTEND_INDEX_PAGE || 'CORE/FRONTEND';
+const FRONTEND_DIR = process.env.FRONTEND_INDEX_PAGE || 'src/public';
 
 // Generate unique session ID on server startup
 const SERVER_SESSION_ID = uuidv4();
@@ -81,7 +81,7 @@ app.get('/README.md', (req, res) => {
 // Serve poster images
 app.get('/GAME_POSTERS/:filename', (req, res) => {
     const filename = path.basename(req.params.filename);
-    const posterPath = path.join(__dirname, 'CORE', 'DATA', 'GAME_POSTERS', filename);
+    const posterPath = path.join(__dirname, 'data', 'GAME_POSTERS', filename);
 
     if (!fs.existsSync(posterPath)) {
         console.error(`POSTER NOT FOUND: ${posterPath}`);
@@ -101,7 +101,7 @@ app.get('/GAME_POSTERS/:filename', (req, res) => {
 // Serve promo GIFs
 app.get('/GAME_PROMOS/:filename', (req, res) => {
     const filename = path.basename(req.params.filename);
-    const promoPath = path.join(__dirname, 'CORE', 'DATA', 'GAME_PROMOS', filename);
+    const promoPath = path.join(__dirname, 'data', 'GAME_PROMOS', filename);
 
     if (!fs.existsSync(promoPath)) {
         console.error(`PROMO NOT FOUND: ${promoPath}`);
@@ -127,7 +127,7 @@ if (fs.existsSync(frontendPath)) {
 
     // Serve index.html for root
     app.get('/', (req, res) => {
-        res.sendFile(path.join(frontendPath, 'A_home_page', 'index.html'));
+        res.sendFile(path.join(frontendPath, 'index.html'));
     });
 } else {
     console.error(`CRITICAL: Frontend directory does not exist: ${frontendPath}`);

@@ -20,10 +20,10 @@ const REDIS_KEYS = {
 
 // File paths
 const PATHS = {
-  DATA_DIR: path.join(__dirname, '../../CORE/DATA'),
-  USERS_FILE: path.join(__dirname, '../../CORE/DATA/users.csv'),
-  PROMOS_DIR: path.join(__dirname, '../../CORE/DATA/GAME_PROMOS'),
-  POSTERS_DIR: path.join(__dirname, '../../CORE/DATA/GAME_POSTERS')
+  DATA_DIR: path.join(__dirname, '../../data'),
+  USERS_FILE: path.join(__dirname, '../../data/users.csv'),
+  PROMOS_DIR: path.join(__dirname, '../../data/GAME_PROMOS'),
+  POSTERS_DIR: path.join(__dirname, '../../data/GAME_POSTERS')
 };
 
 // Map generation modes

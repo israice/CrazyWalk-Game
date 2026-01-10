@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         html: `
             <div style="transform: translate(-50%, -50%); position: relative; display: flex; align-items: center; justify-content: center;">
                 <div style="position: absolute; width: 4vh; height: 4vh; background-color: #9900ff; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px #9900ff; opacity: 0.8; transform: perspective(500px) rotateX(45deg);"></div>
-                <img id="marker-gif" src="/B_map_page/components/marker.gif" style="position: relative; z-index: 2; width: 8vh; height: auto; transform: translateY(-25%); bottom: 2vh;">
+                <img id="marker-gif" src="/assets/marker.gif" style="position: relative; z-index: 2; width: 8vh; height: auto; transform: translateY(-25%); bottom: 2vh;">
             </div>
         `,
         iconSize: null,

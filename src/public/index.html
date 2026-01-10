@@ -26,17 +26,17 @@
         // Mask URL to show only root address
         window.history.replaceState(null, '', '/');
     </script>
-    <link rel="icon" type="image/png" href="/A_home_page/components/crazywalk_logo.png">
+    <link rel="icon" type="image/png" href="/assets/crazywalk_logo.png">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/A_home_page/manifest.json">
+    <link rel="manifest" href="/manifest.json">
     <!-- Preconnect for Performance -->
     <link rel="preconnect" href="https://unpkg.com">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
 
     <!-- Preload iPhone Frame (highest priority) -->
-    <link rel="preload" href="/A_home_page/components/iphone.png" as="image" fetchpriority="high">
+    <link rel="preload" href="/assets/iphone.png" as="image" fetchpriority="high">
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -47,7 +47,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
 
     <!-- Home Page Styles -->
-    <link rel="stylesheet" href="/A_home_page/components/home.css">
+    <link rel="stylesheet" href="/css/home.css">
 </head>
 
 <body>
@@ -75,7 +75,7 @@
 
     <div class="black-square">
         <div id="map"></div>
-        <img id="loading-gif" src="/A_home_page/components/earth.gif" alt="Loading...">
+        <img id="loading-gif" src="/assets/earth.gif" alt="Loading...">
 
         <!-- Red Error Screen -->
         <div id="error-screen">
@@ -87,7 +87,7 @@
 
         <div class="ui-overlay" id="ui-overlay">
             <div class="header">
-                <img src="/A_home_page/components/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
+                <img src="/assets/crazywalk_logo.png" class="logo-img" alt="CrazyWalk Logo">
                 <h1>CrazyWalk</h1>
                 <h2>Walk & Earn Game</h2>
             </div>
@@ -114,7 +114,7 @@
             </div>
 
             <div class="action-buttons">
-                <button class="btn btn-login" onclick="window.location.href='/A_home_page/login.html'">LOGIN</button>
+                <button class="btn btn-login" onclick="window.location.href='/login.html'">LOGIN</button>
                 <button class="btn btn-guest">GUEST</button>
             </div>
 
@@ -122,14 +122,14 @@
             <div id="city-label"></div>
         </div>
     </div>
-    <img class="iphone-frame" src="/A_home_page/components/iphone.png" alt="iphone">
+    <img class="iphone-frame" src="/assets/iphone.png" alt="iphone">
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- Home Page Logic -->
-    <script src="/A_home_page/components/home.js"></script>
+    <script src="/js/components/home/home.js"></script>
 </body>
 
 </html>

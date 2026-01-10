@@ -27,14 +27,14 @@
 
 - v0.0.27 - added POSTERS instead finished polygons
 <div align="center">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-1.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-2.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-3.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-4.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-5.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-6.png" alt="Dashboard" height="300">
-  <img src="CORE/DATA/DEV_SCREENSHOTS/v0.0.27-7.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.10-1.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-1.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-2.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-3.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-4.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-5.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-6.png" alt="Dashboard" height="300">
+  <img src="data/DEV_SCREENSHOTS/v0.0.27-7.png" alt="Dashboard" height="300">
 </div>
 
 <!-- ---------------------- -->
@@ -373,7 +373,7 @@
 
   ```Bash
   git add .
-  git commit -m "v0.0.38 - refactor test 14"
+  git commit -m "v0.0.38 - refactor test 15"
   git push
   ```
 
@@ -383,6 +383,8 @@
 
 npm run dev
 npm start
+
+node tools\analyze_calls.js
 
   </details>
 

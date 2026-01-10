@@ -1,63 +1,25 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T05:43:34.025Z
+Generated on: 2026-01-10T06:44:23.029Z
 
 ## File Statistics
 > [!NOTE]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 92 files, 10,760 lines, 365.4 KB
-
-### Large Files (300+ lines or 10KB+)
-
-| Lines | Size | File |
-|------:|-----:|------|
-| 197 | 10.5 KB | `src/public/js/components/TopBar.js` |
+**Total:** 91 files, 10,610 lines, 360.2 KB
 
 ### Breakdown by File Type
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 88 | 10,467 | 353.1 KB |
-| .html | 4 | 293 | 12.3 KB |
+| .js | 88 | 10,331 | 348.4 KB |
+| .html | 3 | 279 | 11.7 KB |
 
 ---
 
 ## Import Graph
 > [!TIP]
 > Shows dependencies between files. Useful for understanding module coupling.
-
-### TOOLS/analyze_calls.js
-- 📦 `fs` → `fs`
-- 📦 `path` → `path`
-- 📦 `./parsers` → `analyzeJsContent`, `extractImports`, `PATTERNS`
-- 📦 `./call-graph` → `buildCallGraph`, `buildImportGraph`, `findRootsAndUnused`
-- 📦 `./report-generator` → `generateMarkdownReport`, `generateJsonReport`
-- 📦 `./file-scanner` → `getFilesToAnalyze`
-- 📦 `./cli-handler` → `parseArgs`, `showHelp`
-
-### AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js
-- 📦 `http` → `http`
-- 📦 `crypto` → `crypto`
-- 📦 `child_process` → `exec`
-
-### TOOLS/call-graph.js
-- 📦 `path` → `path`
-
-### TOOLS/file-scanner.js
-- 📦 `fs` → `fs`
-- 📦 `path` → `path`
-
-### TOOLS/markdown-generator.js
-- 📦 `path` → `path`
-
-### TOOLS/parsers.js
-- 🔷 `module` → `a`, `b`
-- 🔷 `module` → `name`
-
-### TOOLS/report-generator.js
-- 📦 `./markdown-generator` → `generateMarkdownReport`, `printTreeBuffer`
-- 📦 `./json-generator` → `generateJsonReport`
 
 ### server.js
 - 📦 `express` → `express`
@@ -275,6 +237,38 @@ Generated on: 2026-01-10T05:43:34.025Z
 ### utils/geometry.js
 - 📦 `crypto` → `crypto`
 
+### tools/analyze_calls.js
+- 📦 `fs` → `fs`
+- 📦 `path` → `path`
+- 📦 `./parsers` → `analyzeJsContent`, `extractImports`, `PATTERNS`
+- 📦 `./call-graph` → `buildCallGraph`, `buildImportGraph`, `findRootsAndUnused`
+- 📦 `./report-generator` → `generateMarkdownReport`, `generateJsonReport`
+- 📦 `./file-scanner` → `getFilesToAnalyze`
+- 📦 `./cli-handler` → `parseArgs`, `showHelp`
+
+### AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js
+- 📦 `http` → `http`
+- 📦 `crypto` → `crypto`
+- 📦 `child_process` → `exec`
+
+### tools/call-graph.js
+- 📦 `path` → `path`
+
+### tools/file-scanner.js
+- 📦 `fs` → `fs`
+- 📦 `path` → `path`
+
+### tools/markdown-generator.js
+- 📦 `path` → `path`
+
+### tools/parsers.js
+- 🔷 `module` → `a`, `b`
+- 🔷 `module` → `name`
+
+### tools/report-generator.js
+- 📦 `./markdown-generator` → `generateMarkdownReport`, `printTreeBuffer`
+- 📦 `./json-generator` → `generateJsonReport`
+
 ---
 
 ## Entry Points / Root Functions
@@ -288,17 +282,12 @@ root: locate [src/controllers/locationController.js] (31 lines) [C:5]
   calls: getCityCenter [src/services/nominatim.service.js] (14 lines) [C:3]
     calls: searchPlace [src/services/nominatim.service.js] (11 lines) [C:2]
 ---
-root: loadIPLocation [CORE/FRONTEND/A_home_page/components/home.js] (28 lines) [C:3]
-  calls: revealContent [CORE/FRONTEND/A_home_page/components/home.js] (7 lines) [C:1]
----
-root: handleRegister [CORE/FRONTEND/A_home_page/login.js] (39 lines) [C:10]
-  calls: switchTab [CORE/FRONTEND/A_home_page/login.js] (23 lines) [C:9]
----
-root: constructor [CORE/FRONTEND/B_map_page/components/KeyboardNavigation.js] (8 lines) [C:1]
-  calls: init [CORE/FRONTEND/B_map_page/components/map_controls.js] (47 lines) [C:3]
-    calls: addVisibilityRule [CORE/FRONTEND/B_map_page/components/map_controls.js] (5 lines) [C:1]
-      calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines) [C:8]
-    calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines) [C:8]
+root: constructor [src/middleware/errorHandler.js] (8 lines) [C:1]
+  calls: init [src/public/js/components/map/map_controls.js] (47 lines) [C:3]
+    calls: addVisibilityRule [src/public/js/components/map/map_controls.js] (5 lines) [C:1]
+      calls: checkVisibility [src/public/js/components/map/map_controls.js] (27 lines) [C:8]
+    calls: checkVisibility [src/public/js/components/map/map_controls.js] (27 lines) [C:8]
+  calls: loadStyles [src/public/js/components/TopBar.js] (12 lines) [C:5]
 ---
 root: login [src/controllers/authController.js] (23 lines) [C:3]
   calls: readUsers [src/controllers/authController.js] (18 lines) [C:2]
@@ -411,12 +400,14 @@ root: getLocationState [src/controllers/locationController.js] (34 lines) [C:5]
 root: saveLocationState [src/controllers/locationController.js] (49 lines) [C:5]
   calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
+root: loadIPLocation [src/public/js/components/home/home.js] (28 lines) [C:3]
+  calls: revealContent [src/public/js/components/home/home.js] (7 lines) [C:1]
+---
 root: isWithinDistance [src/public/js/modules/utils/GeometryUtils.js] (3 lines) [C:1]
   calls: euclideanDistance [src/public/js/modules/utils/GeometryUtils.js] (5 lines) [C:1]
 ---
-root: handleLogin [CORE/FRONTEND/A_home_page/login.js] (38 lines) [C:7]
----
-root: def [CORE/TOOLS/markdown-generator.js] (2 lines) [C:1]
+root: handleRegister [src/public/js/pages/login.js] (39 lines) [C:10]
+  calls: switchTab [src/public/js/pages/login.js] (23 lines) [C:9]
 ---
 root: getPromos [src/controllers/gameController.js] (12 lines) [C:2]
 ---
@@ -450,16 +441,20 @@ root: getCoordinateKey [src/public/js/modules/utils/CoordinateUtils.js] (3 lines
 ---
 root: parseCoordinateKey [src/public/js/modules/utils/CoordinateUtils.js] (4 lines) [C:1]
 ---
+root: handleLogin [src/public/js/pages/login.js] (38 lines) [C:7]
+---
 root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
+---
+root: def [tools/markdown-generator.js] (2 lines) [C:1]
 ---
 
 ## Potentially Unused Functions
 > [!WARNING]
 > These functions are defined but not called within the analyzed files. Verify if they are used dynamically or in external systems before deleting.
 
-- `runUpdate` (38 lines) [C:11] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
-- `requestHandler` (29 lines) [C:3] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
 - `shutdown` (7 lines) [C:2] ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
+- `runUpdate` (38 lines) [C:11] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\tools\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
+- `requestHandler` (29 lines) [C:3] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\tools\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
 
 ## Large Functions (50+ lines)
 > [!NOTE]
@@ -467,13 +462,12 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 
 | Lines | Complexity | Function | File |
 |------:|-----------:|----------|------|
-| 157 | 24 | `generateMarkdownReport` | TOOLS/markdown-generator.js |
-| 150 | 1 | `getStyles` | components/TopBar.js |
+| 157 | 24 | `generateMarkdownReport` | tools/markdown-generator.js |
 | 125 | 15 | `generateMap` | map/index.js |
 | 113 | 19 | `initializeRender` | rendering/RenderInitializer.js |
 | 101 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
 | 100 | 12 | `renderPolygons` | rendering/PolygonRenderer.js |
-| 98 | 14 | `main` | TOOLS/analyze_calls.js |
+| 98 | 14 | `main` | tools/analyze_calls.js |
 | 95 | 12 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 95 | 14 | `createPosterGrid` | map/posterGridCreator.js |
 | 91 | 11 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
@@ -484,11 +478,11 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 76 | 12 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
 | 75 | 17 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
 | 72 | 8 | `buildPolygonStats` | ui/DebugStatsBuilder.js |
-| 71 | 19 | `moveSelection` | components/KeyboardNavigation.js |
+| 71 | 19 | `moveSelection` | map/KeyboardNavigation.js |
 | 71 | 9 | `renderWhiteLines` | rendering/WhiteLineRenderer.js |
 | 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
-| 67 | 6 | `generateJsonReport` | TOOLS/json-generator.js |
 | 67 | 11 | `initPosterGrid` | rendering/PosterRenderer.js |
+| 67 | 6 | `generateJsonReport` | tools/json-generator.js |
 | 66 | 7 | `createPercentageLabel` | polygons/PolygonLabel.js |
 | 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
 | 65 | 10 | `createGameDataLoader` | api/GameDataLoader.js |
@@ -506,21 +500,21 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 
 | Complexity | Lines | Function | File |
 |-----------:|------:|----------|------|
-| 24 | 157 | `generateMarkdownReport` | TOOLS/markdown-generator.js |
-| 19 | 71 | `moveSelection` | components/KeyboardNavigation.js |
+| 24 | 157 | `generateMarkdownReport` | tools/markdown-generator.js |
+| 19 | 71 | `moveSelection` | map/KeyboardNavigation.js |
 | 19 | 113 | `initializeRender` | rendering/RenderInitializer.js |
-| 18 | 27 | `getDirection` | components/KeyboardNavigation.js |
+| 18 | 27 | `getDirection` | map/KeyboardNavigation.js |
 | 18 | 57 | `propagateCircleConnections` | rendering/CirclePropagation.js |
 | 18 | 91 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
 | 17 | 75 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
-| 16 | 49 | `bind` | components/KeyboardNavigation.js |
+| 16 | 49 | `bind` | map/KeyboardNavigation.js |
 | 16 | 68 | `applyCollectedState` | rendering/RenderFinalizer.js |
 | 15 | 39 | `updateAllCircleSaturation` | rendering/CirclePropagation.js |
 | 15 | 40 | `getElementStatus` | ui/DebugStatsBuilder.js |
 | 15 | 125 | `generateMap` | map/index.js |
 | 15 | 87 | `applyModeFiltering` | map/modeFilter.js |
-| 14 | 98 | `main` | TOOLS/analyze_calls.js |
 | 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
+| 14 | 98 | `main` | tools/analyze_calls.js |
 | 13 | 24 | `showError` | ui/ErrorDisplay.js |
 | 13 | 39 | `updateEndpointPolygonIds` | rendering/CirclePropagation.js |
 | 13 | 47 | `highlightPolygon` | ui/DebugHighlighter.js |
@@ -528,14 +522,14 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 12 | 76 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
 | 12 | 95 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 12 | 100 | `renderPolygons` | rendering/PolygonRenderer.js |
-| 11 | 38 | `runUpdate` | AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js |
 | 11 | 42 | `restoreState` | api/GameDataLoader.js |
 | 11 | 91 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
 | 11 | 67 | `initPosterGrid` | rendering/PosterRenderer.js |
 | 11 | 37 | `highlightWhiteLine` | ui/DebugHighlighter.js |
 | 11 | 66 | `calculateLabelPosition` | utils/geometry.js |
-| 10 | 39 | `handleRegister` | A_home_page/login.js |
-| 10 | 26 | `parseArgs` | TOOLS/cli-handler.js |
+| 11 | 38 | `runUpdate` | AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js |
 | 10 | 65 | `createGameDataLoader` | api/GameDataLoader.js |
+| 10 | 39 | `handleRegister` | pages/login.js |
 | 10 | 41 | `enrichBlueCircles` | map/connectionCalculator.js |
 | 10 | 55 | `findPolygons` | map/polygonFinder.js |
+| 10 | 26 | `parseArgs` | tools/cli-handler.js |

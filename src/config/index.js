@@ -9,7 +9,7 @@ const config = {
   // Server settings
   server: {
     port: parseInt(process.env.SERVER_PORT || '8000', 10),
-    frontendDir: process.env.FRONTEND_INDEX_PAGE || 'CORE/FRONTEND'
+    frontendDir: process.env.FRONTEND_INDEX_PAGE || 'src/public'
   },
 
   // Redis settings

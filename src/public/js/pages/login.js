@@ -58,7 +58,7 @@ async function handleLogin() {
             status.className = "status-message status-success";
 
             setTimeout(() => {
-                window.location.href = '/B_map_page/index.html';
+                window.location.href = '/map.html';
             }, 1000);
         } else {
             status.textContent = data.message || "Login Failed";

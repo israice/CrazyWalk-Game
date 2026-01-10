@@ -16,13 +16,13 @@
         window.history.replaceState(null, '', '/');
     </script>
     <!-- Preload iPhone Frame (highest priority) -->
-    <link rel="preload" href="/B_map_page/components/iphone.png" as="image" fetchpriority="high">
+    <link rel="preload" href="/assets/iphone.png" as="image" fetchpriority="high">
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <!-- Map Page Styles (extracted from inline) -->
-    <link rel="stylesheet" href="/B_map_page/styles/map.css">
+    <link rel="stylesheet" href="/css/map.css">
 </head>
 
 <body>
@@ -30,7 +30,7 @@
         <div id="map"></div>
 
         <div id="top-bar-container" style="opacity: 0; transition: opacity 0.8s ease-in-out;"></div>
-        <img id="loading-gif" src="/B_map_page/components/earth.gif" alt="Loading...">
+        <img id="loading-gif" src="/assets/earth.gif" alt="Loading...">
 
         <!-- Red Error Screen -->
         <div id="error-screen">
@@ -46,18 +46,18 @@
         <div id="version-badge">v0.0.0</div>
 
     </div>
-    <img class="phone-frame" src="/B_map_page/components/iphone.png" alt="Phone Frame">
+    <img class="phone-frame" src="/assets/iphone.png" alt="Phone Frame">
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- Map Controls Modules -->
-    <script src="/B_map_page/components/SnapLogic.js"></script>
-    <script src="/B_map_page/components/NavigationGraph.js"></script>
-    <script src="/B_map_page/components/KeyboardNavigation.js"></script>
+    <script src="/js/components/map/SnapLogic.js"></script>
+    <script src="/js/components/map/NavigationGraph.js"></script>
+    <script src="/js/components/map/KeyboardNavigation.js"></script>
     <!-- Map Controls Logic -->
-    <script src="/B_map_page/components/map_controls.js?v=10"></script>
+    <script src="/js/components/map/map_controls.js?v=10"></script>
     <!-- Game API (New src location) -->
     <script type="module" src="/js/game-api.js"></script>
     <!-- Main Map Logic (extracted from inline) -->
