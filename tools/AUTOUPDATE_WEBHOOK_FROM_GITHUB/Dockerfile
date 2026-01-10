@@ -1,10 +1,9 @@
 FROM node:20-slim
 
-# Install git and docker CLI
+# Install git and docker CLI (docker compose v2 is included in docker.io)
 RUN apt-get update && apt-get install -y \
     git \
     docker.io \
-    docker-compose \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix "dubious ownership" error in git
