@@ -61,9 +61,10 @@ function runUpdate() {
         if (stderr) console.log(`Git pull stderr: ${stderr}`);
 
         // Step 2: docker compose up (rebuild backend and frontend)
-        console.log('Running: docker compose -f docker-compose.prod.yml up --build -d backend frontend');
+        const cmd = 'docker compose -f docker-compose.prod.yml up --build -d backend frontend';
+        console.log(`Running: ${cmd}`);
         exec(
-            'docker compose -f docker-compose.prod.yml up --build -d backend frontend',
+            cmd,
             { cwd: WORK_DIR },
             (error, stdout, stderr) => {
                 if (error) {

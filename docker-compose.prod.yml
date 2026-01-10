@@ -1,3 +1,5 @@
+name: crazywalk-game
+
 services:
   # 1. Redis - cache (starts first, no dependencies)
   redis:
