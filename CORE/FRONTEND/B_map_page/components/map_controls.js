@@ -159,10 +159,6 @@ class MapControls {
     }
 
     // Legacy method wrappers for compatibility
-    bindKeys() {
-        this.keyboardNav.bind();
-    }
-
     moveSelection(direction) {
         this.keyboardNav.moveSelection(direction);
     }

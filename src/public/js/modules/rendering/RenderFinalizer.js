@@ -73,7 +73,8 @@ export async function finalizeRender(data, mode, deps) {
         posterRenderer,
         onExpand: (lat, lon) => loadGameData(lat, lon, false, 'expand'),
         debouncedSavePosition,
-        updatePolygonVisuals
+        updatePolygonVisuals,
+        gameState
     });
 
     // Map view event handlers

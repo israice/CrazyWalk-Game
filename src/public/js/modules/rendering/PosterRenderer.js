@@ -26,15 +26,7 @@ export class PosterRenderer {
         this._lineLayerMap = null;
     }
 
-    /**
-     * Set external dependencies (for toggleHiddenDebug)
-     */
-    setDependencies({ circleLayerMap, polygonState, lineLayerMap, userMarker }) {
-        this._circleLayerMap = circleLayerMap;
-        this._polygonState = polygonState;
-        this._lineLayerMap = lineLayerMap;
-        this._userMarker = userMarker;
-    }
+
 
     /**
      * Initialize poster grid from server data
@@ -519,19 +511,5 @@ export class PosterRenderer {
         return this.currentPosterGrid;
     }
 
-    /**
-     * Get reveal mask element
-     * @returns {SVGElement} Reveal mask element
-     */
-    getRevealMask() {
-        return this.revealMask;
-    }
 
-    /**
-     * Get poster SVG overlay
-     * @returns {L.SVGOverlay} Poster SVG overlay
-     */
-    getPosterSvgOverlay() {
-        return this.posterSvgOverlay;
-    }
 }

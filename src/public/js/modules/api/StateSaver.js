@@ -71,13 +71,5 @@ export class StateSaver {
         }, this.debounceMs);
     }
 
-    /**
-     * Cancel any pending debounced save
-     */
-    cancelPendingSave() {
-        if (this.saveDebounceTimer) {
-            clearTimeout(this.saveDebounceTimer);
-            this.saveDebounceTimer = null;
-        }
-    }
+
 }

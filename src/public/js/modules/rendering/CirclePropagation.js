@@ -108,10 +108,23 @@ function propagateNeighborUpdates(localPolys, localWhiteLines, circleLayerMap) {
 /**
  * Final safety check - rebuild blue circle data from white lines
  */
+/**
+ * Final safety check - rebuild blue circle data from white lines
+ */
 function performFinalSafetyCheck(circleLayerMap) {
     const relevantBlueCircles = new Set();
 
-    // Iterate all white lines and propagate to blue circles
+    // 1. Iterate all white lines and propagate to blue circles
+    rebuildConnectionsFromWhiteLines(relevantBlueCircles);
+
+    // 2. Finalize and recalculate for all blue circles
+    recalculateBlueCircleStats(circleLayerMap);
+}
+
+/**
+ * Rebuild connections from white lines to blue circles
+ */
+function rebuildConnectionsFromWhiteLines(relevantBlueCircles) {
     window.allItems.forEach(item => {
         if (item.id && item.id.startsWith('WHITE_LINE_')) {
             const linePolys = item.connected_polygon_ids || [];
@@ -142,8 +155,12 @@ function performFinalSafetyCheck(circleLayerMap) {
             }
         }
     });
+}
 
-    // Finalize and recalculate for all blue circles
+/**
+ * Recalculate stats and saturation for all blue circles
+ */
+function recalculateBlueCircleStats(circleLayerMap) {
     window.allItems.forEach(item => {
         if (item.id && item.id.startsWith('BLUE_CIRCLE_')) {
             // Flush sets to counts

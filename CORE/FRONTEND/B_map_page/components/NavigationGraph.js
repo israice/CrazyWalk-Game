@@ -114,6 +114,12 @@ class NavigationGraph {
      * @param {Array} blueCircles - Blue circle data (intersections)
      * @param {Array} whiteLines - White line data (roads)
      */
+    /**
+     * Build navigation graph from game elements
+     * @param {Array} greenCircles - Green circle data
+     * @param {Array} blueCircles - Blue circle data (intersections)
+     * @param {Array} whiteLines - White line data (roads)
+     */
     build(greenCircles, blueCircles, whiteLines) {
         if (!greenCircles && !blueCircles && !whiteLines) return;
 
@@ -122,74 +128,103 @@ class NavigationGraph {
         // Clear previous nodes
         this.nodeList = [];
 
-        // Register Blue Circles (Intersections)
+        // 1. Register Blue Circles (Intersections)
+        this.registerBlueCircles(blueCircles);
+
+        // 2. Process White Lines to build chains
+        this.processWhiteLines(whiteLines, greenCircles);
+
+        console.log(`NavigationGraph: Built graph with ${this.nodeList.length} nodes.`);
+    }
+
+    /**
+     * Register blue circles as nodes
+     */
+    registerBlueCircles(blueCircles) {
         if (blueCircles) {
             blueCircles.forEach(b => this.getNode(b.lat, b.lon));
         }
+    }
 
-        // Process White Lines to build chains
-        if (whiteLines && greenCircles) {
-            const greenCircleMap = new Map();
-            greenCircles.forEach(g => greenCircleMap.set(g.uid, g));
+    /**
+     * Process white lines and link circles along them
+     */
+    processWhiteLines(whiteLines, greenCircles) {
+        if (!whiteLines || !greenCircles) return;
 
-            whiteLines.forEach(line => {
-                const startNode = this.getNode(line.start[0], line.start[1]);
-                const endNode = this.getNode(line.end[0], line.end[1]);
+        const greenCircleMap = new Map();
+        greenCircles.forEach(g => greenCircleMap.set(g.uid, g));
 
-                let circlesOnLine = [];
+        whiteLines.forEach(line => {
+            const startNode = this.getNode(line.start[0], line.start[1]);
+            const endNode = this.getNode(line.end[0], line.end[1]);
 
-                // Use backend UIDs if available
-                if (line.green_circles_uids && line.green_circles_uids.length > 0) {
-                    line.green_circles_uids.forEach(uid => {
-                        const g = greenCircleMap.get(uid);
-                        if (g) {
-                            circlesOnLine.push(this.getNode(g.lat, g.lon));
-                        }
-                    });
-                } else {
-                    // Fallback to geometry-based detection
-                    greenCircles.forEach(g => {
-                        let minDSq = Infinity;
-                        for (let i = 0; i < line.path.length - 1; i++) {
-                            const d = this.distToSegmentSq(
-                                { lat: g.lat, lon: g.lon },
-                                line.path[i],
-                                line.path[i + 1]
-                            );
-                            if (d < minDSq) minDSq = d;
-                        }
-                        if (minDSq < 0.00000001) {
-                            circlesOnLine.push(this.getNode(g.lat, g.lon));
-                        }
-                    });
+            let circlesOnLine = this.findCirclesOnLine(line, greenCircles, greenCircleMap);
+
+            // Sort by distance along path
+            const circlesWithDist = circlesOnLine.map(node => ({
+                node,
+                dist: this.getProjectedDist(node, line.path)
+            }));
+            circlesWithDist.sort((a, b) => a.dist - b.dist);
+            circlesOnLine = circlesWithDist.map(o => o.node);
+
+            // Link chain
+            this.linkChain(startNode, endNode, circlesOnLine);
+        });
+    }
+
+    /**
+     * Find all circles that lie on a specific line
+     */
+    findCirclesOnLine(line, greenCircles, greenCircleMap) {
+        let circlesOnLine = [];
+
+        // Use backend UIDs if available
+        if (line.green_circles_uids && line.green_circles_uids.length > 0) {
+            line.green_circles_uids.forEach(uid => {
+                const g = greenCircleMap.get(uid);
+                if (g) {
+                    circlesOnLine.push(this.getNode(g.lat, g.lon));
                 }
-
-                // Sort by distance along path
-                const circlesWithDist = circlesOnLine.map(node => ({
-                    node,
-                    dist: this.getProjectedDist(node, line.path)
-                }));
-                circlesWithDist.sort((a, b) => a.dist - b.dist);
-                circlesOnLine = circlesWithDist.map(o => o.node);
-
-                // Link chain: Start -> C1 -> C2 ... -> End
-                let prev = startNode;
-                circlesOnLine.forEach(curr => {
-                    if (curr === prev) return;
-                    if (!prev.neighbors.includes(curr)) prev.neighbors.push(curr);
-                    if (!curr.neighbors.includes(prev)) curr.neighbors.push(prev);
-                    prev = curr;
-                });
-
-                // Link last to End
-                if (prev !== endNode) {
-                    if (!prev.neighbors.includes(endNode)) prev.neighbors.push(endNode);
-                    if (!endNode.neighbors.includes(prev)) endNode.neighbors.push(prev);
+            });
+        } else {
+            // Fallback to geometry-based detection
+            greenCircles.forEach(g => {
+                let minDSq = Infinity;
+                for (let i = 0; i < line.path.length - 1; i++) {
+                    const d = this.distToSegmentSq(
+                        { lat: g.lat, lon: g.lon },
+                        line.path[i],
+                        line.path[i + 1]
+                    );
+                    if (d < minDSq) minDSq = d;
+                }
+                if (minDSq < 0.00000001) {
+                    circlesOnLine.push(this.getNode(g.lat, g.lon));
                 }
             });
         }
+        return circlesOnLine;
+    }
 
-        console.log(`NavigationGraph: Built graph with ${this.nodeList.length} nodes.`);
+    /**
+     * Link nodes in a chain: Start -> C1 -> C2 ... -> End
+     */
+    linkChain(startNode, endNode, circlesOnLine) {
+        let prev = startNode;
+        circlesOnLine.forEach(curr => {
+            if (curr === prev) return;
+            if (!prev.neighbors.includes(curr)) prev.neighbors.push(curr);
+            if (!curr.neighbors.includes(prev)) curr.neighbors.push(prev);
+            prev = curr;
+        });
+
+        // Link last to End
+        if (prev !== endNode) {
+            if (!prev.neighbors.includes(endNode)) prev.neighbors.push(endNode);
+            if (!endNode.neighbors.includes(prev)) endNode.neighbors.push(prev);
+        }
     }
 
     /**
@@ -200,26 +235,6 @@ class NavigationGraph {
         return this.nodeList;
     }
 
-    /**
-     * Find closest node to position
-     * @param {number} lat - Latitude
-     * @param {number} lon - Longitude
-     * @returns {Object|null} Closest node
-     */
-    findClosestNode(lat, lon) {
-        let closest = null;
-        let minDistSq = Infinity;
-
-        this.nodeList.forEach(node => {
-            const d = (node.lat - lat) ** 2 + (node.lon - lon) ** 2;
-            if (d < minDistSq) {
-                minDistSq = d;
-                closest = node;
-            }
-        });
-
-        return closest;
-    }
 }
 
 // Export for browser global usage
