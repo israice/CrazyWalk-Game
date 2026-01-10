@@ -1,169 +1,538 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T04:08:54.453Z
+Generated on: 2026-01-10T04:37:35.429Z
 
 ## File Statistics
-> [!INFO]
+> [!NOTE]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 33 files, 3,762 lines, 113.9 KB
+**Total:** 82 files, 10,772 lines, 371.1 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
+| 538 | 22.1 KB | `src/public/js/modules/rendering/PosterRenderer.js` |
+| 395 | 14.9 KB | `src/public/js/modules/rendering/PolygonRenderer.js` |
+| 326 | 14.1 KB | `CORE/TOOLS/analyze_calls.js` |
+| 296 | 12.1 KB | `CORE/TOOLS/report-generator.js` |
+| 286 | 12.2 KB | `src/public/js/modules/rendering/CirclePropagation.js` |
 | 273 | 10.5 KB | `CORE/FRONTEND/B_map_page/components/top_bar.html` |
 
 ### Breakdown by File Type
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 28 | 3,196 | 91.1 KB |
+| .js | 77 | 10,206 | 348.3 KB |
 | .html | 5 | 566 | 22.8 KB |
 
 ---
 
+## Import Graph
+> [!TIP]
+> Shows dependencies between files. Useful for understanding module coupling.
+
+### TOOLS/analyze_calls.js
+- 📦 `fs` → `fs`
+- 📦 `path` → `path`
+- 📦 `./parsers` → `analyzeJsContent`, `extractImports`, `PATTERNS`
+- 📦 `./call-graph` → `buildCallGraph`, `buildImportGraph`, `findRootsAndUnused`
+- 📦 `./report-generator` → `generateMarkdownReport`, `generateJsonReport`
+
+### AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js
+- 📦 `http` → `http`
+- 📦 `crypto` → `crypto`
+- 📦 `child_process` → `exec`
+
+### TOOLS/call-graph.js
+- 📦 `path` → `path`
+
+### TOOLS/parsers.js
+- 🔷 `module` → `a`, `b`
+- 🔷 `module` → `name`
+
+### TOOLS/report-generator.js
+- 📦 `path` → `path`
+
+### server.js
+- 📦 `express` → `express`
+- 📦 `cors` → `cors`
+- 📦 `path` → `path`
+- 📦 `fs` → `fs`
+- 📦 `uuid` → `v4`
+- 📦 `./src/routes` → `apiRoutes`, `authRoutes`
+- 📦 `./src/services/redis` → `getRedisClient`, `flushDatabase`
+
+### config/constants.js
+- 📦 `path` → `path`
+
+### controllers/authController.js
+- 📦 `fs` → `fs`
+- 📦 `csv-parse/sync` → `parse`
+- 📦 `../config/constants` → `PATHS`
+
+### controllers/gameController.js
+- 📦 `path` → `path`
+- 📦 `fs` → `fs`
+- 📦 `../config` → `config`
+- 📦 `../config/constants` → `REDIS_KEYS`, `PATHS`
+- 📦 `../services/redis.service` → `getRedisClient`, `loadFromRedis`
+- 📦 `../services/map` → `generateMap`
+
+### controllers/index.js
+- 📦 `./sessionController` → `sessionController`
+- 📦 `./locationController` → `locationController`
+- 📦 `./gameController` → `gameController`
+- 📦 `./authController` → `authController`
+
+### controllers/locationController.js
+- 📦 `axios` → `axios`
+- 📦 `../config` → `config`
+- 📦 `../config/constants` → `REDIS_KEYS`
+- 📦 `../services/redis.service` → `getRedisClient`, `saveToRedis`, `loadFromRedis`
+- 📦 `../services/nominatim.service` → `getCityFromCoords`, `getCityCenter`, `reverseGeocode`, `searchPlace`
+
+### middleware/errorHandler.js
+- 📦 `../config/constants` → `HTTP_STATUS`
+
+### middleware/index.js
+- 📦 `./asyncHandler` → `asyncHandler`
+- 📦 `./errorHandler` → `AppError`, `NotFoundError`, `BadRequestError`, `ValidationError`, `errorHandler`, `notFoundHandler`
+- 📦 `./requestLogger` → `requestLogger`
+
+### js/map-logic.js
+- 🔷 `./modules/utils/CoordinateUtils.js` → `getLocationKey`, `parseLocationKey`, `getCoordinateKey`, `parseCoordinateKey`
+- 🔷 `./modules/utils/UIDGenerator.js` → `generateUID`, `createUIDMaps`
+- 🔷 `./modules/utils/GeometryUtils.js` → `euclideanDistance`, `isWithinDistance`
+- 🔷 `./modules/ui/ErrorDisplay.js` → `showError`
+- 🔷 `./modules/ui/TopBarHandler.js` → `initTopBarEvents`
+- 🔷 `./modules/ui/DebugMode.js` → `resetSelection`, `addToSelection`, `getSelectedLayers`, `clearSelection`
+- 🔷 `./modules/ui/VersionBadge.js` → `loadVersionBadge`
+- 🔷 `./modules/state/GameState.js` → `gameState`, `resetGameState`, `getCurrentPosition`, `setCurrentPosition`, `isCircleCollected`, `collectCircle`, `isCircleExpanded`, `markCircleExpanded`
+- 🔷 `./modules/rendering/PosterRenderer.js` → `PosterRenderer`
+- 🔷 `./modules/rendering/index.js` → `renderGameElements`
+- 🔷 `./modules/rendering/PolygonVisuals.js` → `createPolygonVisualsUpdater`
+- 🔷 `./modules/api/StateLoader.js` → `loadGlobalState`, `loadLocationState`
+- 🔷 `./modules/api/StateSaver.js` → `StateSaver`
+- 🔷 `./modules/api/StateRestorer.js` → `renderFromSavedState`
+- 🔷 `./modules/api/GameDataLoader.js` → `createGameDataLoader`
+- 🔷 `./modules/events/MovementHandlers.js` → `setupMovementHandlers`
+- 🔷 `./modules/events/DebugHandlers.js` → `setupDebugHandlers`
+- 🔷 `./modules/events/MarkerDirectionHandler.js` → `setupMarkerDirectionHandler`
+- 🔷 `./modules/events/DebugModeToggle.js` → `setupDebugModeToggle`
+- 🔷 `./modules/debug/IntersectionDebug.js` → `lineIntersectsRect`, `updateDebugBoxIntersections`, `resetWhiteLineColors`
+- 🔷 `./modules/logic/ProgressManager.js` → `setupProgressHiding`, `findNearestActiveCircle`
+- 🔷 `./modules/ui/DebugInteractionHandler.js` → `DebugInteractionHandler`
+- 🔷 `./modules/core/GameInitializer.js` → `createGameInitializer`
+
+### api/GameDataLoader.js
+- 🔷 `../utils/CoordinateUtils.js` → `getLocationKey`
+- 🔷 `../ui/ErrorDisplay.js` → `showError`
+
+### core/GameInitializer.js
+- 🔷 `../api/StateLoader.js` → `loadGlobalState`
+- 🔷 `../api/StateRestorer.js` → `renderFromSavedState`
+
+### logic/ProgressManager.js
+- 🔷 `../state/GameState.js` → `gameState`
+
+### rendering/index.js
+- 🔷 `./RenderInitializer.js` → `initializeRender`
+- 🔷 `./PolygonRenderer.js` → `renderPolygons`
+- 🔷 `./WhiteLineRenderer.js` → `renderWhiteLines`
+- 🔷 `./BlueCircleRenderer.js` → `renderBlueCircles`
+- 🔷 `./GreenCircleRenderer.js` → `renderGreenCircles`
+- 🔷 `./CirclePropagation.js` → `propagateCircleConnections`, `updateEndpointPolygonIds`
+- 🔷 `./RenderFinalizer.js` → `finalizeRender`
+
+### rendering/RenderFinalizer.js
+- 🔷 `../logic/ProgressManager.js` → `setupProgressHiding`, `findNearestActiveCircle`
+- 🔷 `../debug/IntersectionDebug.js` → `updateDebugBoxIntersections`
+
+### rendering/RenderInitializer.js
+- 🔷 `../utils/UIDGenerator.js` → `createUIDMaps`
+- 🔷 `../ui/ErrorDisplay.js` → `showError`
+
+### ui/DebugHighlighter.js
+- 🔷 `./DebugMode.js` → `resetSelection`, `addToSelection`, `getSelectedLayers`
+
+### ui/DebugInteractionHandler.js
+- 🔷 `./DebugMode.js` → `resetSelection`
+- 🔷 `./DebugHighlighter.js` → `highlightPolygon`, `highlightWhiteLine`, `highlightGeneric`, `highlightLabel`
+- 🔷 `./DebugStatsBuilder.js` → `getElementStatus`, `getStatsHtml`
+- 🔷 `./DebugPopupBuilder.js` → `openDebugPopup`
+
+### routes/api.routes.js
+- 📦 `express` → `express`
+- 📦 `../middleware` → `asyncHandler`
+- 📦 `../controllers` → `sessionController`, `locationController`, `gameController`
+
+### routes/auth.routes.js
+- 📦 `express` → `express`
+- 📦 `../middleware` → `asyncHandler`
+- 📦 `../controllers` → `authController`
+
+### routes/index.js
+- 📦 `./api.routes` → `apiRoutes`
+- 📦 `./auth.routes` → `authRoutes`
+
+### map/connectionCalculator.js
+- 📦 `../../utils/geometry` → `roundCoord`
+
+### map/graphBuilder.js
+- 📦 `../../config` → `config`
+- 📦 `../../config/constants` → `REDIS_KEYS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+- 📦 `../../utils/geometry` → `haversineDistance`, `coordKey`, `parseCoordKey`
+
+### map/groupCreator.js
+- 📦 `@turf/turf` → `turf`
+- 📦 `../../config/constants` → `REDIS_KEYS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+
+### map/index.js
+- 📦 `../../config` → `config`
+- 📦 `../../config/constants` → `REDIS_KEYS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+- 📦 `./roadFetcher` → `fetchRedLines`
+- 📦 `./intersectionFinder` → `identifyIntersections`
+- 📦 `./graphBuilder` → `createGraphElements`
+- 📦 `./polygonFinder` → `findPolygons`
+- 📦 `./groupCreator` → `createGroups`
+- 📦 `./connectionCalculator` → `calculateConnections`
+- 📦 `./posterGridCreator` → `createPosterGrid`
+- 📦 `./modeFilter` → `applyModeFiltering`
+- 📦 `./mapHelpers` → `filterOrphanedElements`, `calculatePolygonPoints`
+
+### map/intersectionFinder.js
+- 📦 `../../config/constants` → `REDIS_KEYS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+- 📦 `../../utils/geometry` → `coordKey`, `parseCoordKey`
+
+### map/mapHelpers.js
+- 📦 `../../utils/geometry` → `roundCoord`
+
+### map/modeFilter.js
+- 📦 `../../utils/geometry` → `roundCoord`
+
+### map/planarGraphBuilder.js
+- 📦 `../../utils/geometry` → `coordKey`
+
+### map/polygonFinder.js
+- 📦 `@turf/turf` → `turf`
+- 📦 `../../config/constants` → `REDIS_KEYS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+- 📦 `../../utils/geometry` → `calculatePolygonCentroid`, `calculateLabelPosition`, `parseCoordKey`
+- 📦 `./planarGraphBuilder` → `buildPlanarGraph`
+- 📦 `./promoAssigner` → `assignPromoGifs`
+
+### map/posterGridCreator.js
+- 📦 `path` → `path`
+- 📦 `fs` → `fs`
+- 📦 `../../config/constants` → `PATHS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+- 📦 `../../utils/geometry` → `generateUid`
+
+### map/promoAssigner.js
+- 📦 `fs` → `fs`
+- 📦 `../../config/constants` → `PATHS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+
+### map/roadFetcher.js
+- 📦 `axios` → `axios`
+- 📦 `../../config` → `config`
+- 📦 `../../config/constants` → `REDIS_KEYS`
+- 📦 `../redis.service` → `saveToRedis`, `loadFromRedis`
+
+### services/nominatim.service.js
+- 📦 `axios` → `axios`
+- 📦 `../config` → `config`
+
+### services/redis.js
+- 📦 `ioredis` → `Redis`
+
+### services/redis.service.js
+- 📦 `ioredis` → `Redis`
+- 📦 `../config` → `config`
+- 📦 `../config/constants` → `REDIS_KEYS`
+
+### utils/geometry.js
+- 📦 `crypto` → `crypto`
+
+---
+
 ## Entry Points / Root Functions
-root: register [src/controllers/authController.js] (19 lines)
-  calls: readUsers [src/controllers/authController.js] (18 lines)
-  calls: appendUser [src/controllers/authController.js] (4 lines)
+root: register [src/controllers/authController.js] (19 lines) [C:3]
+  calls: readUsers [src/controllers/authController.js] (18 lines) [C:2]
+  calls: appendUser [src/controllers/authController.js] (4 lines) [C:1]
 ---
-root: locate [src/controllers/locationController.js] (31 lines)
-  calls: getCityFromCoords [src/services/nominatim.service.js] (21 lines)
-    calls: reverseGeocode [src/services/nominatim.service.js] (12 lines)
-  calls: getCityCenter [src/services/nominatim.service.js] (14 lines)
-    calls: searchPlace [src/services/nominatim.service.js] (11 lines)
+root: locate [src/controllers/locationController.js] (31 lines) [C:5]
+  calls: getCityFromCoords [src/services/nominatim.service.js] (21 lines) [C:2]
+    calls: reverseGeocode [src/services/nominatim.service.js] (12 lines) [C:2]
+  calls: getCityCenter [src/services/nominatim.service.js] (14 lines) [C:3]
+    calls: searchPlace [src/services/nominatim.service.js] (11 lines) [C:2]
 ---
-root: constructor [src/public/js/game-api.js] (4 lines)
-  calls: init [CORE/FRONTEND/B_map_page/components/map_controls.js] (47 lines)
-    calls: addVisibilityRule [CORE/FRONTEND/B_map_page/components/map_controls.js] (5 lines)
-      calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines)
-    calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines)
+root: loadIPLocation [CORE/FRONTEND/A_home_page/components/home.js] (28 lines) [C:3]
+  calls: revealContent [CORE/FRONTEND/A_home_page/components/home.js] (7 lines) [C:1]
 ---
-root: login [src/controllers/authController.js] (23 lines)
-  calls: readUsers [src/controllers/authController.js] (18 lines)
+root: handleRegister [CORE/FRONTEND/A_home_page/login.js] (39 lines) [C:10]
+  calls: switchTab [CORE/FRONTEND/A_home_page/login.js] (23 lines) [C:9]
 ---
-root: getGameState [src/controllers/gameController.js] (12 lines)
-  calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-    calls: getRedisClient [src/services/redis.service.js] (23 lines)
+root: constructor [CORE/FRONTEND/B_map_page/components/KeyboardNavigation.js] (8 lines) [C:1]
+  calls: init [CORE/FRONTEND/B_map_page/components/map_controls.js] (47 lines) [C:3]
+    calls: addVisibilityRule [CORE/FRONTEND/B_map_page/components/map_controls.js] (5 lines) [C:1]
+      calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines) [C:8]
+    calls: checkVisibility [CORE/FRONTEND/B_map_page/components/map_controls.js] (27 lines) [C:8]
 ---
-root: getGameData [src/controllers/gameController.js] (28 lines)
-  calls: generateMap [src/services/map/index.js] (125 lines)
-    calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-      calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: fetchRedLines [src/services/map/roadFetcher.js] (31 lines)
-      calls: buildOverpassQuery [src/services/map/roadFetcher.js] (11 lines)
-      calls: raceOverpassServers [src/services/map/roadFetcher.js] (20 lines)
-      calls: parseOverpassResponse [src/services/map/roadFetcher.js] (31 lines)
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: mergeRoadLines [src/services/map/roadFetcher.js] (31 lines)
-        calls: normalizePath [src/services/map/roadFetcher.js] (4 lines)
-      calls: saveToRedis [src/services/redis.service.js] (17 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: identifyIntersections [src/services/map/intersectionFinder.js] (20 lines)
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: buildAdjacencyFromRoads [src/services/map/intersectionFinder.js] (32 lines)
-        calls: coordKey [src/utils/geometry.js] (3 lines)
-      calls: findIntersectionNodes [src/services/map/intersectionFinder.js] (19 lines)
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines)
-      calls: saveToRedis [src/services/redis.service.js] (17 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: serializeAdjacency [src/services/map/intersectionFinder.js] (18 lines)
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines)
-    calls: createGraphElements [src/services/map/graphBuilder.js] (61 lines)
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: getRelevantNodes [src/services/map/graphBuilder.js] (11 lines)
-        calls: coordKey [src/utils/geometry.js] (3 lines)
-      calls: rebuildAdjacencyMap [src/services/map/graphBuilder.js] (17 lines)
-        calls: coordKey [src/utils/geometry.js] (3 lines)
-      calls: parseCoordKey [src/utils/geometry.js] (3 lines)
-      calls: tracePath [src/services/map/graphBuilder.js] (37 lines)
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines)
-        calls: haversineDistance [src/utils/geometry.js] (14 lines)
-      calls: createGreenCirclesForPath [src/services/map/graphBuilder.js] (42 lines)
-        calls: haversineDistance [src/utils/geometry.js] (14 lines)
-      calls: saveToRedis [src/services/redis.service.js] (17 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: findPolygons [src/services/map/polygonFinder.js] (55 lines)
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: findMinimalCycles [src/services/map/polygonFinder.js] (63 lines)
-      calls: cycleToPolygonCoords [src/services/map/polygonFinder.js] (40 lines)
-        calls: parseCoordKey [src/utils/geometry.js] (3 lines)
-      calls: validatePolygonArea [src/services/map/polygonFinder.js] (22 lines)
-      calls: createPolygonData [src/services/map/polygonFinder.js] (24 lines)
-        calls: calculatePolygonCentroid [src/utils/geometry.js] (44 lines)
-        calls: calculateLabelPosition [src/utils/geometry.js] (66 lines)
-          calls: lineSegmentIntersection [src/utils/geometry.js] (21 lines)
-      calls: saveToRedis [src/services/redis.service.js] (17 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-    calls: createGroups [src/services/map/groupCreator.js] (51 lines)
-      calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: saveToRedis [src/services/redis.service.js] (17 lines)
-        calls: getRedisClient [src/services/redis.service.js] (23 lines)
-      calls: polygonToTurf [src/services/map/groupCreator.js] (10 lines)
-      calls: dissolvePolygons [src/services/map/groupCreator.js] (18 lines)
-      calls: findContainedPolygons [src/services/map/groupCreator.js] (13 lines)
-    calls: saveToRedis [src/services/redis.service.js] (17 lines)
-      calls: getRedisClient [src/services/redis.service.js] (23 lines)
+root: login [src/controllers/authController.js] (23 lines) [C:3]
+  calls: readUsers [src/controllers/authController.js] (18 lines) [C:2]
 ---
-root: reverseProxy [src/controllers/locationController.js] (10 lines)
-  calls: reverseGeocode [src/services/nominatim.service.js] (12 lines)
+root: getGameState [src/controllers/gameController.js] (12 lines) [C:2]
+  calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+    calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
-root: searchProxy [src/controllers/locationController.js] (10 lines)
-  calls: searchPlace [src/services/nominatim.service.js] (11 lines)
+root: getGameData [src/controllers/gameController.js] (28 lines) [C:6]
+  calls: generateMap [src/services/map/index.js] (125 lines) [C:15]
+    calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+      calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+    calls: fetchRedLines [src/services/map/roadFetcher.js] (31 lines) [C:4]
+      calls: buildOverpassQuery [src/services/map/roadFetcher.js] (11 lines) [C:1]
+      calls: raceOverpassServers [src/services/map/roadFetcher.js] (20 lines) [C:2]
+      calls: parseOverpassResponse [src/services/map/roadFetcher.js] (31 lines) [C:8]
+      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: mergeRoadLines [src/services/map/roadFetcher.js] (31 lines) [C:7]
+        calls: normalizePath [src/services/map/roadFetcher.js] (4 lines) [C:1]
+      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+    calls: identifyIntersections [src/services/map/intersectionFinder.js] (20 lines) [C:2]
+      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: buildAdjacencyFromRoads [src/services/map/intersectionFinder.js] (32 lines) [C:7]
+        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: findIntersectionNodes [src/services/map/intersectionFinder.js] (19 lines) [C:3]
+        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: serializeAdjacency [src/services/map/intersectionFinder.js] (18 lines) [C:4]
+        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+    calls: createGraphElements [src/services/map/graphBuilder.js] (61 lines) [C:6]
+      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: getRelevantNodes [src/services/map/graphBuilder.js] (11 lines) [C:3]
+        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: rebuildAdjacencyMap [src/services/map/graphBuilder.js] (17 lines) [C:5]
+        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: tracePath [src/services/map/graphBuilder.js] (37 lines) [C:5]
+        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+        calls: haversineDistance [src/utils/geometry.js] (14 lines) [C:1]
+      calls: createGreenCirclesForPath [src/services/map/graphBuilder.js] (42 lines) [C:5]
+        calls: haversineDistance [src/utils/geometry.js] (14 lines) [C:1]
+      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+    calls: findPolygons [src/services/map/polygonFinder.js] (55 lines) [C:10]
+      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: buildPlanarGraph [src/services/map/planarGraphBuilder.js] (39 lines) [C:5]
+        calls: coordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: findMinimalCycles [src/services/map/polygonFinder.js] (63 lines) [C:13]
+      calls: cycleToPolygonCoords [src/services/map/polygonFinder.js] (40 lines) [C:6]
+        calls: parseCoordKey [src/utils/geometry.js] (3 lines) [C:1]
+      calls: validatePolygonArea [src/services/map/polygonFinder.js] (22 lines) [C:6]
+      calls: createPolygonData [src/services/map/polygonFinder.js] (24 lines) [C:1]
+        calls: calculatePolygonCentroid [src/utils/geometry.js] (44 lines) [C:6]
+        calls: calculateLabelPosition [src/utils/geometry.js] (66 lines) [C:11]
+          calls: lineSegmentIntersection [src/utils/geometry.js] (21 lines) [C:3]
+      calls: assignPromoGifs [src/services/map/promoAssigner.js] (20 lines) [C:5]
+        calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+        calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+          calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+    calls: filterOrphanedElements [src/services/map/mapHelpers.js] (13 lines) [C:1]
+    calls: calculatePolygonPoints [src/services/map/mapHelpers.js] (38 lines) [C:8]
+      calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+    calls: createGroups [src/services/map/groupCreator.js] (51 lines) [C:7]
+      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: polygonToTurf [src/services/map/groupCreator.js] (10 lines) [C:3]
+      calls: dissolvePolygons [src/services/map/groupCreator.js] (18 lines) [C:5]
+      calls: findContainedPolygons [src/services/map/groupCreator.js] (13 lines) [C:4]
+    calls: calculateConnections [src/services/map/connectionCalculator.js] (112 lines) [C:24]
+      calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+    calls: createPosterGrid [src/services/map/posterGridCreator.js] (95 lines) [C:14]
+      calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+        calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
+      calls: generateUid [src/utils/geometry.js] (3 lines) [C:1]
+    calls: applyModeFiltering [src/services/map/modeFilter.js] (87 lines) [C:15]
+      calls: roundCoord [src/utils/geometry.js] (3 lines) [C:1]
+    calls: saveToRedis [src/services/redis.service.js] (17 lines) [C:3]
+      calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
-root: getLocationState [src/controllers/locationController.js] (34 lines)
-  calls: loadFromRedis [src/services/redis.service.js] (12 lines)
-    calls: getRedisClient [src/services/redis.service.js] (23 lines)
+root: reverseProxy [src/controllers/locationController.js] (10 lines) [C:2]
+  calls: reverseGeocode [src/services/nominatim.service.js] (12 lines) [C:2]
 ---
-root: saveLocationState [src/controllers/locationController.js] (49 lines)
-  calls: getRedisClient [src/services/redis.service.js] (23 lines)
+root: searchProxy [src/controllers/locationController.js] (10 lines) [C:2]
+  calls: searchPlace [src/services/nominatim.service.js] (11 lines) [C:2]
 ---
-root: getPromos [src/controllers/gameController.js] (12 lines)
+root: getLocationState [src/controllers/locationController.js] (34 lines) [C:5]
+  calls: loadFromRedis [src/services/redis.service.js] (12 lines) [C:3]
+    calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
-root: getIpLocation [src/controllers/locationController.js] (46 lines)
+root: saveLocationState [src/controllers/locationController.js] (49 lines) [C:5]
+  calls: getRedisClient [src/services/redis.service.js] (23 lines) [C:3]
 ---
-root: getSession [src/controllers/sessionController.js] (7 lines)
+root: isWithinDistance [src/public/js/modules/utils/GeometryUtils.js] (3 lines) [C:1]
+  calls: euclideanDistance [src/public/js/modules/utils/GeometryUtils.js] (5 lines) [C:1]
 ---
-root: errorHandler [src/middleware/errorHandler.js] (35 lines)
+root: handleLogin [CORE/FRONTEND/A_home_page/login.js] (38 lines) [C:7]
 ---
-root: notFoundHandler [src/middleware/errorHandler.js] (3 lines)
+root: def [CORE/TOOLS/report-generator.js] (2 lines) [C:1]
 ---
-root: requestLogger [src/middleware/requestLogger.js] (10 lines)
+root: getPromos [src/controllers/gameController.js] (12 lines) [C:2]
 ---
-root: retryStrategy [src/services/redis.service.js] (5 lines)
+root: getIpLocation [src/controllers/locationController.js] (46 lines) [C:4]
+---
+root: getSession [src/controllers/sessionController.js] (7 lines) [C:1]
+---
+root: errorHandler [src/middleware/errorHandler.js] (35 lines) [C:6]
+---
+root: notFoundHandler [src/middleware/errorHandler.js] (3 lines) [C:1]
+---
+root: requestLogger [src/middleware/requestLogger.js] (10 lines) [C:2]
+---
+root: resetGameState [src/public/js/modules/state/GameState.js] (18 lines) [C:1]
+---
+root: isCircleCollected [src/public/js/modules/state/GameState.js] (3 lines) [C:1]
+---
+root: collectCircle [src/public/js/modules/state/GameState.js] (3 lines) [C:1]
+---
+root: isCircleExpanded [src/public/js/modules/state/GameState.js] (3 lines) [C:1]
+---
+root: markCircleExpanded [src/public/js/modules/state/GameState.js] (3 lines) [C:1]
+---
+root: clearSelection [src/public/js/modules/ui/DebugMode.js] (4 lines) [C:1]
+---
+root: closeMenu [src/public/js/modules/ui/TopBarHandler.js] (5 lines) [C:2]
+---
+root: parseLocationKey [src/public/js/modules/utils/CoordinateUtils.js] (4 lines) [C:1]
+---
+root: getCoordinateKey [src/public/js/modules/utils/CoordinateUtils.js] (3 lines) [C:1]
+---
+root: parseCoordinateKey [src/public/js/modules/utils/CoordinateUtils.js] (4 lines) [C:1]
+---
+root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 ---
 
 ## Potentially Unused Functions
 > [!WARNING]
 > These functions are defined but not called within the analyzed files. Verify if they are used dynamically or in external systems before deleting.
 
-- `setSnapLines` (6 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `updateGraph` (11 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `bindKeys` (4 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `moveSelection` (5 lines) ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
-- `shutdown` (7 lines) ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
-- `updateAndSaveUserPosition` (4 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `debouncedSavePosition` (9 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `revealMap` (9 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `renderGameElements` (31 lines) ([map-logic.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\map-logic.js))
-- `generateUid` (3 lines) ([geometry.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\utils\geometry.js))
-- `roundCoord` (3 lines) ([geometry.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\utils\geometry.js))
+- `bindKeys` (4 lines) [C:1] ([map_controls.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\map_controls.js))
+- `findClosestNode` (15 lines) [C:3] ([NavigationGraph.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\FRONTEND\B_map_page\components\NavigationGraph.js))
+- `runUpdate` (38 lines) [C:11] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
+- `requestHandler` (29 lines) [C:3] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\CORE\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
+- `shutdown` (7 lines) [C:2] ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
+- `cancelPendingSave` (7 lines) [C:2] ([StateSaver.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\api\StateSaver.js))
+- `setDependencies` (2 lines) [C:1] ([PosterRenderer.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\rendering\PosterRenderer.js))
+- `getRevealMask` (4 lines) [C:1] ([PosterRenderer.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\rendering\PosterRenderer.js))
+- `getPosterSvgOverlay` (4 lines) [C:1] ([PosterRenderer.js](file://c:\0_PROJECTS\CrazyWalk-Game\src\public\js\modules\rendering\PosterRenderer.js))
 
 ## Large Functions (50+ lines)
 > [!NOTE]
-> Functions with 50+ lines may benefit from refactoring into smaller pieces.
+> Functions with high line counts may benefit from refactoring into smaller pieces.
 
-| Lines | Function | File |
-|------:|----------|------|
-| 125 | `generateMap` | map/index.js |
-| 66 | `calculateLabelPosition` | utils/geometry.js |
-| 63 | `findMinimalCycles` | map/polygonFinder.js |
-| 61 | `createGraphElements` | map/graphBuilder.js |
-| 55 | `findPolygons` | map/polygonFinder.js |
-| 51 | `createGroups` | map/groupCreator.js |
+| Lines | Complexity | Function | File |
+|------:|-----------:|----------|------|
+| 187 | 34 | `createGameDataLoader` | api/GameDataLoader.js |
+| 175 | 40 | `createUIDMaps` | utils/UIDGenerator.js |
+| 169 | 24 | `generateMarkdownReport` | TOOLS/report-generator.js |
+| 167 | 32 | `loadGameData` | api/GameDataLoader.js |
+| 146 | 13 | `initPosterGrid` | rendering/PosterRenderer.js |
+| 132 | 38 | `checkAndHide` | logic/ProgressManager.js |
+| 129 | 18 | `updatePosterSVG` | rendering/PosterRenderer.js |
+| 125 | 15 | `generateMap` | map/index.js |
+| 113 | 19 | `initializeRender` | rendering/RenderInitializer.js |
+| 112 | 24 | `calculateConnections` | map/connectionCalculator.js |
+| 100 | 12 | `renderPolygons` | rendering/PolygonRenderer.js |
+| 100 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
+| 98 | 23 | `initTopBarEvents` | ui/TopBarHandler.js |
+| 95 | 14 | `main` | TOOLS/analyze_calls.js |
+| 95 | 12 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
+| 95 | 14 | `createPosterGrid` | map/posterGridCreator.js |
+| 91 | 11 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
+| 91 | 18 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
+| 87 | 15 | `applyModeFiltering` | map/modeFilter.js |
+| 84 | 4 | `renderGameElements` | rendering/index.js |
+| 81 | 21 | `performFinalSafetyCheck` | rendering/CirclePropagation.js |
+| 78 | 22 | `build` | components/NavigationGraph.js |
+| 76 | 6 | `createGameInitializer` | core/GameInitializer.js |
+| 76 | 12 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
+| 75 | 17 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
+| 72 | 8 | `buildPolygonStats` | ui/DebugStatsBuilder.js |
+| 71 | 19 | `moveSelection` | components/KeyboardNavigation.js |
+| 71 | 9 | `renderWhiteLines` | rendering/WhiteLineRenderer.js |
+| 68 | 17 | `propagateNeighborUpdates` | rendering/CirclePropagation.js |
+| 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
+| 67 | 6 | `generateJsonReport` | TOOLS/report-generator.js |
+| 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
+| 64 | 6 | `createPercentageLabel` | rendering/PolygonRenderer.js |
+| 63 | 13 | `findMinimalCycles` | map/polygonFinder.js |
+| 61 | 6 | `createGraphElements` | map/graphBuilder.js |
+| 55 | 5 | `initializeGame` | core/GameInitializer.js |
+| 55 | 10 | `findPolygons` | map/polygonFinder.js |
+| 54 | 13 | `toggleHiddenDebug` | rendering/PosterRenderer.js |
+| 52 | 2 | `createPromoPopupContent` | rendering/PolygonRenderer.js |
+| 51 | 7 | `createGroups` | map/groupCreator.js |
+
+## High Complexity Functions (10+)
+> [!CAUTION]
+> Functions with cyclomatic complexity ≥10 are harder to test and maintain.
+
+| Complexity | Lines | Function | File |
+|-----------:|------:|----------|------|
+| 40 | 175 | `createUIDMaps` | utils/UIDGenerator.js |
+| 38 | 132 | `checkAndHide` | logic/ProgressManager.js |
+| 34 | 187 | `createGameDataLoader` | api/GameDataLoader.js |
+| 32 | 167 | `loadGameData` | api/GameDataLoader.js |
+| 24 | 169 | `generateMarkdownReport` | TOOLS/report-generator.js |
+| 24 | 112 | `calculateConnections` | map/connectionCalculator.js |
+| 23 | 98 | `initTopBarEvents` | ui/TopBarHandler.js |
+| 22 | 78 | `build` | components/NavigationGraph.js |
+| 21 | 81 | `performFinalSafetyCheck` | rendering/CirclePropagation.js |
+| 19 | 71 | `moveSelection` | components/KeyboardNavigation.js |
+| 19 | 113 | `initializeRender` | rendering/RenderInitializer.js |
+| 18 | 27 | `getDirection` | components/KeyboardNavigation.js |
+| 18 | 91 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
+| 18 | 129 | `updatePosterSVG` | rendering/PosterRenderer.js |
+| 17 | 68 | `propagateNeighborUpdates` | rendering/CirclePropagation.js |
+| 17 | 75 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
+| 16 | 49 | `bind` | components/KeyboardNavigation.js |
+| 16 | 68 | `applyCollectedState` | rendering/RenderFinalizer.js |
+| 15 | 40 | `getElementStatus` | ui/DebugStatsBuilder.js |
+| 15 | 125 | `generateMap` | map/index.js |
+| 15 | 87 | `applyModeFiltering` | map/modeFilter.js |
+| 14 | 95 | `main` | TOOLS/analyze_calls.js |
+| 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
+| 13 | 24 | `showError` | ui/ErrorDisplay.js |
+| 13 | 146 | `initPosterGrid` | rendering/PosterRenderer.js |
+| 13 | 54 | `toggleHiddenDebug` | rendering/PosterRenderer.js |
+| 13 | 47 | `highlightPolygon` | ui/DebugHighlighter.js |
+| 13 | 63 | `findMinimalCycles` | map/polygonFinder.js |
+| 12 | 76 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
+| 12 | 46 | `updateEndpointPolygonIds` | rendering/CirclePropagation.js |
+| 12 | 95 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
+| 12 | 100 | `renderPolygons` | rendering/PolygonRenderer.js |
+| 11 | 38 | `runUpdate` | AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js |
+| 11 | 91 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
+| 11 | 37 | `highlightWhiteLine` | ui/DebugHighlighter.js |
+| 11 | 66 | `calculateLabelPosition` | utils/geometry.js |
+| 10 | 39 | `handleRegister` | A_home_page/login.js |
+| 10 | 26 | `parseArgs` | TOOLS/analyze_calls.js |
+| 10 | 55 | `findPolygons` | map/polygonFinder.js |

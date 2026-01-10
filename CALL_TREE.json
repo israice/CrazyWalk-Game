@@ -1,0 +1,1843 @@
+{
+  "meta": {
+    "generatedAt": "2026-01-10T04:16:34.333Z",
+    "options": {
+      "output": "CALL_TREE.md",
+      "minLines": 50,
+      "format": "both",
+      "verbose": true,
+      "help": false
+    }
+  },
+  "summary": {
+    "totalFiles": 33,
+    "totalLines": 3762,
+    "totalBytes": 116608,
+    "totalFunctions": 80,
+    "rootFunctions": 17,
+    "unusedFunctions": 11
+  },
+  "files": [
+    {
+      "path": "CORE/FRONTEND/A_home_page/index.html",
+      "lines": 135,
+      "bytes": 5916,
+      "type": ".html"
+    },
+    {
+      "path": "CORE/FRONTEND/A_home_page/login.html",
+      "lines": 77,
+      "bytes": 3400,
+      "type": ".html"
+    },
+    {
+      "path": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 172,
+      "bytes": 5111,
+      "type": ".js"
+    },
+    {
+      "path": "CORE/FRONTEND/B_map_page/components/top_bar.html",
+      "lines": 273,
+      "bytes": 10757,
+      "type": ".html"
+    },
+    {
+      "path": "CORE/FRONTEND/B_map_page/index.html",
+      "lines": 67,
+      "bytes": 2944,
+      "type": ".html"
+    },
+    {
+      "path": "CORE/FRONTEND/index.html",
+      "lines": 14,
+      "bytes": 288,
+      "type": ".html"
+    },
+    {
+      "path": "src/config/constants.js",
+      "lines": 66,
+      "bytes": 1549,
+      "type": ".js"
+    },
+    {
+      "path": "src/config/index.js",
+      "lines": 65,
+      "bytes": 1792,
+      "type": ".js"
+    },
+    {
+      "path": "src/controllers/authController.js",
+      "lines": 104,
+      "bytes": 2367,
+      "type": ".js"
+    },
+    {
+      "path": "src/controllers/gameController.js",
+      "lines": 120,
+      "bytes": 3626,
+      "type": ".js"
+    },
+    {
+      "path": "src/controllers/index.js",
+      "lines": 16,
+      "bytes": 369,
+      "type": ".js"
+    },
+    {
+      "path": "src/controllers/locationController.js",
+      "lines": 236,
+      "bytes": 6596,
+      "type": ".js"
+    },
+    {
+      "path": "src/controllers/sessionController.js",
+      "lines": 22,
+      "bytes": 440,
+      "type": ".js"
+    },
+    {
+      "path": "src/middleware/asyncHandler.js",
+      "lines": 16,
+      "bytes": 455,
+      "type": ".js"
+    },
+    {
+      "path": "src/middleware/errorHandler.js",
+      "lines": 103,
+      "bytes": 2344,
+      "type": ".js"
+    },
+    {
+      "path": "src/middleware/index.js",
+      "lines": 26,
+      "bytes": 451,
+      "type": ".js"
+    },
+    {
+      "path": "src/middleware/requestLogger.js",
+      "lines": 21,
+      "bytes": 482,
+      "type": ".js"
+    },
+    {
+      "path": "src/public/js/game-api.js",
+      "lines": 66,
+      "bytes": 1989,
+      "type": ".js"
+    },
+    {
+      "path": "src/public/js/map-logic.js",
+      "lines": 277,
+      "bytes": 10069,
+      "type": ".js"
+    },
+    {
+      "path": "src/routes/api.routes.js",
+      "lines": 30,
+      "bytes": 1167,
+      "type": ".js"
+    },
+    {
+      "path": "src/routes/auth.routes.js",
+      "lines": 17,
+      "bytes": 426,
+      "type": ".js"
+    },
+    {
+      "path": "src/routes/index.js",
+      "lines": 12,
+      "bytes": 178,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/map/graphBuilder.js",
+      "lines": 223,
+      "bytes": 6695,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/map/groupCreator.js",
+      "lines": 132,
+      "bytes": 3272,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/map/index.js",
+      "lines": 165,
+      "bytes": 6468,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/map/intersectionFinder.js",
+      "lines": 128,
+      "bytes": 3811,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/map/polygonFinder.js",
+      "lines": 256,
+      "bytes": 7552,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/map/roadFetcher.js",
+      "lines": 191,
+      "bytes": 5583,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/nominatim.service.js",
+      "lines": 111,
+      "bytes": 2554,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/redis.js",
+      "lines": 109,
+      "bytes": 2939,
+      "type": ".js"
+    },
+    {
+      "path": "src/services/redis.service.js",
+      "lines": 112,
+      "bytes": 2883,
+      "type": ".js"
+    },
+    {
+      "path": "src/utils/geometry.js",
+      "lines": 231,
+      "bytes": 6850,
+      "type": ".js"
+    },
+    {
+      "path": "server.js",
+      "lines": 169,
+      "bytes": 5285,
+      "type": ".js"
+    }
+  ],
+  "functions": [
+    {
+      "name": "constructor",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 2,
+      "complexity": 1
+    },
+    {
+      "name": "init",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 47,
+      "complexity": 3
+    },
+    {
+      "name": "getMap",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 5,
+      "complexity": 1
+    },
+    {
+      "name": "setSnapLines",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 6,
+      "complexity": 3
+    },
+    {
+      "name": "getSnappedPosition",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 4,
+      "complexity": 1
+    },
+    {
+      "name": "addVisibilityRule",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 5,
+      "complexity": 1
+    },
+    {
+      "name": "checkVisibility",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 27,
+      "complexity": 8
+    },
+    {
+      "name": "updateUserPosition",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 7,
+      "complexity": 1
+    },
+    {
+      "name": "updateGraph",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 11,
+      "complexity": 3
+    },
+    {
+      "name": "bindKeys",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 4,
+      "complexity": 1
+    },
+    {
+      "name": "moveSelection",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lines": 5,
+      "complexity": 1
+    },
+    {
+      "name": "readUsers",
+      "file": "src/controllers/authController.js",
+      "lines": 18,
+      "complexity": 2
+    },
+    {
+      "name": "appendUser",
+      "file": "src/controllers/authController.js",
+      "lines": 4,
+      "complexity": 1
+    },
+    {
+      "name": "register",
+      "file": "src/controllers/authController.js",
+      "lines": 19,
+      "complexity": 3
+    },
+    {
+      "name": "login",
+      "file": "src/controllers/authController.js",
+      "lines": 23,
+      "complexity": 3
+    },
+    {
+      "name": "getGameState",
+      "file": "src/controllers/gameController.js",
+      "lines": 12,
+      "complexity": 2
+    },
+    {
+      "name": "saveGameState",
+      "file": "src/controllers/gameController.js",
+      "lines": 25,
+      "complexity": 2
+    },
+    {
+      "name": "getPromos",
+      "file": "src/controllers/gameController.js",
+      "lines": 12,
+      "complexity": 2
+    },
+    {
+      "name": "getGameData",
+      "file": "src/controllers/gameController.js",
+      "lines": 28,
+      "complexity": 6
+    },
+    {
+      "name": "getIpLocation",
+      "file": "src/controllers/locationController.js",
+      "lines": 46,
+      "complexity": 4
+    },
+    {
+      "name": "locate",
+      "file": "src/controllers/locationController.js",
+      "lines": 31,
+      "complexity": 5
+    },
+    {
+      "name": "reverseProxy",
+      "file": "src/controllers/locationController.js",
+      "lines": 10,
+      "complexity": 2
+    },
+    {
+      "name": "searchProxy",
+      "file": "src/controllers/locationController.js",
+      "lines": 10,
+      "complexity": 2
+    },
+    {
+      "name": "getLocationState",
+      "file": "src/controllers/locationController.js",
+      "lines": 34,
+      "complexity": 5
+    },
+    {
+      "name": "saveLocationState",
+      "file": "src/controllers/locationController.js",
+      "lines": 49,
+      "complexity": 5
+    },
+    {
+      "name": "getSession",
+      "file": "src/controllers/sessionController.js",
+      "lines": 7,
+      "complexity": 1
+    },
+    {
+      "name": "asyncHandler",
+      "file": "src/middleware/asyncHandler.js",
+      "lines": 3,
+      "complexity": 2
+    },
+    {
+      "name": "errorHandler",
+      "file": "src/middleware/errorHandler.js",
+      "lines": 35,
+      "complexity": 6
+    },
+    {
+      "name": "notFoundHandler",
+      "file": "src/middleware/errorHandler.js",
+      "lines": 3,
+      "complexity": 1
+    },
+    {
+      "name": "requestLogger",
+      "file": "src/middleware/requestLogger.js",
+      "lines": 10,
+      "complexity": 2
+    },
+    {
+      "name": "loadGameState",
+      "file": "src/public/js/game-api.js",
+      "lines": 16,
+      "complexity": 3
+    },
+    {
+      "name": "loadLocationState",
+      "file": "src/public/js/game-api.js",
+      "lines": 10,
+      "complexity": 3
+    },
+    {
+      "name": "updateAndSaveUserPosition",
+      "file": "src/public/js/map-logic.js",
+      "lines": 4,
+      "complexity": 1
+    },
+    {
+      "name": "debouncedSavePosition",
+      "file": "src/public/js/map-logic.js",
+      "lines": 9,
+      "complexity": 1
+    },
+    {
+      "name": "revealMap",
+      "file": "src/public/js/map-logic.js",
+      "lines": 9,
+      "complexity": 2
+    },
+    {
+      "name": "renderGameElements",
+      "file": "src/public/js/map-logic.js",
+      "lines": 31,
+      "complexity": 1
+    },
+    {
+      "name": "rebuildAdjacencyMap",
+      "file": "src/services/map/graphBuilder.js",
+      "lines": 17,
+      "complexity": 5
+    },
+    {
+      "name": "getRelevantNodes",
+      "file": "src/services/map/graphBuilder.js",
+      "lines": 11,
+      "complexity": 3
+    },
+    {
+      "name": "tracePath",
+      "file": "src/services/map/graphBuilder.js",
+      "lines": 37,
+      "complexity": 5
+    },
+    {
+      "name": "createGreenCirclesForPath",
+      "file": "src/services/map/graphBuilder.js",
+      "lines": 42,
+      "complexity": 5
+    },
+    {
+      "name": "createGraphElements",
+      "file": "src/services/map/graphBuilder.js",
+      "lines": 61,
+      "complexity": 6
+    },
+    {
+      "name": "polygonToTurf",
+      "file": "src/services/map/groupCreator.js",
+      "lines": 10,
+      "complexity": 3
+    },
+    {
+      "name": "dissolvePolygons",
+      "file": "src/services/map/groupCreator.js",
+      "lines": 18,
+      "complexity": 5
+    },
+    {
+      "name": "findContainedPolygons",
+      "file": "src/services/map/groupCreator.js",
+      "lines": 13,
+      "complexity": 4
+    },
+    {
+      "name": "createGroups",
+      "file": "src/services/map/groupCreator.js",
+      "lines": 51,
+      "complexity": 7
+    },
+    {
+      "name": "generateMap",
+      "file": "src/services/map/index.js",
+      "lines": 125,
+      "complexity": 15
+    },
+    {
+      "name": "buildAdjacencyFromRoads",
+      "file": "src/services/map/intersectionFinder.js",
+      "lines": 32,
+      "complexity": 7
+    },
+    {
+      "name": "findIntersectionNodes",
+      "file": "src/services/map/intersectionFinder.js",
+      "lines": 19,
+      "complexity": 3
+    },
+    {
+      "name": "serializeAdjacency",
+      "file": "src/services/map/intersectionFinder.js",
+      "lines": 18,
+      "complexity": 4
+    },
+    {
+      "name": "identifyIntersections",
+      "file": "src/services/map/intersectionFinder.js",
+      "lines": 20,
+      "complexity": 2
+    },
+    {
+      "name": "findMinimalCycles",
+      "file": "src/services/map/polygonFinder.js",
+      "lines": 63,
+      "complexity": 13
+    },
+    {
+      "name": "cycleToPolygonCoords",
+      "file": "src/services/map/polygonFinder.js",
+      "lines": 40,
+      "complexity": 6
+    },
+    {
+      "name": "validatePolygonArea",
+      "file": "src/services/map/polygonFinder.js",
+      "lines": 22,
+      "complexity": 6
+    },
+    {
+      "name": "createPolygonData",
+      "file": "src/services/map/polygonFinder.js",
+      "lines": 24,
+      "complexity": 1
+    },
+    {
+      "name": "findPolygons",
+      "file": "src/services/map/polygonFinder.js",
+      "lines": 55,
+      "complexity": 10
+    },
+    {
+      "name": "buildOverpassQuery",
+      "file": "src/services/map/roadFetcher.js",
+      "lines": 11,
+      "complexity": 1
+    },
+    {
+      "name": "raceOverpassServers",
+      "file": "src/services/map/roadFetcher.js",
+      "lines": 20,
+      "complexity": 2
+    },
+    {
+      "name": "parseOverpassResponse",
+      "file": "src/services/map/roadFetcher.js",
+      "lines": 31,
+      "complexity": 8
+    },
+    {
+      "name": "normalizePath",
+      "file": "src/services/map/roadFetcher.js",
+      "lines": 4,
+      "complexity": 1
+    },
+    {
+      "name": "mergeRoadLines",
+      "file": "src/services/map/roadFetcher.js",
+      "lines": 31,
+      "complexity": 7
+    },
+    {
+      "name": "fetchRedLines",
+      "file": "src/services/map/roadFetcher.js",
+      "lines": 31,
+      "complexity": 4
+    },
+    {
+      "name": "reverseGeocode",
+      "file": "src/services/nominatim.service.js",
+      "lines": 12,
+      "complexity": 2
+    },
+    {
+      "name": "searchPlace",
+      "file": "src/services/nominatim.service.js",
+      "lines": 11,
+      "complexity": 2
+    },
+    {
+      "name": "getCityFromCoords",
+      "file": "src/services/nominatim.service.js",
+      "lines": 21,
+      "complexity": 2
+    },
+    {
+      "name": "getCityCenter",
+      "file": "src/services/nominatim.service.js",
+      "lines": 14,
+      "complexity": 3
+    },
+    {
+      "name": "getRedisClient",
+      "file": "src/services/redis.service.js",
+      "lines": 23,
+      "complexity": 3
+    },
+    {
+      "name": "flushDatabase",
+      "file": "src/services/redis.service.js",
+      "lines": 4,
+      "complexity": 1
+    },
+    {
+      "name": "saveToRedis",
+      "file": "src/services/redis.service.js",
+      "lines": 17,
+      "complexity": 3
+    },
+    {
+      "name": "loadFromRedis",
+      "file": "src/services/redis.service.js",
+      "lines": 12,
+      "complexity": 3
+    },
+    {
+      "name": "retryStrategy",
+      "file": "src/services/redis.js",
+      "lines": 5,
+      "complexity": 2
+    },
+    {
+      "name": "haversineDistance",
+      "file": "src/utils/geometry.js",
+      "lines": 14,
+      "complexity": 1
+    },
+    {
+      "name": "lineSegmentIntersection",
+      "file": "src/utils/geometry.js",
+      "lines": 21,
+      "complexity": 3
+    },
+    {
+      "name": "calculateLabelPosition",
+      "file": "src/utils/geometry.js",
+      "lines": 66,
+      "complexity": 11
+    },
+    {
+      "name": "calculatePolygonCentroid",
+      "file": "src/utils/geometry.js",
+      "lines": 44,
+      "complexity": 6
+    },
+    {
+      "name": "generateUid",
+      "file": "src/utils/geometry.js",
+      "lines": 3,
+      "complexity": 1
+    },
+    {
+      "name": "coordKey",
+      "file": "src/utils/geometry.js",
+      "lines": 3,
+      "complexity": 1
+    },
+    {
+      "name": "parseCoordKey",
+      "file": "src/utils/geometry.js",
+      "lines": 3,
+      "complexity": 1
+    },
+    {
+      "name": "roundCoord",
+      "file": "src/utils/geometry.js",
+      "lines": 3,
+      "complexity": 1
+    },
+    {
+      "name": "startServer",
+      "file": "server.js",
+      "lines": 30,
+      "complexity": 3
+    },
+    {
+      "name": "shutdown",
+      "file": "server.js",
+      "lines": 7,
+      "complexity": 2
+    }
+  ],
+  "callGraph": {
+    "constructor": [
+      "init"
+    ],
+    "init": [
+      "addVisibilityRule",
+      "checkVisibility"
+    ],
+    "addVisibilityRule": [
+      "checkVisibility"
+    ],
+    "updateUserPosition": [
+      "getSnappedPosition"
+    ],
+    "register": [
+      "readUsers",
+      "appendUser"
+    ],
+    "login": [
+      "readUsers"
+    ],
+    "getGameState": [
+      "loadFromRedis"
+    ],
+    "saveGameState": [
+      "getRedisClient"
+    ],
+    "getGameData": [
+      "generateMap"
+    ],
+    "locate": [
+      "getCityFromCoords",
+      "getCityCenter"
+    ],
+    "reverseProxy": [
+      "reverseGeocode"
+    ],
+    "searchProxy": [
+      "searchPlace"
+    ],
+    "getLocationState": [
+      "loadFromRedis"
+    ],
+    "saveLocationState": [
+      "getRedisClient"
+    ],
+    "global": [
+      "saveGameState",
+      "loadGameState",
+      "loadLocationState",
+      "getMap",
+      "addVisibilityRule",
+      "asyncHandler",
+      "startServer"
+    ],
+    "updateAndSaveUserPosition": [
+      "updateUserPosition"
+    ],
+    "rebuildAdjacencyMap": [
+      "coordKey"
+    ],
+    "getRelevantNodes": [
+      "coordKey"
+    ],
+    "tracePath": [
+      "parseCoordKey",
+      "haversineDistance"
+    ],
+    "createGreenCirclesForPath": [
+      "haversineDistance"
+    ],
+    "createGraphElements": [
+      "loadFromRedis",
+      "getRelevantNodes",
+      "rebuildAdjacencyMap",
+      "parseCoordKey",
+      "tracePath",
+      "createGreenCirclesForPath",
+      "saveToRedis"
+    ],
+    "createGroups": [
+      "loadFromRedis",
+      "saveToRedis",
+      "polygonToTurf",
+      "dissolvePolygons",
+      "findContainedPolygons"
+    ],
+    "generateMap": [
+      "loadFromRedis",
+      "fetchRedLines",
+      "identifyIntersections",
+      "createGraphElements",
+      "findPolygons",
+      "createGroups",
+      "saveToRedis"
+    ],
+    "buildAdjacencyFromRoads": [
+      "coordKey"
+    ],
+    "findIntersectionNodes": [
+      "parseCoordKey"
+    ],
+    "serializeAdjacency": [
+      "parseCoordKey"
+    ],
+    "identifyIntersections": [
+      "loadFromRedis",
+      "buildAdjacencyFromRoads",
+      "findIntersectionNodes",
+      "saveToRedis",
+      "serializeAdjacency"
+    ],
+    "cycleToPolygonCoords": [
+      "parseCoordKey"
+    ],
+    "createPolygonData": [
+      "calculatePolygonCentroid",
+      "calculateLabelPosition"
+    ],
+    "findPolygons": [
+      "loadFromRedis",
+      "findMinimalCycles",
+      "cycleToPolygonCoords",
+      "validatePolygonArea",
+      "createPolygonData",
+      "saveToRedis"
+    ],
+    "mergeRoadLines": [
+      "normalizePath"
+    ],
+    "fetchRedLines": [
+      "buildOverpassQuery",
+      "raceOverpassServers",
+      "parseOverpassResponse",
+      "loadFromRedis",
+      "mergeRoadLines",
+      "saveToRedis"
+    ],
+    "getCityFromCoords": [
+      "reverseGeocode"
+    ],
+    "getCityCenter": [
+      "searchPlace"
+    ],
+    "flushDatabase": [
+      "getRedisClient"
+    ],
+    "saveToRedis": [
+      "getRedisClient"
+    ],
+    "loadFromRedis": [
+      "getRedisClient"
+    ],
+    "calculateLabelPosition": [
+      "lineSegmentIntersection"
+    ],
+    "startServer": [
+      "getRedisClient",
+      "flushDatabase"
+    ]
+  },
+  "importGraph": {
+    "src/config/constants.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "path"
+        ],
+        "module": "path",
+        "file": "src/config/constants.js"
+      }
+    ],
+    "src/controllers/authController.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "fs"
+        ],
+        "module": "fs",
+        "file": "src/controllers/authController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "parse"
+        ],
+        "module": "csv-parse/sync",
+        "file": "src/controllers/authController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "PATHS"
+        ],
+        "module": "../config/constants",
+        "file": "src/controllers/authController.js"
+      }
+    ],
+    "src/controllers/gameController.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "path"
+        ],
+        "module": "path",
+        "file": "src/controllers/gameController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "fs"
+        ],
+        "module": "fs",
+        "file": "src/controllers/gameController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../config",
+        "file": "src/controllers/gameController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS",
+          "PATHS"
+        ],
+        "module": "../config/constants",
+        "file": "src/controllers/gameController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "getRedisClient",
+          "loadFromRedis"
+        ],
+        "module": "../services/redis.service",
+        "file": "src/controllers/gameController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "generateMap"
+        ],
+        "module": "../services/map",
+        "file": "src/controllers/gameController.js"
+      }
+    ],
+    "src/controllers/index.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "sessionController"
+        ],
+        "module": "./sessionController",
+        "file": "src/controllers/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "locationController"
+        ],
+        "module": "./locationController",
+        "file": "src/controllers/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "gameController"
+        ],
+        "module": "./gameController",
+        "file": "src/controllers/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "authController"
+        ],
+        "module": "./authController",
+        "file": "src/controllers/index.js"
+      }
+    ],
+    "src/controllers/locationController.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "axios"
+        ],
+        "module": "axios",
+        "file": "src/controllers/locationController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../config",
+        "file": "src/controllers/locationController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../config/constants",
+        "file": "src/controllers/locationController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "getRedisClient",
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../services/redis.service",
+        "file": "src/controllers/locationController.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "getCityFromCoords",
+          "getCityCenter",
+          "reverseGeocode",
+          "searchPlace"
+        ],
+        "module": "../services/nominatim.service",
+        "file": "src/controllers/locationController.js"
+      }
+    ],
+    "src/middleware/errorHandler.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "HTTP_STATUS"
+        ],
+        "module": "../config/constants",
+        "file": "src/middleware/errorHandler.js"
+      }
+    ],
+    "src/middleware/index.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "asyncHandler"
+        ],
+        "module": "./asyncHandler",
+        "file": "src/middleware/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "AppError",
+          "NotFoundError",
+          "BadRequestError",
+          "ValidationError",
+          "errorHandler",
+          "notFoundHandler"
+        ],
+        "module": "./errorHandler",
+        "file": "src/middleware/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "requestLogger"
+        ],
+        "module": "./requestLogger",
+        "file": "src/middleware/index.js"
+      }
+    ],
+    "src/public/js/map-logic.js": [
+      {
+        "type": "es6-named",
+        "names": [
+          "getLocationKey",
+          "parseLocationKey",
+          "getCoordinateKey",
+          "parseCoordinateKey"
+        ],
+        "module": "./modules/utils/CoordinateUtils.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "generateUID",
+          "createUIDMaps"
+        ],
+        "module": "./modules/utils/UIDGenerator.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "euclideanDistance",
+          "isWithinDistance"
+        ],
+        "module": "./modules/utils/GeometryUtils.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "showError"
+        ],
+        "module": "./modules/ui/ErrorDisplay.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "initTopBarEvents"
+        ],
+        "module": "./modules/ui/TopBarHandler.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "resetSelection",
+          "addToSelection",
+          "getSelectedLayers",
+          "clearSelection"
+        ],
+        "module": "./modules/ui/DebugMode.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "loadVersionBadge"
+        ],
+        "module": "./modules/ui/VersionBadge.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "gameState",
+          "resetGameState",
+          "getCurrentPosition",
+          "setCurrentPosition",
+          "isCircleCollected",
+          "collectCircle",
+          "isCircleExpanded",
+          "markCircleExpanded"
+        ],
+        "module": "./modules/state/GameState.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "PosterRenderer"
+        ],
+        "module": "./modules/rendering/PosterRenderer.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "renderGameElements"
+        ],
+        "module": "./modules/rendering/index.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "createPolygonVisualsUpdater"
+        ],
+        "module": "./modules/rendering/PolygonVisuals.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "loadGlobalState",
+          "loadLocationState"
+        ],
+        "module": "./modules/api/StateLoader.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "StateSaver"
+        ],
+        "module": "./modules/api/StateSaver.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "renderFromSavedState"
+        ],
+        "module": "./modules/api/StateRestorer.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "createGameDataLoader"
+        ],
+        "module": "./modules/api/GameDataLoader.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "setupMovementHandlers"
+        ],
+        "module": "./modules/events/MovementHandlers.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "setupDebugHandlers"
+        ],
+        "module": "./modules/events/DebugHandlers.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "setupMarkerDirectionHandler"
+        ],
+        "module": "./modules/events/MarkerDirectionHandler.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "setupDebugModeToggle"
+        ],
+        "module": "./modules/events/DebugModeToggle.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "lineIntersectsRect",
+          "updateDebugBoxIntersections",
+          "resetWhiteLineColors"
+        ],
+        "module": "./modules/debug/IntersectionDebug.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "setupProgressHiding",
+          "findNearestActiveCircle"
+        ],
+        "module": "./modules/logic/ProgressManager.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "DebugInteractionHandler"
+        ],
+        "module": "./modules/ui/DebugInteractionHandler.js",
+        "file": "src/public/js/map-logic.js"
+      },
+      {
+        "type": "es6-named",
+        "names": [
+          "createGameInitializer"
+        ],
+        "module": "./modules/core/GameInitializer.js",
+        "file": "src/public/js/map-logic.js"
+      }
+    ],
+    "src/routes/api.routes.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "express"
+        ],
+        "module": "express",
+        "file": "src/routes/api.routes.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "asyncHandler"
+        ],
+        "module": "../middleware",
+        "file": "src/routes/api.routes.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "sessionController",
+          "locationController",
+          "gameController"
+        ],
+        "module": "../controllers",
+        "file": "src/routes/api.routes.js"
+      }
+    ],
+    "src/routes/auth.routes.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "express"
+        ],
+        "module": "express",
+        "file": "src/routes/auth.routes.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "asyncHandler"
+        ],
+        "module": "../middleware",
+        "file": "src/routes/auth.routes.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "authController"
+        ],
+        "module": "../controllers",
+        "file": "src/routes/auth.routes.js"
+      }
+    ],
+    "src/routes/index.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "apiRoutes"
+        ],
+        "module": "./api.routes",
+        "file": "src/routes/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "authRoutes"
+        ],
+        "module": "./auth.routes",
+        "file": "src/routes/index.js"
+      }
+    ],
+    "src/services/map/graphBuilder.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../../config",
+        "file": "src/services/map/graphBuilder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../../config/constants",
+        "file": "src/services/map/graphBuilder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../redis.service",
+        "file": "src/services/map/graphBuilder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "haversineDistance",
+          "coordKey",
+          "parseCoordKey"
+        ],
+        "module": "../../utils/geometry",
+        "file": "src/services/map/graphBuilder.js"
+      }
+    ],
+    "src/services/map/groupCreator.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "turf"
+        ],
+        "module": "@turf/turf",
+        "file": "src/services/map/groupCreator.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../../config/constants",
+        "file": "src/services/map/groupCreator.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../redis.service",
+        "file": "src/services/map/groupCreator.js"
+      }
+    ],
+    "src/services/map/index.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../../config",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../../config/constants",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../redis.service",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "fetchRedLines"
+        ],
+        "module": "./roadFetcher",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "identifyIntersections"
+        ],
+        "module": "./intersectionFinder",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "createGraphElements"
+        ],
+        "module": "./graphBuilder",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "findPolygons"
+        ],
+        "module": "./polygonFinder",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "createGroups"
+        ],
+        "module": "./groupCreator",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "calculateConnections"
+        ],
+        "module": "./connectionCalculator",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "createPosterGrid"
+        ],
+        "module": "./posterGridCreator",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "applyModeFiltering"
+        ],
+        "module": "./modeFilter",
+        "file": "src/services/map/index.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "filterOrphanedElements",
+          "calculatePolygonPoints"
+        ],
+        "module": "./mapHelpers",
+        "file": "src/services/map/index.js"
+      }
+    ],
+    "src/services/map/intersectionFinder.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../../config/constants",
+        "file": "src/services/map/intersectionFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../redis.service",
+        "file": "src/services/map/intersectionFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "coordKey",
+          "parseCoordKey"
+        ],
+        "module": "../../utils/geometry",
+        "file": "src/services/map/intersectionFinder.js"
+      }
+    ],
+    "src/services/map/polygonFinder.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "turf"
+        ],
+        "module": "@turf/turf",
+        "file": "src/services/map/polygonFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../../config/constants",
+        "file": "src/services/map/polygonFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../redis.service",
+        "file": "src/services/map/polygonFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "calculatePolygonCentroid",
+          "calculateLabelPosition",
+          "parseCoordKey"
+        ],
+        "module": "../../utils/geometry",
+        "file": "src/services/map/polygonFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "buildPlanarGraph"
+        ],
+        "module": "./planarGraphBuilder",
+        "file": "src/services/map/polygonFinder.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "assignPromoGifs"
+        ],
+        "module": "./promoAssigner",
+        "file": "src/services/map/polygonFinder.js"
+      }
+    ],
+    "src/services/map/roadFetcher.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "axios"
+        ],
+        "module": "axios",
+        "file": "src/services/map/roadFetcher.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../../config",
+        "file": "src/services/map/roadFetcher.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../../config/constants",
+        "file": "src/services/map/roadFetcher.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "saveToRedis",
+          "loadFromRedis"
+        ],
+        "module": "../redis.service",
+        "file": "src/services/map/roadFetcher.js"
+      }
+    ],
+    "src/services/nominatim.service.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "axios"
+        ],
+        "module": "axios",
+        "file": "src/services/nominatim.service.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../config",
+        "file": "src/services/nominatim.service.js"
+      }
+    ],
+    "src/services/redis.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "Redis"
+        ],
+        "module": "ioredis",
+        "file": "src/services/redis.js"
+      }
+    ],
+    "src/services/redis.service.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "Redis"
+        ],
+        "module": "ioredis",
+        "file": "src/services/redis.service.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "config"
+        ],
+        "module": "../config",
+        "file": "src/services/redis.service.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "REDIS_KEYS"
+        ],
+        "module": "../config/constants",
+        "file": "src/services/redis.service.js"
+      }
+    ],
+    "src/utils/geometry.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "crypto"
+        ],
+        "module": "crypto",
+        "file": "src/utils/geometry.js"
+      }
+    ],
+    "server.js": [
+      {
+        "type": "commonjs",
+        "names": [
+          "express"
+        ],
+        "module": "express",
+        "file": "server.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "cors"
+        ],
+        "module": "cors",
+        "file": "server.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "path"
+        ],
+        "module": "path",
+        "file": "server.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "fs"
+        ],
+        "module": "fs",
+        "file": "server.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "v4"
+        ],
+        "module": "uuid",
+        "file": "server.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "apiRoutes",
+          "authRoutes"
+        ],
+        "module": "./src/routes",
+        "file": "server.js"
+      },
+      {
+        "type": "commonjs",
+        "names": [
+          "getRedisClient",
+          "flushDatabase"
+        ],
+        "module": "./src/services/redis",
+        "file": "server.js"
+      }
+    ]
+  },
+  "roots": [
+    "register",
+    "locate",
+    "constructor",
+    "login",
+    "getGameState",
+    "getGameData",
+    "reverseProxy",
+    "searchProxy",
+    "getLocationState",
+    "saveLocationState",
+    "getPromos",
+    "getIpLocation",
+    "getSession",
+    "errorHandler",
+    "notFoundHandler",
+    "requestLogger",
+    "retryStrategy"
+  ],
+  "unused": [
+    {
+      "name": "setSnapLines",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lineCount": 6,
+      "complexity": 3
+    },
+    {
+      "name": "updateGraph",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lineCount": 11,
+      "complexity": 3
+    },
+    {
+      "name": "bindKeys",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lineCount": 4,
+      "complexity": 1
+    },
+    {
+      "name": "moveSelection",
+      "file": "CORE/FRONTEND/B_map_page/components/map_controls.js",
+      "lineCount": 5,
+      "complexity": 1
+    },
+    {
+      "name": "shutdown",
+      "file": "server.js",
+      "lineCount": 7,
+      "complexity": 2
+    },
+    {
+      "name": "updateAndSaveUserPosition",
+      "file": "src/public/js/map-logic.js",
+      "lineCount": 4,
+      "complexity": 1
+    },
+    {
+      "name": "debouncedSavePosition",
+      "file": "src/public/js/map-logic.js",
+      "lineCount": 9,
+      "complexity": 1
+    },
+    {
+      "name": "revealMap",
+      "file": "src/public/js/map-logic.js",
+      "lineCount": 9,
+      "complexity": 2
+    },
+    {
+      "name": "renderGameElements",
+      "file": "src/public/js/map-logic.js",
+      "lineCount": 31,
+      "complexity": 1
+    },
+    {
+      "name": "generateUid",
+      "file": "src/utils/geometry.js",
+      "lineCount": 3,
+      "complexity": 1
+    },
+    {
+      "name": "roundCoord",
+      "file": "src/utils/geometry.js",
+      "lineCount": 3,
+      "complexity": 1
+    }
+  ]
+}
