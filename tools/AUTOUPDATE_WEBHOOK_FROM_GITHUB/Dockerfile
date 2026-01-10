@@ -14,8 +14,7 @@ EXPOSE 9000
 
 WORKDIR /app
 
-# Copy webhook script
-COPY webhook.js .
+# No COPY needed - the entire project is mounted as /app via docker-compose volume
+# This ensures webhook.js is always up-to-date after git pull
 
-# The CMD runs the script from the mounted volume
 CMD ["node", "tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js"]
