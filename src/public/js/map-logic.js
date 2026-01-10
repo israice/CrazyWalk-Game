@@ -8,6 +8,7 @@ import { showError } from './modules/ui/ErrorDisplay.js';
 // Phase 2: UI Components
 import { initTopBarEvents } from './modules/ui/TopBarHandler.js';
 import { resetSelection, addToSelection, getSelectedLayers, clearSelection } from './modules/ui/DebugMode.js';
+import { loadVersionBadge } from './modules/ui/VersionBadge.js';
 
 // Phase 3: State Management
 import { gameState, resetGameState, getCurrentPosition, setCurrentPosition, isCircleCollected, collectCircle, isCircleExpanded, markCircleExpanded } from './modules/state/GameState.js';
@@ -26,6 +27,8 @@ import { createGameDataLoader } from './modules/api/GameDataLoader.js';
 // Phase 6: Event Handlers
 import { setupMovementHandlers } from './modules/events/MovementHandlers.js';
 import { setupDebugHandlers } from './modules/events/DebugHandlers.js';
+import { setupMarkerDirectionHandler } from './modules/events/MarkerDirectionHandler.js';
+import { setupDebugModeToggle } from './modules/events/DebugModeToggle.js';
 
 // Phase 7: Debug Tools
 import { lineIntersectsRect, updateDebugBoxIntersections, resetWhiteLineColors } from './modules/debug/IntersectionDebug.js';
@@ -37,25 +40,8 @@ import { DebugInteractionHandler } from './modules/ui/DebugInteractionHandler.js
 // Phase 9: Core Initialization
 import { createGameInitializer } from './modules/core/GameInitializer.js';
 
-// Version Badge Loader - Fetches version from README.md
-(async function loadVersionBadge() {
-    const versionBadge = document.getElementById('version-badge');
-
-    try {
-        const response = await fetch('/README.md?t=' + Date.now());
-        if (!response.ok) throw new Error('README.md not found');
-
-        const text = await response.text();
-        const match = text.match(/git commit -m "(v[\d.]+)/m);
-        if (!match) throw new Error('Version not found in README.md');
-
-        versionBadge.textContent = match[1];
-        versionBadge.style.opacity = '1';
-    } catch (err) {
-        console.warn('DEBUG: Failed to load version badge:', err.message);
-        versionBadge.style.display = 'none';
-    }
-})();
+// Load version badge
+loadVersionBadge();
 
 document.addEventListener('DOMContentLoaded', () => {
     const mapElement = document.getElementById('map');
@@ -241,47 +227,17 @@ document.addEventListener('DOMContentLoaded', () => {
         DEFAULT_LON
     });
 
-    // Keyboard Navigation - Marker direction flipping
-    let lastFacingDirection = 'left';
-    document.addEventListener('map-move-request', (e) => {
-        const { lat, lon, direction } = e.detail;
-
-        // Flip marker GIF based on direction
-        if (direction) {
-            const isLeft = direction.includes('LEFT');
-            const isRight = direction.includes('RIGHT');
-            const markerGif = document.getElementById('marker-gif');
-
-            if (isRight && lastFacingDirection !== 'right' && markerGif) {
-                markerGif.style.transform = 'translateY(-25%) scaleX(-1)';
-                lastFacingDirection = 'right';
-            } else if (isLeft && lastFacingDirection !== 'left' && markerGif) {
-                markerGif.style.transform = 'translateY(-25%)';
-                lastFacingDirection = 'left';
-            }
-        }
-
-        // Move marker and update state
-        userMarker.setLatLng([lat, lon]);
-        gameState.currentUserPosition = { lat, lon };
-        updateAndSaveUserPosition(userMarker, lat, lon);
-        map.panTo([lat, lon]);
-        debouncedSavePosition();
+    // Setup marker direction handler
+    setupMarkerDirectionHandler({
+        userMarker,
+        gameState,
+        updateAndSaveUserPosition,
+        map,
+        debouncedSavePosition
     });
 
-    // Debug Mode Toggle Handler
-    document.addEventListener('debug-mode-change', (e) => {
-        gameState.isDebugActive = e.detail.active;
-        const postersBtn = document.getElementById('btn-debug-posters');
-        if (gameState.isDebugActive) {
-            postersBtn.style.display = 'flex';
-        } else {
-            postersBtn.style.display = 'none';
-            gameState.isPostersDebugActive = false;
-            postersBtn.classList.remove('active');
-            posterRenderer.updatePostersVisibility();
-        }
-    });
+    // Setup debug mode toggle handler
+    setupDebugModeToggle({ gameState, posterRenderer });
 
     // Load Top Bar
     fetch(`/B_map_page/components/top_bar.html?v=${Date.now()}`)

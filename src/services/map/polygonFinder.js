@@ -3,57 +3,12 @@
  * Finds minimal cycles (polygons) in the road graph
  */
 
-const path = require('path');
-const fs = require('fs');
 const turf = require('@turf/turf');
-const { REDIS_KEYS, PATHS } = require('../../config/constants');
+const { REDIS_KEYS } = require('../../config/constants');
 const { saveToRedis, loadFromRedis } = require('../redis.service');
-const { calculatePolygonCentroid, calculateLabelPosition, coordKey, parseCoordKey } = require('../../utils/geometry');
-
-/**
- * Build node adjacency with angle information for planar face detection
- * @param {Array} whiteLines - White lines array
- * @returns {Object} { nodes, edgeData }
- */
-function buildPlanarGraph(whiteLines) {
-  const nodes = new Map(); // nodeKey -> { lat, lon, neighbors: [{key, angle, lineId}] }
-  const edgeData = new Map();
-
-  for (const wl of whiteLines) {
-    const uKey = coordKey(wl.start[0], wl.start[1]);
-    const vKey = coordKey(wl.end[0], wl.end[1]);
-    const edgeKey = [uKey, vKey].sort().join('|');
-
-    if (!nodes.has(uKey)) {
-      nodes.set(uKey, { lat: wl.start[0], lon: wl.start[1], neighbors: [] });
-    }
-    if (!nodes.has(vKey)) {
-      nodes.set(vKey, { lat: wl.end[0], lon: wl.end[1], neighbors: [] });
-    }
-
-    const uNode = nodes.get(uKey);
-    const vNode = nodes.get(vKey);
-
-    const angleUtoV = Math.atan2(vNode.lon - uNode.lon, vNode.lat - uNode.lat);
-    const angleVtoU = Math.atan2(uNode.lon - vNode.lon, uNode.lat - vNode.lat);
-
-    uNode.neighbors.push({ key: vKey, angle: angleUtoV, lineId: wl.id });
-    vNode.neighbors.push({ key: uKey, angle: angleVtoU, lineId: wl.id });
-
-    edgeData.set(edgeKey, {
-      path: wl.path,
-      green_count: wl.green_count || 0,
-      line_id: wl.id
-    });
-  }
-
-  // Sort neighbors by angle at each node
-  for (const [key, node] of nodes) {
-    node.neighbors.sort((a, b) => a.angle - b.angle);
-  }
-
-  return { nodes, edgeData };
-}
+const { calculatePolygonCentroid, calculateLabelPosition, parseCoordKey } = require('../../utils/geometry');
+const { buildPlanarGraph } = require('./planarGraphBuilder');
+const { assignPromoGifs } = require('./promoAssigner');
 
 /**
  * Find all minimal faces using "next edge" traversal
@@ -232,32 +187,6 @@ function createPolygonData(coords, boundaryIds, totalPoints) {
 }
 
 /**
- * Assign promo GIFs to polygons
- * @param {Array} polygonsData - Polygons array
- * @returns {Promise<void>}
- */
-async function assignPromoGifs(polygonsData) {
-  let promoGifs = [];
-  if (fs.existsSync(PATHS.PROMOS_DIR)) {
-    promoGifs = fs.readdirSync(PATHS.PROMOS_DIR).filter(f => f.toLowerCase().endsWith('.gif'));
-  }
-
-  if (promoGifs.length === 0) return;
-
-  for (const poly of polygonsData) {
-    const redisKey = `game:promo_assignment:${poly.id}`;
-    let assignedGif = await loadFromRedis(redisKey);
-
-    if (!assignedGif) {
-      assignedGif = promoGifs[Math.floor(Math.random() * promoGifs.length)];
-      await saveToRedis(redisKey, assignedGif, null);
-    }
-
-    poly.promo_gif = assignedGif;
-  }
-}
-
-/**
  * Find polygons from white lines
  * @returns {Promise<Object>} { polygons, usedIds }
  */
@@ -319,10 +248,8 @@ async function findPolygons() {
 
 module.exports = {
   findPolygons,
-  buildPlanarGraph,
   findMinimalCycles,
   cycleToPolygonCoords,
   validatePolygonArea,
-  createPolygonData,
-  assignPromoGifs
+  createPolygonData
 };
