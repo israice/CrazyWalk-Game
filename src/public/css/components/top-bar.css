@@ -1,0 +1,142 @@
+/* Top Bar Container */
+.top-controls {
+    position: absolute;
+    top: 2vh;
+    left: 0;
+    width: 100%;
+    padding: 0 2vw;
+    box-sizing: border-box;
+    display: flex;
+    gap: clamp(4px, 2vw, 4vh);
+    z-index: 50;
+    align-items: center;
+    justify-content: flex-end;
+    pointer-events: none;
+    flex-wrap: nowrap;
+}
+
+/* Expanded State */
+.top-controls.expanded {
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    min-height: 10vh;
+    padding: 2vh 2vw;
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    align-items: center;
+    pointer-events: auto;
+    justify-content: flex-end;
+}
+
+/* Control Button - Scalable Size */
+.control-btn {
+    width: clamp(32px, 6vw, 6vh);
+    height: clamp(32px, 6vw, 6vh);
+    min-width: 32px;
+    min-height: 32px;
+    background-color: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: clamp(4px, 1vh, 1vh);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex-shrink: 1;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+}
+
+.control-btn.active {
+    border: 2px solid red;
+    background-color: rgba(60, 60, 60, 0.9);
+}
+
+.control-btn:active {
+    background-color: rgba(60, 60, 60, 0.9);
+}
+
+.control-btn svg {
+    width: 60%;
+    height: 60%;
+    fill: white;
+    transition: fill 0.3s;
+}
+
+#btn-debug-posters {
+    font-size: clamp(16px, 3.5vh, 3.5vh);
+    line-height: 1;
+}
+
+.top-controls.expanded #menu-btn {
+    border: 2px solid red;
+    background-color: rgba(60, 60, 60, 0.9);
+}
+
+.top-controls.expanded .social-group,
+.top-controls.expanded #debug-btn,
+.top-controls.expanded #btn-debug-posters {
+    display: none;
+}
+
+.menu-items {
+    display: none;
+    gap: clamp(4px, 2vw, 4vh);
+}
+
+.top-controls.expanded .menu-items {
+    display: flex;
+}
+
+.social-group {
+    display: flex;
+    gap: clamp(4px, 1.5vw, 2vh);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+    flex-shrink: 1;
+}
+
+@media (max-width: 768px) {
+    .social-group {
+        position: relative;
+        left: auto;
+        transform: none;
+        margin-right: auto;
+    }
+
+    .top-controls {
+        gap: clamp(2px, 1.5vw, 2vh);
+        padding: 0 1vw;
+    }
+
+    .control-btn {
+        width: clamp(28px, 8vw, 5vh);
+        height: clamp(28px, 8vw, 5vh);
+        min-width: 28px;
+        min-height: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .control-btn {
+        width: clamp(24px, 10vw, 40px);
+        height: clamp(24px, 10vw, 40px);
+    }
+
+    .top-controls {
+        gap: 2px;
+        padding: 0 4px;
+    }
+}
+
+body.debug-mode .social-group {
+    display: none;
+}

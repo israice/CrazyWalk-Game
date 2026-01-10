@@ -1,28 +1,25 @@
 # Project Function Analysis
 
-Generated on: 2026-01-10T05:26:41.525Z
+Generated on: 2026-01-10T05:43:34.025Z
 
 ## File Statistics
 > [!NOTE]
 > Files with 300+ lines or 10KB+ size may benefit from splitting into smaller modules.
 
-**Total:** 90 files, 11,088 lines, 378.0 KB
+**Total:** 92 files, 10,760 lines, 365.4 KB
 
 ### Large Files (300+ lines or 10KB+)
 
 | Lines | Size | File |
 |------:|-----:|------|
-| 303 | 12.6 KB | `src/public/js/modules/rendering/CirclePropagation.js` |
-| 296 | 12.1 KB | `CORE/TOOLS/report-generator.js` |
-| 277 | 10.8 KB | `src/public/js/modules/rendering/PosterRenderer.js` |
-| 273 | 10.5 KB | `CORE/FRONTEND/B_map_page/components/top_bar.html` |
+| 197 | 10.5 KB | `src/public/js/components/TopBar.js` |
 
 ### Breakdown by File Type
 
 | Type | Files | Lines | Size |
 |------|------:|------:|-----:|
-| .js | 85 | 10,522 | 355.2 KB |
-| .html | 5 | 566 | 22.8 KB |
+| .js | 88 | 10,467 | 353.1 KB |
+| .html | 4 | 293 | 12.3 KB |
 
 ---
 
@@ -51,12 +48,16 @@ Generated on: 2026-01-10T05:26:41.525Z
 - 📦 `fs` → `fs`
 - 📦 `path` → `path`
 
+### TOOLS/markdown-generator.js
+- 📦 `path` → `path`
+
 ### TOOLS/parsers.js
 - 🔷 `module` → `a`, `b`
 - 🔷 `module` → `name`
 
 ### TOOLS/report-generator.js
-- 📦 `path` → `path`
+- 📦 `./markdown-generator` → `generateMarkdownReport`, `printTreeBuffer`
+- 📦 `./json-generator` → `generateJsonReport`
 
 ### server.js
 - 📦 `express` → `express`
@@ -112,6 +113,7 @@ Generated on: 2026-01-10T05:26:41.525Z
 - 🔷 `./modules/ui/TopBarHandler.js` → `initTopBarEvents`
 - 🔷 `./modules/ui/DebugMode.js` → `resetSelection`, `addToSelection`, `getSelectedLayers`, `clearSelection`
 - 🔷 `./modules/ui/VersionBadge.js` → `loadVersionBadge`
+- 🔷 `./components/TopBar.js` → `TopBar`
 - 🔷 `./modules/state/GameState.js` → `gameState`, `resetGameState`, `getCurrentPosition`, `setCurrentPosition`, `isCircleCollected`, `collectCircle`, `isCircleExpanded`, `markCircleExpanded`
 - 🔷 `./modules/rendering/PosterRenderer.js` → `PosterRenderer`
 - 🔷 `./modules/rendering/index.js` → `renderGameElements`
@@ -414,7 +416,7 @@ root: isWithinDistance [src/public/js/modules/utils/GeometryUtils.js] (3 lines) 
 ---
 root: handleLogin [CORE/FRONTEND/A_home_page/login.js] (38 lines) [C:7]
 ---
-root: def [CORE/TOOLS/report-generator.js] (2 lines) [C:1]
+root: def [CORE/TOOLS/markdown-generator.js] (2 lines) [C:1]
 ---
 root: getPromos [src/controllers/gameController.js] (12 lines) [C:2]
 ---
@@ -465,8 +467,8 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 
 | Lines | Complexity | Function | File |
 |------:|-----------:|----------|------|
-| 169 | 24 | `generateMarkdownReport` | TOOLS/report-generator.js |
-| 140 | 13 | `initPosterGrid` | rendering/PosterRenderer.js |
+| 157 | 24 | `generateMarkdownReport` | TOOLS/markdown-generator.js |
+| 150 | 1 | `getStyles` | components/TopBar.js |
 | 125 | 15 | `generateMap` | map/index.js |
 | 113 | 19 | `initializeRender` | rendering/RenderInitializer.js |
 | 101 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
@@ -484,14 +486,15 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 | 72 | 8 | `buildPolygonStats` | ui/DebugStatsBuilder.js |
 | 71 | 19 | `moveSelection` | components/KeyboardNavigation.js |
 | 71 | 9 | `renderWhiteLines` | rendering/WhiteLineRenderer.js |
-| 68 | 17 | `propagateNeighborUpdates` | rendering/CirclePropagation.js |
 | 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
-| 67 | 6 | `generateJsonReport` | TOOLS/report-generator.js |
+| 67 | 6 | `generateJsonReport` | TOOLS/json-generator.js |
+| 67 | 11 | `initPosterGrid` | rendering/PosterRenderer.js |
 | 66 | 7 | `createPercentageLabel` | polygons/PolygonLabel.js |
 | 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
 | 65 | 10 | `createGameDataLoader` | api/GameDataLoader.js |
 | 63 | 13 | `findMinimalCycles` | map/polygonFinder.js |
 | 61 | 6 | `createGraphElements` | map/graphBuilder.js |
+| 57 | 18 | `propagateCircleConnections` | rendering/CirclePropagation.js |
 | 55 | 5 | `initializeGame` | core/GameInitializer.js |
 | 55 | 10 | `findPolygons` | map/polygonFinder.js |
 | 52 | 2 | `createPromoPopupContent` | polygons/PolygonPromo.js |
@@ -503,37 +506,36 @@ root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 
 | Complexity | Lines | Function | File |
 |-----------:|------:|----------|------|
-| 24 | 169 | `generateMarkdownReport` | TOOLS/report-generator.js |
+| 24 | 157 | `generateMarkdownReport` | TOOLS/markdown-generator.js |
 | 19 | 71 | `moveSelection` | components/KeyboardNavigation.js |
 | 19 | 113 | `initializeRender` | rendering/RenderInitializer.js |
 | 18 | 27 | `getDirection` | components/KeyboardNavigation.js |
+| 18 | 57 | `propagateCircleConnections` | rendering/CirclePropagation.js |
 | 18 | 91 | `createPolygonVisualsUpdater` | rendering/PolygonVisuals.js |
-| 17 | 68 | `propagateNeighborUpdates` | rendering/CirclePropagation.js |
 | 17 | 75 | `updatePolygonVisuals` | rendering/PolygonVisuals.js |
 | 16 | 49 | `bind` | components/KeyboardNavigation.js |
 | 16 | 68 | `applyCollectedState` | rendering/RenderFinalizer.js |
+| 15 | 39 | `updateAllCircleSaturation` | rendering/CirclePropagation.js |
 | 15 | 40 | `getElementStatus` | ui/DebugStatsBuilder.js |
 | 15 | 125 | `generateMap` | map/index.js |
 | 15 | 87 | `applyModeFiltering` | map/modeFilter.js |
 | 14 | 98 | `main` | TOOLS/analyze_calls.js |
 | 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
 | 13 | 24 | `showError` | ui/ErrorDisplay.js |
-| 13 | 140 | `initPosterGrid` | rendering/PosterRenderer.js |
+| 13 | 39 | `updateEndpointPolygonIds` | rendering/CirclePropagation.js |
 | 13 | 47 | `highlightPolygon` | ui/DebugHighlighter.js |
 | 13 | 63 | `findMinimalCycles` | map/polygonFinder.js |
 | 12 | 76 | `updateDebugBoxIntersections` | debug/IntersectionDebug.js |
-| 12 | 46 | `updateEndpointPolygonIds` | rendering/CirclePropagation.js |
 | 12 | 95 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 12 | 100 | `renderPolygons` | rendering/PolygonRenderer.js |
 | 11 | 38 | `runUpdate` | AUTOUPDATE_WEBHOOK_FROM_GITHUB/webhook.js |
 | 11 | 42 | `restoreState` | api/GameDataLoader.js |
 | 11 | 91 | `renderBlueCircles` | rendering/BlueCircleRenderer.js |
-| 11 | 46 | `recalculateBlueCircleStats` | rendering/CirclePropagation.js |
+| 11 | 67 | `initPosterGrid` | rendering/PosterRenderer.js |
 | 11 | 37 | `highlightWhiteLine` | ui/DebugHighlighter.js |
 | 11 | 66 | `calculateLabelPosition` | utils/geometry.js |
 | 10 | 39 | `handleRegister` | A_home_page/login.js |
 | 10 | 26 | `parseArgs` | TOOLS/cli-handler.js |
 | 10 | 65 | `createGameDataLoader` | api/GameDataLoader.js |
-| 10 | 32 | `rebuildConnectionsFromWhiteLines` | rendering/CirclePropagation.js |
 | 10 | 41 | `enrichBlueCircles` | map/connectionCalculator.js |
 | 10 | 55 | `findPolygons` | map/polygonFinder.js |

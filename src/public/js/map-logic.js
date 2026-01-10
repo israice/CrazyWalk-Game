@@ -9,6 +9,7 @@ import { showError } from './modules/ui/ErrorDisplay.js';
 import { initTopBarEvents } from './modules/ui/TopBarHandler.js';
 import { resetSelection, addToSelection, getSelectedLayers, clearSelection } from './modules/ui/DebugMode.js';
 import { loadVersionBadge } from './modules/ui/VersionBadge.js';
+import { TopBar } from './components/TopBar.js';
 
 // Phase 3: State Management
 import { gameState, resetGameState, getCurrentPosition, setCurrentPosition, isCircleCollected, collectCircle, isCircleExpanded, markCircleExpanded } from './modules/state/GameState.js';
@@ -240,24 +241,21 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDebugModeToggle({ gameState, posterRenderer });
 
     // Load Top Bar
-    fetch(`/B_map_page/components/top_bar.html?v=${Date.now()}`)
-        .then(response => response.text())
-        .then(html => {
-            document.getElementById('top-bar-container').innerHTML = html;
+    // Load Top Bar (New Component)
+    const topBar = new TopBar();
+    document.getElementById('top-bar-container').innerHTML = topBar.render();
 
-            initTopBarEvents({
-                onDebugToggle: (isActive) => { gameState.isDebugActive = isActive; },
-                onPostersToggle: (isActive) => {
-                    gameState.isPostersDebugActive = isActive;
-                    posterRenderer.updatePostersVisibility();
-                },
-                updateDebugBoxIntersections: () => updateDebugBoxIntersections(polygonState, lineLayerMap),
-                resetWhiteLineColors: () => resetWhiteLineColors(lineLayerMap),
-                resetSelection,
-                map
-            });
-        })
-        .catch(err => console.error('Error loading top bar:', err));
+    initTopBarEvents({
+        onDebugToggle: (isActive) => { gameState.isDebugActive = isActive; },
+        onPostersToggle: (isActive) => {
+            gameState.isPostersDebugActive = isActive;
+            posterRenderer.updatePostersVisibility();
+        },
+        updateDebugBoxIntersections: () => updateDebugBoxIntersections(polygonState, lineLayerMap),
+        resetWhiteLineColors: () => resetWhiteLineColors(lineLayerMap),
+        resetSelection,
+        map
+    });
 
     // Initialize event handlers
     setupMovementHandlers({
