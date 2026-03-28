@@ -244,7 +244,7 @@ Generated on: 2026-01-10T07:01:24.222Z
 ### utils/geometry.js
 - 📦 `crypto` → `crypto`
 
-### tools/analyze_calls.js
+### TOOLS/analyze_calls.js
 - 📦 `fs` → `fs`
 - 📦 `path` → `path`
 - 📦 `./parsers` → `analyzeJsContent`, `extractImports`, `PATTERNS`
@@ -258,21 +258,21 @@ Generated on: 2026-01-10T07:01:24.222Z
 - 📦 `crypto` → `crypto`
 - 📦 `child_process` → `exec`
 
-### tools/call-graph.js
+### TOOLS/call-graph.js
 - 📦 `path` → `path`
 
-### tools/file-scanner.js
+### TOOLS/file-scanner.js
 - 📦 `fs` → `fs`
 - 📦 `path` → `path`
 
-### tools/markdown-generator.js
+### TOOLS/markdown-generator.js
 - 📦 `path` → `path`
 
-### tools/parsers.js
+### TOOLS/parsers.js
 - 🔷 `module` → `a`, `b`
 - 🔷 `module` → `name`
 
-### tools/report-generator.js
+### TOOLS/report-generator.js
 - 📦 `./markdown-generator` → `generateMarkdownReport`, `printTreeBuffer`
 - 📦 `./json-generator` → `generateJsonReport`
 
@@ -457,7 +457,7 @@ root: handleLogin [src/public/js/pages/login.js] (38 lines) [C:7]
 ---
 root: retryStrategy [src/services/redis.js] (5 lines) [C:2]
 ---
-root: def [tools/markdown-generator.js] (2 lines) [C:1]
+root: def [TOOLS/markdown-generator.js] (2 lines) [C:1]
 ---
 
 ## Potentially Unused Functions
@@ -465,8 +465,8 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 > These functions are defined but not called within the analyzed files. Verify if they are used dynamically or in external systems before deleting.
 
 - `shutdown` (7 lines) [C:2] ([server.js](file://c:\0_PROJECTS\CrazyWalk-Game\server.js))
-- `runUpdate` (38 lines) [C:11] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\tools\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
-- `requestHandler` (29 lines) [C:3] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\tools\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
+- `runUpdate` (38 lines) [C:11] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
+- `requestHandler` (29 lines) [C:3] ([webhook.js](file://c:\0_PROJECTS\CrazyWalk-Game\TOOLS\AUTOUPDATE_WEBHOOK_FROM_GITHUB\webhook.js))
 
 ## Large Functions (50+ lines)
 > [!NOTE]
@@ -474,10 +474,10 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 
 | Lines | Complexity | Function | File |
 |------:|-----------:|----------|------|
-| 157 | 24 | `generateMarkdownReport` | tools/markdown-generator.js |
+| 157 | 24 | `generateMarkdownReport` | TOOLS/markdown-generator.js |
 | 101 | 7 | `finalizeRender` | rendering/RenderFinalizer.js |
 | 100 | 12 | `renderPolygons` | rendering/PolygonRenderer.js |
-| 98 | 14 | `main` | tools/analyze_calls.js |
+| 98 | 14 | `main` | TOOLS/analyze_calls.js |
 | 95 | 12 | `renderGreenCircles` | rendering/GreenCircleRenderer.js |
 | 95 | 14 | `createPosterGrid` | map/posterGridCreator.js |
 | 94 | 4 | `processRegion` | map/regionProcessor.js |
@@ -494,7 +494,7 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | 68 | 16 | `applyCollectedState` | rendering/RenderFinalizer.js |
 | 67 | 11 | `initPosterGrid` | rendering/PosterRenderer.js |
 | 67 | 5 | `initializeRender` | rendering/RenderInitializer.js |
-| 67 | 6 | `generateJsonReport` | tools/json-generator.js |
+| 67 | 6 | `generateJsonReport` | TOOLS/json-generator.js |
 | 66 | 7 | `createPercentageLabel` | polygons/PolygonLabel.js |
 | 66 | 11 | `calculateLabelPosition` | utils/geometry.js |
 | 65 | 10 | `createGameDataLoader` | api/GameDataLoader.js |
@@ -512,7 +512,7 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 
 | Complexity | Lines | Function | File |
 |-----------:|------:|----------|------|
-| 24 | 157 | `generateMarkdownReport` | tools/markdown-generator.js |
+| 24 | 157 | `generateMarkdownReport` | TOOLS/markdown-generator.js |
 | 19 | 71 | `moveSelection` | map/KeyboardNavigation.js |
 | 18 | 27 | `getDirection` | map/KeyboardNavigation.js |
 | 18 | 57 | `propagateCircleConnections` | rendering/CirclePropagation.js |
@@ -524,7 +524,7 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | 15 | 40 | `getElementStatus` | ui/DebugStatsBuilder.js |
 | 15 | 87 | `applyModeFiltering` | map/modeFilter.js |
 | 14 | 95 | `createPosterGrid` | map/posterGridCreator.js |
-| 14 | 98 | `main` | tools/analyze_calls.js |
+| 14 | 98 | `main` | TOOLS/analyze_calls.js |
 | 13 | 24 | `showError` | ui/ErrorDisplay.js |
 | 13 | 39 | `updateEndpointPolygonIds` | rendering/CirclePropagation.js |
 | 13 | 47 | `highlightPolygon` | ui/DebugHighlighter.js |
@@ -543,4 +543,4 @@ root: def [tools/markdown-generator.js] (2 lines) [C:1]
 | 10 | 39 | `handleRegister` | pages/login.js |
 | 10 | 41 | `enrichBlueCircles` | map/connectionCalculator.js |
 | 10 | 55 | `findPolygons` | map/polygonFinder.js |
-| 10 | 26 | `parseArgs` | tools/cli-handler.js |
+| 10 | 26 | `parseArgs` | TOOLS/cli-handler.js |

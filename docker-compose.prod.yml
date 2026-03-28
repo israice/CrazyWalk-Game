@@ -16,7 +16,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: tools/backend/Dockerfile
+      dockerfile: TOOLS/backend/Dockerfile
     container_name: crazywalk-backend
     restart: always
     ports:
@@ -35,7 +35,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: tools/frontend/Dockerfile
+      dockerfile: TOOLS/frontend/Dockerfile
     container_name: crazywalk-frontend
     restart: always
     ports:
@@ -49,7 +49,7 @@ services:
   webhook:
     build:
       context: .
-      dockerfile: tools/AUTOUPDATE_WEBHOOK_FROM_GITHUB/Dockerfile
+      dockerfile: TOOLS/AUTOUPDATE_WEBHOOK_FROM_GITHUB/Dockerfile
     container_name: crazywalk-webhook-update
     restart: always
     ports:

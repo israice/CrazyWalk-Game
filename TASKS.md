@@ -1,0 +1,13 @@
+
+- ### Next Tasks
+- prod docker must to be fixed
+- when teleporting back to last location i do see good greens saved but all circles unhiden!!!
+- fix space between icons
+- must fix micro polygons on map
+- fixed layers view of polygon items
+- deleted all lines that not have red line
+- show white lines instead red lines
+- need more green circles
+- fixed space between icons
+- fix when left marker is gif left when right marker is gif right
+- move default location to .env
